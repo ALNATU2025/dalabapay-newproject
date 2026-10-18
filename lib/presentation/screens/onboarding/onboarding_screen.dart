@@ -15,12 +15,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
 
+  // Slide images live in assets/images/ (listed in pubspec.yaml).
   // Slide 1 follows the design. Slides 2 and 3 keep the design's layout but
   // describe features the app really has (the design's POS and Mastercard
   // slides advertise services with no backend yet).
   final List<OnboardingData> _onboardingData = [
     OnboardingData(
-      image: DPAssets.onboarding1,
+      image: 'assets/images/onboarding_1.png',
       icon: DPIcons.wallet,
       eyebrow: '',
       title: 'Manage Your\nWallet & Pay Bills',
@@ -28,7 +29,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'Top up your wallet, pay bills, buy airtime, data and more — all in one place.',
     ),
     OnboardingData(
-      image: DPAssets.onboarding2,
+      image: 'assets/images/onboarding_2.png',
       icon: DPIcons.bolt,
       eyebrow: '',
       title: 'Instant Payments,\n24/7',
@@ -36,7 +37,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'No queue, no stress. Airtime, data, TV and electricity delivered in seconds — any time of day.',
     ),
     OnboardingData(
-      image: DPAssets.onboarding3,
+      image: 'assets/images/onboarding_3.png',
       icon: DPIcons.sparkle,
       eyebrow: '',
       title: 'Earn As\nYou Pay',
