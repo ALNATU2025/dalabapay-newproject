@@ -1,9 +1,15 @@
 // lib/presentation/screens/admin/vtpass_settings_dashboard.dart
-// VTpass Settings — UI only. Provider balance, environment, health,
-// service switches, maintenance and alerts.
+// Provider Settings: bill-provider balance and environment
+// (GET /api/admin/provider), health check and credential test, service
+// switches, maintenance mode and low-balance alerts (PATCH /api/admin/settings).
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class VtpassSettingsDashboard extends StatefulWidget {
@@ -15,29 +21,24 @@ class VtpassSettingsDashboard extends StatefulWidget {
 }
 
 class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
-  bool _live = true;
-  bool _maintenance = false;
-  bool _lowBalanceAlerts = true;
+  Map<String, dynamic> _settings = {};
+  Map<String, dynamic> _provider = {};
+  bool _loading = true;
+  Object? _error;
   bool _checking = false;
   bool _testing = false;
-  String _health = 'Server is healthy';
-  DateTime _lastChecked = DateTime.now();
-  final _message = TextEditingController(
-    text: 'We\'re doing quick maintenance. Please try again shortly.',
-  );
-  final Map<String, bool> _services = {
-    'Airtime': true,
-    'Data': true,
-    'Electricity': true,
-    'Cable TV': true,
-    'Education': true,
-    'Insurance': false,
-    'International Airtime': true,
-    'Money Transfer': true,
-  };
+  bool _saving = false;
+  Map<String, dynamic>? _health;
+  final _message = TextEditingController();
 
-  static const double _balance = 186450.75;
-  static const double _lowThreshold = 50000;
+  bool get _canWrite => adminCan('settings:write');
+  bool get _canManageProvider => adminCan('provider:manage');
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -45,261 +46,405 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
     super.dispose();
   }
 
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait([
+        api.get('/api/admin/settings'),
+        api.get('/api/admin/provider'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _settings = asMap(results[0]);
+        _provider = asMap(results[1]);
+        _message.text = str(_settings['maintenanceMessage']);
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  Future<void> _patch(Map<String, dynamic> body, {String? done}) async {
+    if (!_canWrite) {
+      dpSnack(context, 'Your role can\'t change settings.', error: true);
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final s = asMap(await api.patch('/api/admin/settings', body));
+      if (!mounted) return;
+      setState(() {
+        _settings = s;
+        _saving = false;
+      });
+      if (done != null) dpSnack(context, done, success: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
   Future<void> _checkHealth() async {
     setState(() => _checking = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() {
-      _checking = false;
-      _health = 'Server is healthy';
-      _lastChecked = DateTime.now();
-    });
+    try {
+      final h = asMap(await api.post('/api/admin/provider/health'));
+      if (!mounted) return;
+      setState(() {
+        _health = h;
+        _checking = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _checking = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   Future<void> _testCredentials() async {
     setState(() => _testing = true);
-    await Future.delayed(const Duration(milliseconds: 1100));
+    Map<String, dynamic> r;
+    try {
+      r = asMap(await api.post('/api/admin/provider/test'));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _testing = false);
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
     if (!mounted) return;
     setState(() => _testing = false);
+    final ok = r['ok'] == true;
     dpDialog(
       context,
-      title: 'Test completed',
-      message:
-          'Credentials are valid for ${_live ? 'Live' : 'Sandbox'} mode. Response time 412 ms.',
+      title: ok ? 'Test completed' : 'Test failed',
+      message: str(r['message'], ok ? 'Credentials are valid.' : 'The provider rejected the credentials.'),
       confirmLabel: 'Close',
+      tone: ok ? DPTone.success : DPTone.error,
     );
   }
+
+  String _cap(String v) => v.isEmpty ? v : v[0].toUpperCase() + v.substring(1);
 
   String _time(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}:${d.second.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
-    final low = _balance < _lowThreshold;
+    if (_loading) {
+      return const AdminScaffold(
+        title: 'Provider Settings',
+        breadcrumb: 'Admin / Provider Settings',
+        body: DPLoading(),
+      );
+    }
+    if (_error != null && _settings.isEmpty) {
+      return AdminScaffold(
+        title: 'Provider Settings',
+        breadcrumb: 'Admin / Provider Settings',
+        body: DPLoadError(error: _error, onRetry: _load),
+      );
+    }
+    final bill = asMap(_provider['bill']);
+    final providerName = str(bill['name'], 'none');
+    final env = str(bill['environment'], providerName);
+    final configured = bill['configured'] == true;
+    final live = env == 'live';
+    final balance = _provider['balance'] == null ? null : toDouble(_provider['balance']);
+    final low = _provider['lowBalance'] == true;
+    final threshold = toDouble(_provider['lowBalanceThreshold']);
+    final services = asMap(_settings['services']);
+    final labels = asMap(_settings['serviceLabels']);
+    final maintenance = _settings['maintenance'] == true;
+    final lowAlerts = _settings['lowBalanceAlerts'] == true;
+    final healthy = _health == null ? null : _health!['ok'] == true;
+
     return AdminScaffold(
-      title: 'VTpass Settings',
-      breadcrumb: 'Admin / VTpass Settings',
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: DP.navyGradient,
-              borderRadius: BorderRadius.circular(DP.rXl),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
+      title: 'Provider Settings',
+      breadcrumb: 'Admin / Provider Settings',
+      body: RefreshIndicator(
+        color: DP.green,
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: DP.navyGradient,
+                borderRadius: BorderRadius.circular(DP.rXl),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '${providerName == 'none' ? 'Bill provider' : providerName.toUpperCase()} Balance',
+                        style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
+                      ),
+                      const Spacer(),
+                      StatusPill(
+                        !configured
+                            ? 'Not connected'
+                            : (live ? 'Live Mode' : '${_cap(env)} Mode'),
+                        color: live ? const Color(0xFF7FE3BC) : DP.amberBg,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (balance != null)
+                    DPCountUp(
+                      value: balance,
+                      format: (v) => DP.naira(v),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    )
+                  else
                     const Text(
-                      'VTpass Balance',
-                      style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
-                    ),
-                    const Spacer(),
-                    StatusPill(
-                      _live ? 'Live Mode' : 'Sandbox Mode',
-                      color: _live ? const Color(0xFF7FE3BC) : DP.amberBg,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                DPCountUp(
-                  value: _balance,
-                  format: (v) => DP.naira(v),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                DPButton(
-                  label: 'Add Funds to VTpass',
-                  leadingIcon: DPIcons.plus,
-                  height: 44,
-                  background: DP.greenBright,
-                  onPressed: () => dpSnack(
-                    context,
-                    'Funding VTpass isn\'t set up in this UI build',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (low) ...[
-            const SizedBox(height: 12),
-            const DPBanner(
-              'VTpass wallet balance is low',
-              tone: DPTone.warning,
-              icon: DPIcons.alert,
-            ),
-          ],
-          const SizedBox(height: 20),
-          const DPSectionHeader('Environment'),
-          DPSegmented(
-            options: const ['Sandbox Mode', 'Live Mode'],
-            index: _live ? 1 : 0,
-            onChanged: (i) async {
-              if (i == 1 && !_live) {
-                final ok = await dpDialog(
-                  context,
-                  title: 'Switch to Live?',
-                  message: 'Real payments will be processed with VTpass.',
-                  confirmLabel: 'Go Live',
-                  cancelLabel: 'Cancel',
-                  tone: DPTone.warning,
-                );
-                if (ok != true) return;
-              }
-              setState(() => _live = i == 1);
-            },
-          ),
-          const SizedBox(height: 20),
-          const DPSectionHeader('Server Health'),
-          DPCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.dns_outlined, color: DP.green),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(_health, style: DP.bodyStrong)),
-                    StatusPill(_checking ? 'Checking...' : 'Healthy'),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                DPSummaryRow('Last Checked', _time(_lastChecked)),
-                const DPSummaryRow('Uptime', '99.97%'),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DPOutlineButton(
-                        label: _checking ? 'Checking...' : 'Check Health',
-                        icon: DPIcons.refresh,
-                        height: 46,
-                        onPressed: _checking ? null : _checkHealth,
+                      'Not available',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DPOutlineButton(
-                        label: _testing ? 'Testing...' : 'Test Credentials',
-                        icon: DPIcons.key,
-                        color: DP.navyIcon,
-                        height: 46,
-                        onPressed: _testing ? null : _testCredentials,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          const DPSectionHeader('Service Controls'),
-          Text('Enable or disable individual services',
-              style: DP.caption),
-          const SizedBox(height: 10),
-          DPCard(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Column(
-              children: [
-                for (final e in _services.entries) ...[
-                  if (e.key != _services.keys.first)
-                    Divider(height: 1, color: DP.borderSoft),
-                  DPMenuRow(
-                    icon: _iconFor(e.key),
-                    title: e.key,
-                    subtitle: e.value ? 'Active' : 'Disabled for all users',
-                    trailing: Switch(
-                      value: e.value,
-                      onChanged: (v) => setState(() => _services[e.key] = v),
-                    ),
+                  const SizedBox(height: 10),
+                  Text(
+                    configured
+                        ? 'Top up the provider wallet from the provider\'s own dashboard.'
+                        : 'No bill provider is connected. Set BILL_PROVIDER and its keys on the server.',
+                    style: const TextStyle(color: Color(0xFF7FE3BC), fontSize: 12.5),
                   ),
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          const DPSectionHeader('Maintenance Control'),
-          DPCard(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                DPMenuRow(
-                  icon: Icons.construction_rounded,
-                  title: 'Maintenance Mode',
-                  subtitle: _maintenance
-                      ? 'All VTpass services are paused'
-                      : 'Services running normally',
-                  color: _maintenance ? DP.red : null,
-                  trailing: Switch(
-                    value: _maintenance,
-                    onChanged: (v) => setState(() => _maintenance = v),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                DPField(
-                  controller: _message,
-                  hint: 'Update maintenance message...',
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 10),
-                DPButton.mint(
-                  label: 'Update',
-                  height: 44,
-                  onPressed: () =>
-                      dpSnack(context, 'Maintenance message updated',
-                          success: true),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          const DPSectionHeader('Low Balance Alerts'),
-          DPCard(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: DPMenuRow(
-              icon: DPIcons.bell,
-              title: 'Low Balance Alert',
-              subtitle: 'Notify admins below ${DP.naira(_lowThreshold, decimals: false)}',
-              trailing: Switch(
-                value: _lowBalanceAlerts,
-                onChanged: (v) => setState(() => _lowBalanceAlerts = v),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-          const DPSectionHeader('Documentation & Info'),
-          DPCard(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: DPMenuRow(
-              icon: Icons.menu_book_outlined,
-              title: 'Open Documentation',
-              subtitle: 'Access VTpass API documentation',
-              onTap: () =>
-                  dpSnack(context, 'Links aren\'t set up in this UI build'),
-              trailing: Icon(DPIcons.chevronRight, color: DP.muted),
+            if (low) ...[
+              const SizedBox(height: 12),
+              const DPBanner(
+                'Provider wallet balance is low',
+                tone: DPTone.warning,
+                icon: DPIcons.alert,
+              ),
+            ],
+            const SizedBox(height: 20),
+            const DPSectionHeader('Environment'),
+            DPCard(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Column(
+                children: [
+                  DPSummaryRow('Bill provider', providerName),
+                  DPSummaryRow('Mode', env),
+                  DPSummaryRow('Payment provider', str(asMap(_provider['payment'])['name'], 'none')),
+                ],
+              ),
             ),
-          ),
-        ],
+            const DPHelper('The provider and live/sandbox mode are set in the server\'s environment, so they can\'t be switched by accident from the app.'),
+            const SizedBox(height: 20),
+            const DPSectionHeader('Server Health'),
+            DPCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.dns_outlined,
+                          color: healthy == false ? DP.red : DP.green),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _health == null
+                              ? 'Not checked yet'
+                              : str(_health!['message'], healthy! ? 'Server is healthy' : 'Server problem'),
+                          style: DP.bodyStrong,
+                        ),
+                      ),
+                      StatusPill(_checking
+                          ? 'Checking...'
+                          : (healthy == null ? 'Unknown' : (healthy ? 'Healthy' : 'Failed'))),
+                    ],
+                  ),
+                  if (_health != null) ...[
+                    const SizedBox(height: 10),
+                    DPSummaryRow('Last Checked', _time(parseDate(_health!['checkedAt']))),
+                    DPSummaryRow('Response time', '${toInt(_health!['latencyMs'])} ms'),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DPOutlineButton(
+                          label: _checking ? 'Checking...' : 'Check Health',
+                          icon: DPIcons.refresh,
+                          height: 46,
+                          onPressed: _checking || !_canManageProvider ? null : _checkHealth,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DPOutlineButton(
+                          label: _testing ? 'Testing...' : 'Test Credentials',
+                          icon: DPIcons.key,
+                          color: DP.navyIcon,
+                          height: 46,
+                          onPressed: _testing || !_canManageProvider ? null : _testCredentials,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            const DPSectionHeader('Service Controls'),
+            Text('Enable or disable individual services', style: DP.caption),
+            if (_saving) const LinearProgressIndicator(color: DP.green),
+            const SizedBox(height: 10),
+            DPCard(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Column(
+                children: [
+                  for (final e in services.entries) ...[
+                    if (e.key != services.keys.first)
+                      Divider(height: 1, color: DP.borderSoft),
+                    DPMenuRow(
+                      icon: _iconFor(e.key),
+                      title: str(labels[e.key], e.key),
+                      subtitle: e.value == true ? 'Active' : 'Disabled for all users',
+                      trailing: Switch(
+                        value: e.value == true,
+                        onChanged: _saving || !_canWrite
+                            ? null
+                            : (v) => _patch({
+                                  'services': {e.key: v},
+                                }, done: '${str(labels[e.key], e.key)} ${v ? 'enabled' : 'disabled'}'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            const DPSectionHeader('Maintenance Control'),
+            DPCard(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DPMenuRow(
+                    icon: Icons.construction_rounded,
+                    title: 'Maintenance Mode',
+                    subtitle: maintenance
+                        ? 'All bill payments are paused'
+                        : 'Services running normally',
+                    color: maintenance ? DP.red : null,
+                    trailing: Switch(
+                      value: maintenance,
+                      onChanged: _saving || !_canWrite
+                          ? null
+                          : (v) async {
+                              if (v) {
+                                final ok = await dpDialog(
+                                  context,
+                                  title: 'Pause all payments?',
+                                  message: 'Customers won\'t be able to buy anything until you turn this off.',
+                                  confirmLabel: 'Turn on',
+                                  cancelLabel: 'Cancel',
+                                  tone: DPTone.warning,
+                                );
+                                if (ok != true) return;
+                              }
+                              _patch({'maintenance': v},
+                                  done: v ? 'Maintenance mode on' : 'Maintenance mode off');
+                            },
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  DPField(
+                    controller: _message,
+                    hint: 'Update maintenance message...',
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 10),
+                  DPButton.mint(
+                    label: 'Update',
+                    height: 44,
+                    onPressed: _saving || !_canWrite
+                        ? null
+                        : () {
+                            if (_message.text.trim().length < 3) {
+                              dpSnack(context, 'Enter a short message', error: true);
+                              return;
+                            }
+                            _patch({'maintenanceMessage': _message.text.trim()},
+                                done: 'Maintenance message updated');
+                          },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            const DPSectionHeader('Low Balance Alerts'),
+            DPCard(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: DPMenuRow(
+                icon: DPIcons.bell,
+                title: 'Low Balance Alert',
+                subtitle: 'Notify admins below ${DP.naira(threshold, decimals: false)}',
+                trailing: Switch(
+                  value: lowAlerts,
+                  onChanged: _saving || !_canWrite
+                      ? null
+                      : (v) => _patch({'lowBalanceAlerts': v}),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const DPSectionHeader('Documentation & Info'),
+            DPCard(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: DPMenuRow(
+                icon: Icons.menu_book_outlined,
+                title: 'Open Documentation',
+                subtitle: 'VTpass API documentation',
+                onTap: () async {
+                  var opened = false;
+                  try {
+                    opened = await launchUrl(
+                      Uri.parse('https://www.vtpass.com/documentation/'),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  } catch (_) {}
+                  if (!opened && context.mounted) {
+                    dpSnack(context, 'Open www.vtpass.com/documentation in your browser');
+                  }
+                },
+                trailing: Icon(DPIcons.chevronRight, color: DP.muted),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   IconData _iconFor(String s) => switch (s) {
-        'Airtime' => DPIcons.smartphone,
-        'Data' => DPIcons.wifi,
-        'Electricity' => DPIcons.bolt,
-        'Cable TV' => DPIcons.tv,
-        'Education' => DPIcons.school,
-        'Insurance' => DPIcons.shield,
-        'International Airtime' => DPIcons.globe,
+        'airtime' => DPIcons.smartphone,
+        'data' => DPIcons.wifi,
+        'electricity' => DPIcons.bolt,
+        'cable' => DPIcons.tv,
+        'education' => DPIcons.school,
+        'insurance' => DPIcons.shield,
+        'international' => DPIcons.globe,
         _ => DPIcons.upRight,
       };
 }

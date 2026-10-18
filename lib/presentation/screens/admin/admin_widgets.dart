@@ -1,5 +1,5 @@
 // lib/presentation/screens/admin/admin_widgets.dart
-// Shared building blocks for the admin console (UI only).
+// Shared building blocks for the admin console.
 import 'package:flutter/material.dart';
 
 import '../../../ui/ui.dart';

@@ -1,10 +1,14 @@
 // lib/presentation/screens/admin/admin_verify_payment_page.dart
-// Verify Payments — UI only. Check a reference or credit a user manually.
-// Sample rule: references ending 0–3 verify, 4–6 are pending, others fail.
+// Verify Payments: check a top-up by reference with the payment provider
+// (POST /api/admin/payments/verify) or credit a user manually when a
+// transfer arrived but wasn't matched (POST /api/admin/payments/manual).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminVerifyPaymentPage extends StatefulWidget {
@@ -26,15 +30,33 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
   final _userId = TextEditingController();
   final _amount = TextEditingController();
   final _desc = TextEditingController();
+  final _bankRef = TextEditingController();
   bool _advanced = false;
   bool _busy = false;
-  int _verifiedToday = 14;
-  double _amountToday = 412500;
+  int _verifiedToday = 0;
+  double _amountToday = 0;
   final List<_LogLine> _log = [];
 
   @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final r = asMap(await api.get('/api/admin/payments/verify/stats'));
+      if (!mounted) return;
+      setState(() {
+        _verifiedToday = toInt(r['verifiedToday']);
+        _amountToday = toDouble(r['amountToday']);
+      });
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
-    for (final c in [_ref, _userId, _amount, _desc]) {
+    for (final c in [_ref, _userId, _amount, _desc, _bankRef]) {
       c.dispose();
     }
     super.dispose();
@@ -54,32 +76,42 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
     FocusScope.of(context).unfocus();
     setState(() => _busy = true);
     _add('START', 'Verifying $r');
-    await Future.delayed(const Duration(milliseconds: 400));
-    _add('INFO', 'Validating reference format...');
-    await Future.delayed(const Duration(milliseconds: 500));
-    _add('INFO', 'Verifying with payment service...');
-    await Future.delayed(const Duration(milliseconds: 600));
+    _add('INFO', 'Checking with the payment service...');
+    Map<String, dynamic> res;
+    try {
+      res = asMap(await api.post('/api/admin/payments/verify', {'reference': r}));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _add('FAILURE', errorMessage(e));
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
     if (!mounted) return;
-    final last = int.tryParse(r.substring(r.length - 1)) ?? 9;
     setState(() => _busy = false);
-    if (last <= 3) {
-      _add('SUCCESS', '$r verified · ₦25,000.00 credited to Chidi Eze');
-      setState(() {
-        _verifiedToday++;
-        _amountToday += 25000;
-      });
-      _result('Verified', 'Payment verified and wallet credited.', r, true);
-    } else if (last <= 6) {
+    final status = str(res['status']);
+    final txn = res['transaction'] is Map ? asMap(res['transaction']) : null;
+    final user = str(asMap(txn?['user'])['fullName'], 'the user');
+    final amount = DP.naira(toDouble(txn?['amount']));
+    if (status == 'success') {
+      _add('SUCCESS', '$r verified · $amount for $user');
+      _loadStats();
+      _result('Verified', 'Payment verified and wallet credited.', r, true, txn);
+    } else if (status == 'pending') {
       _add('WARNING', '$r is still pending with the bank');
-      _result('Pending', 'The bank hasn\'t confirmed this payment yet.', r, false);
-    } else {
+      _result('Pending', 'The bank hasn\'t confirmed this payment yet.', r, false, txn);
+    } else if (status == 'not_found') {
       _add('FAILURE', 'No Transaction Found for $r');
       _result('No Transaction Found', 'Check the reference and try again.', r,
-          false);
+          false, null);
+    } else {
+      _add('WARNING', '$r is ${statusLabel(status).toLowerCase()}');
+      _result(statusLabel(status), 'This top-up was not completed.', r, false, txn);
     }
   }
 
-  void _result(String title, String msg, String ref, bool ok) {
+  void _result(String title, String msg, String ref, bool ok,
+      Map<String, dynamic>? txn) {
     showAdminSheet(
       context,
       title: 'Transaction Details',
@@ -108,9 +140,11 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
             child: Column(
               children: [
                 DPSummaryRow('Reference', ref),
-                if (title != 'No Transaction Found') ...[
-                  const DPSummaryRow('User', 'Chidi Eze'),
-                  const DPSummaryRow('Amount', '₦25,000.00'),
+                if (txn != null) ...[
+                  DPSummaryRow('User', str(asMap(txn['user'])['fullName'], '—')),
+                  DPSummaryRow('Email', str(asMap(txn['user'])['email'], '—')),
+                  DPSummaryRow('Amount', DP.naira(toDouble(txn['amount']))),
+                  DPSummaryRow('Date', dateTimeLabel(parseDate(txn['createdAt']))),
                   DPSummaryRow('Status', title,
                       valueColor: StatusPill.colorFor(title)),
                 ],
@@ -126,25 +160,46 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
 
   Future<void> _manual() async {
     final a = double.tryParse(_amount.text) ?? 0;
-    if (_userId.text.trim().isEmpty || a <= 0) {
-      dpSnack(context, 'Please enter User ID and Amount', error: true);
+    if (_userId.text.trim().length < 3 || a <= 0) {
+      dpSnack(context, 'Please enter the user and amount', error: true);
       return;
     }
+    final ok = await dpDialog(
+      context,
+      title: 'Credit ${DP.naira(a)}?',
+      message: 'This adds ${DP.naira(a)} to ${_userId.text.trim()}\'s wallet. Only do this once you\'ve confirmed the money arrived.',
+      confirmLabel: 'Credit wallet',
+      cancelLabel: 'Cancel',
+      tone: DPTone.warning,
+    );
+    if (ok != true || !mounted) return;
     setState(() => _busy = true);
     _add('START', 'Processing manual top-up...');
-    await Future.delayed(const Duration(milliseconds: 900));
+    Map<String, dynamic> res;
+    try {
+      res = asMap(await api.post('/api/admin/payments/manual', {
+        'user': _userId.text.trim(),
+        'amount': a,
+        if (_bankRef.text.trim().isNotEmpty) 'reference': _bankRef.text.trim(),
+        if (_desc.text.trim().isNotEmpty) 'description': _desc.text.trim(),
+      }));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _add('FAILURE', errorMessage(e));
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
     if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _verifiedToday++;
-      _amountToday += a;
-    });
-    _add('SUCCESS',
-        'Manual top-up ${DP.naira(a)} → ${_userId.text.trim()}');
+    setState(() => _busy = false);
+    final who = str(asMap(res['user'])['fullName'], _userId.text.trim());
+    _add('SUCCESS', 'Manual top-up ${DP.naira(a)} → $who');
     dpSnack(context, 'Manual top-up of ${DP.naira(a)} done', success: true);
+    _loadStats();
     _userId.clear();
     _amount.clear();
     _desc.clear();
+    _bankRef.clear();
   }
 
   Color _levelColor(String l) => switch (l) {
@@ -200,7 +255,7 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
               onTap: () => setState(() => _advanced = !_advanced),
             ),
           ),
-          if (_advanced) ...[
+          if (_advanced && adminCan('wallet:fund')) ...[
             const SizedBox(height: 10),
             DPCard(
               padding: const EdgeInsets.all(16),
@@ -214,8 +269,8 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
                     style: DP.caption,
                   ),
                   const SizedBox(height: 14),
-                  const DPLabel('User ID'),
-                  DPField(controller: _userId, hint: 'Enter user ID'),
+                  const DPLabel('User (email, phone or ID)'),
+                  DPField(controller: _userId, hint: 'e.g. user@example.com'),
                   const SizedBox(height: 12),
                   const DPLabel('Amount'),
                   DPField(
@@ -224,6 +279,12 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
                     prefixText: '₦  ',
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                  const SizedBox(height: 12),
+                  const DPLabel('Bank reference (recommended)'),
+                  DPField(
+                    controller: _bankRef,
+                    hint: 'Stops the same transfer being credited twice',
                   ),
                   const SizedBox(height: 12),
                   const DPLabel('Description (Optional)'),

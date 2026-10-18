@@ -1,10 +1,16 @@
 // lib/presentation/screens/admin/admin_fund_wallet_page.dart
-// Fund Wallet — UI only. Find a user and credit their wallet.
+// Fund Wallet: find a user (GET /api/admin/users) and credit their wallet
+// as a manual deposit (POST /api/admin/users/:id/wallet).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import '../../widgets/async_view.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminFundWalletPage extends StatefulWidget {
@@ -18,10 +24,60 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
   String _query = '';
   String _filter = 'All';
   static const _filters = ['All', 'Active', 'Low Balance', 'Admins'];
+  static const _filterValues = {
+    'All': 'all',
+    'Active': 'active',
+    'Low Balance': 'low_balance',
+    'Admins': 'admins',
+  };
+
+  List<AdminUser> _users = [];
+  Map<String, dynamic> _totals = {};
+  bool _loading = true;
+  Object? _error;
+  Timer? _debounce;
+  int _req = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final id = ++_req;
+    try {
+      final r = asMap(await api.get('/api/admin/users', query: {
+        'q': _query.trim(),
+        'filter': _filterValues[_filter],
+        'limit': 50,
+      }));
+      if (!mounted || id != _req) return;
+      setState(() {
+        _users = itemsOf(r).map(AdminUser.fromJson).toList();
+        _totals = asMap(r['totals']);
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || id != _req) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
 
   void _fund(AdminUser u) {
     final amount = TextEditingController();
     final note = TextEditingController();
+    var saving = false;
     showAdminSheet(
       context,
       title: 'Fund Wallet',
@@ -75,13 +131,28 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
             const SizedBox(height: 18),
             DPButton(
               label: 'Confirm Funding',
-              onPressed: a <= 0
+              loading: saving,
+              onPressed: a <= 0 || saving
                   ? null
-                  : () {
-                      setState(() => u.balance += a);
-                      Navigator.pop(ctx);
+                  : () async {
+                      setSheet(() => saving = true);
+                      try {
+                        await api.post('/api/admin/users/${u.id}/wallet', {
+                          'action': 'credit',
+                          'amount': a,
+                          'reason': 'Manual Deposit',
+                          if (note.text.trim().isNotEmpty) 'note': note.text.trim(),
+                        });
+                      } catch (e) {
+                        setSheet(() => saving = false);
+                        if (ctx.mounted) dpSnack(ctx, errorMessage(e), error: true);
+                        return;
+                      }
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (!mounted) return;
                       dpSnack(context, 'Funded ${DP.naira(a)} · ${u.name}',
                           success: true);
+                      _load();
                     },
             ),
           ],
@@ -92,28 +163,18 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
 
   @override
   Widget build(BuildContext context) {
-    final q = _query.toLowerCase();
-    final users = kAdminUsers.where((u) {
-      final f = switch (_filter) {
-        'Active' => u.active,
-        'Low Balance' => u.balance < 5000,
-        'Admins' => u.isAdmin,
-        _ => true,
-      };
-      return f &&
-          (q.isEmpty ||
-              u.name.toLowerCase().contains(q) ||
-              u.email.toLowerCase().contains(q) ||
-              u.phone.contains(q));
-    }).toList();
-    final totalWallet = kAdminUsers.fold<double>(0, (a, u) => a + u.balance);
-    final totalCommission =
-        kAdminUsers.fold<double>(0, (a, u) => a + u.commission);
+    final users = _users;
+    final totalWallet = toDouble(_totals['walletBalance']);
+    final totalCommission = toDouble(_totals['commissionBalance']);
 
     return AdminScaffold(
       title: 'Fund Wallet',
       breadcrumb: 'Admin / Fund Wallet',
-      body: ListView(
+      body: RefreshIndicator(
+        color: DP.green,
+        onRefresh: _load,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
           AdminStatGrid(
@@ -135,16 +196,27 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
           const SizedBox(height: 16),
           AdminSearch(
             hint: 'Search by name, email or phone...',
-            onChanged: (v) => setState(() => _query = v),
+            onChanged: (v) {
+              _query = v;
+              _debounce?.cancel();
+              _debounce = Timer(const Duration(milliseconds: 400), _load);
+            },
           ),
           const SizedBox(height: 12),
           DPChipScroller(
             options: _filters,
             selected: _filter,
-            onSelect: (f) => setState(() => _filter = f),
+            onSelect: (f) {
+              setState(() => _filter = f);
+              _load();
+            },
           ),
           const SizedBox(height: 14),
-          if (users.isEmpty)
+          if (_loading)
+            const DPLoading()
+          else if (_error != null && users.isEmpty)
+            DPLoadError(error: _error, onRetry: _load)
+          else if (users.isEmpty)
             const DPEmptyState(
               icon: Icons.group_outlined,
               title: 'No Users Found',
@@ -176,6 +248,7 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
               ],
             ),
         ],
+      ),
       ),
     );
   }

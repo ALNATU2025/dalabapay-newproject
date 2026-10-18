@@ -1,9 +1,17 @@
 // lib/presentation/screens/admin/admin_all_transactions_page.dart
-// All Transactions — UI only. Search, filter, sort, details and export.
-import 'package:flutter/material.dart';
+// All Transactions: GET /api/admin/transactions with search, status,
+// service and sort; details; CSV export (GET .../export.csv).
+import 'dart:async';
+import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import '../../widgets/async_view.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminAllTransactionsPage extends StatefulWidget {
@@ -20,34 +28,74 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
   String? _service;
   String _sort = 'Newest';
 
-  static const _statuses = ['All', 'Successful', 'Pending', 'Failed', 'Refunded'];
+  static const _statuses = ['All', 'Successful', 'Pending', 'Failed', 'Refunded', 'Disputed'];
   static const _sorts = ['Newest', 'Oldest', 'Highest Amount', 'Lowest Amount'];
+  static const _sortValues = {
+    'Newest': 'newest',
+    'Oldest': 'oldest',
+    'Highest Amount': 'highest',
+    'Lowest Amount': 'lowest',
+  };
 
-  List<AdminTxn> get _items {
-    final q = _query.toLowerCase();
-    final list = kAdminTxns.where((t) {
-      if (_status != 'All' && t.status != _status) return false;
-      if (_service != null && t.service != _service) return false;
-      return q.isEmpty ||
-          t.userName.toLowerCase().contains(q) ||
-          t.userEmail.toLowerCase().contains(q) ||
-          t.ref.toLowerCase().contains(q) ||
-          t.description.toLowerCase().contains(q);
-    }).toList();
-    switch (_sort) {
-      case 'Oldest':
-        list.sort((a, b) => b.minutesAgo.compareTo(a.minutesAgo));
-        break;
-      case 'Highest Amount':
-        list.sort((a, b) => b.amount.compareTo(a.amount));
-        break;
-      case 'Lowest Amount':
-        list.sort((a, b) => a.amount.compareTo(b.amount));
-        break;
-      default:
-        list.sort((a, b) => a.minutesAgo.compareTo(b.minutesAgo));
+  List<AdminTxn> _items = [];
+  int _total = 0;
+  double _totalAmount = 0;
+  bool _loading = true;
+  bool _hasMore = false;
+  int _page = 1;
+  Object? _error;
+  Timer? _debounce;
+  int _req = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Map<String, dynamic> get _query0 => {
+        'q': _query.trim(),
+        'status': kStatusValues[_status],
+        'service': _service == null ? null : kAdminServiceTypes[_service],
+        'sort': _sortValues[_sort],
+      };
+
+  Future<void> _load({bool more = false}) async {
+    final id = ++_req;
+    if (!more && _items.isEmpty) setState(() => _loading = true);
+    try {
+      final r = asMap(await api.get('/api/admin/transactions',
+          query: {..._query0, 'page': more ? _page + 1 : 1}));
+      if (!mounted || id != _req) return;
+      final list = itemsOf(r).map(AdminTxn.fromJson).toList();
+      setState(() {
+        _items = more ? [..._items, ...list] : list;
+        _page = more ? _page + 1 : 1;
+        _hasMore = r['hasMore'] == true;
+        _total = toInt(r['total']);
+        _totalAmount = toDouble(r['totalAmount']);
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || id != _req) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
     }
-    return list;
+  }
+
+  void _search(String v) {
+    _query = v;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), _load);
   }
 
   void _details(AdminTxn t) {
@@ -79,8 +127,19 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                 DPSummaryRow('Email', t.userEmail),
                 DPSummaryRow('Service', t.service),
                 DPSummaryRow('Description', t.description),
+                if (t.json['recipient'] != null)
+                  DPSummaryRow('Recipient', str(t.json['recipient'])),
                 DPSummaryRow('Type', t.credit ? 'Credit' : 'Debit'),
-                DPSummaryRow('Date', adminAgo(t.minutesAgo)),
+                if (t.fee > 0) DPSummaryRow('Fee', DP.naira(t.fee)),
+                if (toDouble(t.json['commission']) > 0)
+                  DPSummaryRow('User commission', DP.naira(toDouble(t.json['commission']))),
+                if (toDouble(t.json['platformRevenue']) > 0)
+                  DPSummaryRow('Platform revenue', DP.naira(toDouble(t.json['platformRevenue']))),
+                if (t.json['providerReference'] != null)
+                  DPSummaryRow('Provider ref', str(t.json['providerReference'])),
+                if (asMap(t.json['actor'])['fullName'] != null)
+                  DPSummaryRow('Handled by', str(asMap(t.json['actor'])['fullName'])),
+                DPSummaryRow('Date', dateTimeLabel(t.date)),
                 if (t.note != null) DPSummaryRow('Admin Note', t.note!),
               ],
             ),
@@ -92,7 +151,29 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
     );
   }
 
+  Future<void> _exportCsv() async {
+    dpSnack(context, 'Preparing export…');
+    try {
+      final csv = await api.getText('/api/admin/transactions/export.csv',
+          query: _query0);
+      final name = 'dalabapay-transactions-${isoDay(DateTime.now())}.csv';
+      try {
+        await Share.shareXFiles([
+          XFile.fromData(utf8.encode(csv), mimeType: 'text/csv', name: name),
+        ], subject: name);
+      } catch (_) {
+        await Share.share(csv, subject: name);
+      }
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
   void _export() {
+    if (!adminCan('transactions:export')) {
+      dpSnack(context, 'Your role can\'t export transactions.', error: true);
+      return;
+    }
     showAdminSheet(
       context,
       title: 'Export Options',
@@ -100,20 +181,11 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
         children: [
           DPMenuRow(
             icon: Icons.table_chart_outlined,
-            title: 'Export as Excel',
-            subtitle: 'Download in Excel/CSV format',
+            title: 'Export as Excel / CSV',
+            subtitle: 'Uses the filters on this page',
             onTap: () {
               Navigator.pop(ctx);
-              dpSnack(context, 'Export isn\'t set up in this UI build');
-            },
-          ),
-          DPMenuRow(
-            icon: Icons.picture_as_pdf_outlined,
-            title: 'Export as PDF',
-            subtitle: 'Download all as PDF report',
-            onTap: () {
-              Navigator.pop(ctx);
-              dpSnack(context, 'Export isn\'t set up in this UI build');
+              _exportCsv();
             },
           ),
         ],
@@ -124,7 +196,7 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
   @override
   Widget build(BuildContext context) {
     final items = _items;
-    final total = items.fold<double>(0, (a, t) => a + t.amount);
+    final total = _totalAmount;
     return AdminScaffold(
       title: 'All Transactions',
       breadcrumb: 'Admin / Transactions',
@@ -132,20 +204,24 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
         DPTextLink(label: 'Export', onTap: _export),
         const SizedBox(width: 8),
       ],
-      body: ListView(
+      body: RefreshIndicator(
+        color: DP.green,
+        onRefresh: _load,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
           AdminStatGrid(
             stats: [
               AdminStat(
-                label: 'Showing total',
+                label: 'Matching total',
                 value: DP.naira(total, decimals: false),
                 icon: Icons.payments_outlined,
                 color: DP.green,
               ),
               AdminStat(
                 label: 'Transactions',
-                value: '${items.length}',
+                value: '$_total',
                 icon: Icons.receipt_long_outlined,
               ),
             ],
@@ -153,13 +229,16 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
           const SizedBox(height: 16),
           AdminSearch(
             hint: 'Search by name, email, ID, phone...',
-            onChanged: (v) => setState(() => _query = v),
+            onChanged: _search,
           ),
           const SizedBox(height: 12),
           DPChipScroller(
             options: _statuses,
             selected: _status,
-            onSelect: (s) => setState(() => _status = s),
+            onSelect: (s) {
+              setState(() => _status = s);
+              _load();
+            },
           ),
           const SizedBox(height: 10),
           Row(
@@ -172,12 +251,13 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                     final v = await dpPickFromList<String>(
                       context,
                       title: 'Service',
-                      items: ['All Services', ...kAdminServices, 'Fund Wallet', 'Commission'],
+                      items: ['All Services', ...kAdminServiceTypes.keys],
                       selected: _service ?? 'All Services',
                       labelOf: (x) => x,
                     );
                     if (v != null) {
                       setState(() => _service = v == 'All Services' ? null : v);
+                      _load();
                     }
                   },
                 ),
@@ -197,24 +277,34 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                       selected: _sort,
                       labelOf: (x) => x,
                     );
-                    if (v != null) setState(() => _sort = v);
+                    if (v != null) {
+                      setState(() => _sort = v);
+                      _load();
+                    }
                   },
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          if (items.isEmpty)
+          if (_loading)
+            const DPLoading()
+          else if (_error != null && items.isEmpty)
+            DPLoadError(error: _error, onRetry: _load)
+          else if (items.isEmpty)
             DPEmptyState(
               icon: Icons.receipt_long_outlined,
               title: 'No Transactions Found',
               message: 'Try adjusting your filters or search.',
               actionLabel: 'Clear All Filters',
-              onAction: () => setState(() {
-                _status = 'All';
-                _service = null;
-                _query = '';
-              }),
+              onAction: () {
+                setState(() {
+                  _status = 'All';
+                  _service = null;
+                  _query = '';
+                });
+                _load();
+              },
             )
           else
             AdminListCard(
@@ -232,7 +322,7 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                       background: t.credit ? DP.mint : DP.blueTint,
                     ),
                     title: '${t.userName} · ${t.service}',
-                    subtitle: '${t.description}\n${t.ref} · ${adminAgo(t.minutesAgo)}',
+                    subtitle: '${t.description}\n${t.ref} · ${agoOf(t.date)}',
                     trailing: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -251,7 +341,18 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                   ),
               ],
             ),
+          if (_hasMore)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Center(
+                child: DPTextLink(
+                  label: 'Load more',
+                  onTap: () => _load(more: true),
+                ),
+              ),
+            ),
         ],
+      ),
       ),
     );
   }

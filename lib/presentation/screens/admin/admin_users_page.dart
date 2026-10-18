@@ -1,11 +1,17 @@
 // lib/presentation/screens/admin/admin_users_page.dart
-// Manage Users — UI only. Search, filter, approve, activate, credit/debit.
+// Manage Users: GET /api/admin/users with search and filters; approve,
+// activate/deactivate, credit/debit wallet, edit and history.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 import 'admin_edit_user_page.dart';
-import 'admin_mock.dart';
+import 'admin_models.dart';
 import 'admin_user_history_page.dart';
 import 'admin_widgets.dart';
 
@@ -27,23 +33,76 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     'Awaiting Approval',
   ];
 
-  List<AdminUser> get _users {
-    final q = _query.toLowerCase();
-    return kAdminUsers.where((u) {
-      final f = switch (_filter) {
-        'Active' => u.active,
-        'Inactive' => !u.active,
-        'Admins' => u.isAdmin,
-        'Awaiting Approval' => !u.approved,
-        _ => true,
-      };
-      return f &&
-          (q.isEmpty ||
-              u.name.toLowerCase().contains(q) ||
-              u.email.toLowerCase().contains(q) ||
-              u.phone.contains(q) ||
-              u.id.toLowerCase().contains(q));
-    }).toList();
+  static const _filterValues = {
+    'All Users': 'all',
+    'Active': 'active',
+    'Inactive': 'inactive',
+    'Admins': 'admins',
+    'Awaiting Approval': 'pending',
+  };
+
+  List<AdminUser> _users = [];
+  Map<String, dynamic> _counts = {};
+  bool _loading = true;
+  bool _hasMore = false;
+  int _page = 1;
+  Object? _error;
+  Timer? _debounce;
+  int _req = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool more = false}) async {
+    final id = ++_req;
+    if (!more && _users.isEmpty) setState(() => _loading = true);
+    try {
+      final r = asMap(await api.get('/api/admin/users', query: {
+        'q': _query.trim(),
+        'filter': _filterValues[_filter],
+        'page': more ? _page + 1 : 1,
+      }));
+      if (!mounted || id != _req) return;
+      final items = itemsOf(r).map(AdminUser.fromJson).toList();
+      setState(() {
+        _users = more ? [..._users, ...items] : items;
+        _page = more ? _page + 1 : 1;
+        _hasMore = r['hasMore'] == true;
+        _counts = asMap(r['counts']);
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || id != _req) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  void _search(String v) {
+    _query = v;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), _load);
+  }
+
+  Future<bool> _call(Future<dynamic> Function() f, String done) async {
+    final r = await runWithFeedback(context, () async {
+      await f();
+      return true;
+    }, success: done);
+    if (r == true) _load();
+    return r == true;
   }
 
   void _openUser(AdminUser u) {
@@ -87,20 +146,21 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 DPSummaryRow('Phone', u.phone),
                 DPSummaryRow('Wallet balance', DP.naira(u.balance), strong: true),
                 DPSummaryRow('Commission', DP.naira(u.commission)),
-                DPSummaryRow('Transactions', '${u.transactions}'),
-                DPSummaryRow('Joined', adminAgo(u.joinedDaysAgo * 1440)),
+                DPSummaryRow('KYC', u.kycStatus == 'none' ? 'Not started' : statusLabel(u.kycStatus)),
+                DPSummaryRow('Payment PIN', u.pinLocked ? 'Locked' : (u.pinSet ? 'Set' : 'Not set')),
+                DPSummaryRow('Joined', dateLabel(u.joined)),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          if (!u.approved) ...[
+          if (!u.approved && adminCan('users:approve')) ...[
             DPButton(
               label: 'Approve User',
               icon: DPIcons.checkCircle,
               onPressed: () {
-                setState(() => u.approved = true);
                 Navigator.pop(ctx);
-                dpSnack(context, '${u.name} approved', success: true);
+                _call(() => api.post('/api/admin/users/${u.id}/approve'),
+                    '${u.name} approved');
               },
             ),
             const SizedBox(height: 10),
@@ -118,7 +178,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                       MaterialPageRoute(
                         builder: (_) => AdminEditUserPage(user: u),
                       ),
-                    ).then((_) => setState(() {}));
+                    ).then((_) => _load());
                   },
                 ),
               ),
@@ -141,6 +201,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               ),
             ],
           ),
+          if (adminCan('wallet:fund')) ...[
           const SizedBox(height: 10),
           DPButton.mint(
             label: 'Credit / Debit Wallet',
@@ -150,6 +211,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               _creditDebit(u);
             },
           ),
+          ],
+          if (adminCan('users:write')) ...[
           const SizedBox(height: 10),
           DPOutlineButton(
             label: u.active ? 'Deactivate User' : 'Activate User',
@@ -169,15 +232,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 destructive: u.active,
               );
               if (ok == true && mounted) {
-                setState(() => u.active = !u.active);
-                dpSnack(
-                  context,
-                  u.active ? 'User activated' : 'User deactivated',
-                  success: true,
+                _call(
+                  () => api.patch('/api/admin/users/${u.id}', {'isActive': !u.active}),
+                  u.active ? 'User deactivated' : 'User activated',
                 );
               }
             },
           ),
+          ],
         ],
       ),
     );
@@ -188,6 +250,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final note = TextEditingController();
     var credit = true;
     var reason = 'Manual Deposit';
+    var saving = false;
     const reasons = [
       'Manual Deposit',
       'Bonus / Goodwill',
@@ -258,16 +321,31 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
             DPButton(
               label: credit ? 'Credit Wallet' : 'Debit Wallet',
               background: credit ? DP.green : DP.red,
-              onPressed: a <= 0 || after < 0
+              loading: saving,
+              onPressed: a <= 0 || after < 0 || saving
                   ? null
-                  : () {
-                      setState(() => u.balance = after);
-                      Navigator.pop(ctx);
+                  : () async {
+                      setSheet(() => saving = true);
+                      try {
+                        await api.post('/api/admin/users/${u.id}/wallet', {
+                          'action': credit ? 'credit' : 'debit',
+                          'amount': a,
+                          'reason': reason,
+                          if (note.text.trim().isNotEmpty) 'note': note.text.trim(),
+                        });
+                      } catch (e) {
+                        setSheet(() => saving = false);
+                        if (ctx.mounted) dpSnack(ctx, errorMessage(e), error: true);
+                        return;
+                      }
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (!mounted) return;
                       dpSnack(
                         context,
                         '${credit ? 'Credited' : 'Debited'} ${DP.naira(a)} · ${u.name}',
                         success: true,
                       );
+                      _load();
                     },
             ),
           ],
@@ -279,29 +357,33 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   @override
   Widget build(BuildContext context) {
     final users = _users;
-    final awaiting = kAdminUsers.where((u) => !u.approved).length;
+    final awaiting = toInt(_counts['pending']);
     return AdminScaffold(
       title: 'Manage Users',
       breadcrumb: 'Admin / Users',
-      body: ListView(
+      body: RefreshIndicator(
+        color: DP.green,
+        onRefresh: _load,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
           AdminStatGrid(
             stats: [
               AdminStat(
                 label: 'All Users',
-                value: '${kAdminUsers.length}',
+                value: '${toInt(_counts['all'])}',
                 icon: Icons.group_outlined,
               ),
               AdminStat(
                 label: 'Active',
-                value: '${kAdminUsers.where((u) => u.active).length}',
+                value: '${toInt(_counts['active'])}',
                 icon: DPIcons.checkCircle,
                 color: DP.green,
               ),
               AdminStat(
                 label: 'Admins',
-                value: '${kAdminUsers.where((u) => u.isAdmin).length}',
+                value: '${toInt(_counts['admins'])}',
                 icon: Icons.admin_panel_settings_outlined,
                 color: DP.navyInk,
               ),
@@ -316,16 +398,23 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           const SizedBox(height: 16),
           AdminSearch(
             hint: 'Search by name, email, phone or ID...',
-            onChanged: (v) => setState(() => _query = v),
+            onChanged: _search,
           ),
           const SizedBox(height: 12),
           DPChipScroller(
             options: _filters,
             selected: _filter,
-            onSelect: (f) => setState(() => _filter = f),
+            onSelect: (f) {
+              setState(() => _filter = f);
+              _load();
+            },
           ),
           const SizedBox(height: 14),
-          if (users.isEmpty)
+          if (_loading)
+            const DPLoading()
+          else if (_error != null && users.isEmpty)
+            DPLoadError(error: _error, onRetry: _load)
+          else if (users.isEmpty)
             const DPEmptyState(
               icon: Icons.group_outlined,
               title: 'No Users Found',
@@ -361,7 +450,18 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                   ),
               ],
             ),
+          if (_hasMore)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Center(
+                child: DPTextLink(
+                  label: 'Load more',
+                  onTap: () => _load(more: true),
+                ),
+              ),
+            ),
         ],
+      ),
       ),
     );
   }

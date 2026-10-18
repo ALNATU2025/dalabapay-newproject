@@ -1,21 +1,48 @@
 // lib/presentation/screens/admin/admin_service_commission_page.dart
-// Service Commission — UI only. Revenue summary, rates per service and
-// service performance.
+// Service Commission: revenue summary, rates per service and service
+// performance (GET /api/admin/commission, PATCH .../commission/rates/:service).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import '../../widgets/async_view.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class _Svc {
+  final String key;
   final String name;
   final IconData icon;
   double rate; // % commission to user
   double margin; // % platform margin
   final int txns;
   final double volume;
-  _Svc(this.name, this.icon, this.rate, this.margin, this.txns, this.volume);
+  final double revenue;
+  _Svc(this.key, this.name, this.icon, this.rate, this.margin, this.txns,
+      this.volume, this.revenue);
+
+  static IconData iconFor(String k) => switch (k) {
+        'airtime' => DPIcons.smartphone,
+        'data' => DPIcons.wifi,
+        'electricity' => DPIcons.bolt,
+        'cable' => DPIcons.tv,
+        'education' => DPIcons.school,
+        'insurance' => DPIcons.shield,
+        _ => DPIcons.globe,
+      };
+
+  factory _Svc.fromJson(Map<String, dynamic> j) => _Svc(
+        str(j['service']),
+        str(j['label']),
+        iconFor(str(j['service'])),
+        toDouble(asMap(j['rate'])['user']),
+        toDouble(asMap(j['rate'])['platform']),
+        toInt(j['transactions']),
+        toDouble(j['volume']),
+        toDouble(j['revenue']),
+      );
 }
 
 class AdminServiceCommissionPage extends StatefulWidget {
@@ -30,28 +57,49 @@ class _AdminServiceCommissionPageState
     extends State<AdminServiceCommissionPage> {
   String _period = 'This Month';
   static const _periods = ['Today', 'This Week', 'This Month', 'This Year', 'All Time'];
+  static const _periodValues = {
+    'Today': 'today',
+    'This Week': 'week',
+    'This Month': 'month',
+    'This Year': 'year',
+    'All Time': 'all',
+  };
 
-  final List<_Svc> _svcs = [
-    _Svc('Airtime', DPIcons.smartphone, 2.0, 1.0, 1840, 3120000),
-    _Svc('Data', DPIcons.wifi, 2.5, 1.5, 1210, 2650000),
-    _Svc('Electricity', DPIcons.bolt, 0.5, 0.5, 430, 4870000),
-    _Svc('Cable TV', DPIcons.tv, 1.0, 0.5, 520, 6230000),
-    _Svc('Education', DPIcons.school, 1.5, 1.0, 96, 410000),
-    _Svc('Insurance', DPIcons.shield, 2.0, 2.0, 22, 330000),
-    _Svc('International Airtime', DPIcons.globe, 1.0, 2.0, 74, 590000),
-  ];
+  List<_Svc> _svcs = [];
+  Map<String, dynamic> _data = {};
+  bool _loading = true;
+  Object? _error;
 
-  double get _factor => switch (_period) {
-        'Today' => 1 / 30,
-        'This Week' => 0.23,
-        'This Year' => 11,
-        'All Time' => 19,
-        _ => 1,
-      };
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final d = asMap(await api.get('/api/admin/commission',
+          query: {'period': _periodValues[_period]}));
+      if (!mounted) return;
+      setState(() {
+        _data = d;
+        _svcs = asList(d['services']).map(_Svc.fromJson).toList();
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
 
   void _editRate(_Svc s) {
     final rate = TextEditingController(text: s.rate.toString());
     final margin = TextEditingController(text: s.margin.toString());
+    var saving = false;
     showAdminSheet(
       context,
       title: '${s.name} Commission',
@@ -78,16 +126,34 @@ class _AdminServiceCommissionPageState
           const SizedBox(height: 8),
           const DPHelper('Example: on ₦1,000 at 2%, the user earns ₦20.'),
           const SizedBox(height: 18),
+          const DPHelper('Each rate can be between 0% and 20%.'),
+          const SizedBox(height: 18),
           DPButton(
             label: 'Save Rates',
-            onPressed: () {
-              setState(() {
-                s.rate = double.tryParse(rate.text) ?? s.rate;
-                s.margin = double.tryParse(margin.text) ?? s.margin;
-              });
-              Navigator.pop(ctx);
-              dpSnack(context, '${s.name} rates updated', success: true);
-            },
+            loading: saving,
+            onPressed: saving || !adminCan('commission:write')
+                ? null
+                : () async {
+                    final u = double.tryParse(rate.text);
+                    final p = double.tryParse(margin.text);
+                    if (u == null || p == null || u > 20 || p > 20) {
+                      dpSnack(ctx, 'Enter rates between 0 and 20', error: true);
+                      return;
+                    }
+                    setSheet(() => saving = true);
+                    try {
+                      await api.patch('/api/admin/commission/rates/${s.key}',
+                          {'user': u, 'platform': p});
+                    } catch (e) {
+                      setSheet(() => saving = false);
+                      if (ctx.mounted) dpSnack(ctx, errorMessage(e), error: true);
+                      return;
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (!mounted) return;
+                    dpSnack(context, '${s.name} rates updated', success: true);
+                    _load();
+                  },
           ),
         ],
       ),
@@ -96,25 +162,44 @@ class _AdminServiceCommissionPageState
 
   @override
   Widget build(BuildContext context) {
-    final f = _factor;
-    final volume = _svcs.fold<double>(0, (a, s) => a + s.volume) * f;
-    final revenue =
-        _svcs.fold<double>(0, (a, s) => a + s.volume * s.margin / 100) * f;
-    final commission =
-        _svcs.fold<double>(0, (a, s) => a + s.volume * s.rate / 100) * f;
-    final txns = (_svcs.fold<int>(0, (a, s) => a + s.txns) * f).round();
+    if (_loading) {
+      return const AdminScaffold(
+        title: 'Service Commission',
+        breadcrumb: 'Admin / Service Commission',
+        body: DPLoading(),
+      );
+    }
+    if (_error != null && _data.isEmpty) {
+      return AdminScaffold(
+        title: 'Service Commission',
+        breadcrumb: 'Admin / Service Commission',
+        body: DPLoadError(error: _error, onRetry: _load),
+      );
+    }
+    final volume = toDouble(_data['volume']);
+    final revenue = toDouble(_data['revenue']);
+    final commission = toDouble(_data['commissionPaid']);
+    final avg = toDouble(_data['avgRevenuePerTxn']);
     final maxVol = _svcs.fold<double>(0, (a, s) => a > s.volume ? a : s.volume);
+    final trend = asList(_data['revenue7d']).map((d) => toDouble(d['value'])).toList();
 
     return AdminScaffold(
       title: 'Service Commission',
       breadcrumb: 'Admin / Service Commission',
-      body: ListView(
+      body: RefreshIndicator(
+        color: DP.green,
+        onRefresh: _load,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
           DPChipScroller(
             options: _periods,
             selected: _period,
-            onSelect: (p) => setState(() => _period = p),
+            onSelect: (p) {
+              setState(() => _period = p);
+              _load();
+            },
           ),
           const SizedBox(height: 14),
           AdminStatGrid(
@@ -138,7 +223,7 @@ class _AdminServiceCommissionPageState
               ),
               AdminStat(
                 label: 'Avg Revenue per Txn',
-                value: DP.naira(txns == 0 ? 0 : revenue / txns),
+                value: DP.naira(avg),
                 icon: Icons.calculate_outlined,
                 color: DP.navyInk,
               ),
@@ -149,7 +234,7 @@ class _AdminServiceCommissionPageState
           DPCard(
             padding: const EdgeInsets.all(16),
             child: AdminBarChart(
-              values: kRevenue7d.map((v) => v * 0.012).toList(),
+              values: trend.isEmpty ? List.filled(7, 0.0) : trend,
               format: (v) => DP.naira(v, decimals: false),
             ),
           ),
@@ -189,7 +274,7 @@ class _AdminServiceCommissionPageState
                                   style: DP.body.copyWith(fontSize: 13.5)),
                             ),
                             Text(
-                              '${(s.txns * f).round()} txns · ${DP.naira(s.volume * f, decimals: false)}',
+                              '${s.txns} txns · ${DP.naira(s.volume, decimals: false)} · earned ${DP.naira(s.revenue, decimals: false)}',
                               style: DP.caption.copyWith(fontSize: 12),
                             ),
                           ],
@@ -198,7 +283,7 @@ class _AdminServiceCommissionPageState
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: s.volume / maxVol,
+                            value: maxVol > 0 ? s.volume / maxVol : 0,
                             minHeight: 7,
                             backgroundColor: DP.borderSoft,
                             color: DP.green,
@@ -211,6 +296,7 @@ class _AdminServiceCommissionPageState
             ),
           ),
         ],
+      ),
       ),
     );
   }

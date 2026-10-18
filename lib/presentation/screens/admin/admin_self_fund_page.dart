@@ -1,10 +1,14 @@
 // lib/presentation/screens/admin/admin_self_fund_page.dart
-// Self Fund — UI only. Top up the admin's own wallet, confirmed with a PIN.
+// Self Fund (Super Admin): top up your own wallet, confirmed with your
+// payment PIN (GET/POST /api/admin/payments/self-fund).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminSelfFundPage extends StatefulWidget {
@@ -16,12 +20,31 @@ class AdminSelfFundPage extends StatefulWidget {
 
 class _AdminSelfFundPageState extends State<AdminSelfFundPage> {
   final _amount = TextEditingController();
-  double _balance = 250000;
-  final List<(double, int)> _history = [
-    (100000, 1440),
-    (50000, 4320),
-    (200000, 10080),
-  ];
+  double _balance = 0;
+  List<Map<String, dynamic>> _history = [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final r = asMap(await api.get('/api/admin/payments/self-fund'));
+      if (!mounted) return;
+      setState(() {
+        _balance = toDouble(r['balance']);
+        _history = asList(r['history']);
+        _loaded = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loaded = true);
+      dpSnack(context, errorMessage(e), error: true);
+    }
+  }
 
   @override
   void dispose() {
@@ -40,6 +63,8 @@ class _AdminSelfFundPageState extends State<AdminSelfFundPage> {
       return;
     }
     final pin = TextEditingController();
+    var saving = false;
+    String? pinError;
     showAdminSheet(
       context,
       title: 'Enter Transaction PIN',
@@ -55,40 +80,48 @@ class _AdminSelfFundPageState extends State<AdminSelfFundPage> {
             controller: pin,
             length: 6,
             autofocus: true,
+            error: pinError != null,
             onChanged: (_) => setSheet(() {}),
           ),
+          if (pinError != null)
+            DPHelper(pinError!, color: DP.red, icon: DPIcons.alert),
           const SizedBox(height: 18),
           DPButton(
             label: 'Confirm',
-            onPressed: pin.text.length < 6
+            loading: saving,
+            onPressed: pin.text.length < 6 || saving
                 ? null
-                : () {
-                    Navigator.pop(ctx);
-                    setState(() {
-                      _balance += a;
-                      _history.insert(0, (a, 0));
-                      _amount.clear();
+                : () async {
+                    setSheet(() {
+                      saving = true;
+                      pinError = null;
                     });
+                    Map<String, dynamic> r;
+                    try {
+                      r = asMap(await api.post('/api/admin/payments/self-fund',
+                          {'amount': a, 'pin': pin.text}));
+                    } catch (e) {
+                      pin.clear();
+                      setSheet(() {
+                        saving = false;
+                        pinError = errorMessage(e);
+                      });
+                      return;
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (!mounted) return;
+                    _amount.clear();
+                    await _load();
+                    Session.instance.refreshQuietly();
+                    if (!mounted) return;
                     dpDialog(
                       context,
                       title: 'Success',
                       message:
-                          '${DP.naira(a)} added. New Balance: ${DP.naira(_balance)}',
+                          '${DP.naira(a)} added. New Balance: ${DP.naira(toDouble(r['balance']))}',
                       confirmLabel: 'Done',
                     );
                   },
-          ),
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: () {
-              pin.text = '000000';
-              setSheet(() {});
-            },
-            icon: const Icon(DPIcons.fingerprint, color: DP.green),
-            label: const Text(
-              'Use Biometric Authentication',
-              style: TextStyle(color: DP.green, fontWeight: FontWeight.w600),
-            ),
           ),
         ],
       ),
@@ -165,6 +198,9 @@ class _AdminSelfFundPageState extends State<AdminSelfFundPage> {
           ),
           const SizedBox(height: 24),
           const DPSectionHeader('Recent Self-Funding'),
+          if (_loaded && _history.isEmpty)
+            const DPEmptyState(icon: DPIcons.wallet, title: 'No self-funding yet'),
+          if (_history.isNotEmpty)
           AdminListCard(
             children: [
               for (final h in _history)
@@ -173,9 +209,9 @@ class _AdminSelfFundPageState extends State<AdminSelfFundPage> {
                   leading: const DPIconBadge(DPIcons.downLeft,
                       size: 40, iconSize: 19),
                   title: 'Self-Funding',
-                  subtitle: adminAgo(h.$2),
+                  subtitle: '${agoOf(parseDate(h['createdAt']))} · ${str(h['reference'])}',
                   trailing: Text(
-                    '+${DP.naira(h.$1)}',
+                    '+${DP.naira(toDouble(h['amount']))}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       color: DP.green,

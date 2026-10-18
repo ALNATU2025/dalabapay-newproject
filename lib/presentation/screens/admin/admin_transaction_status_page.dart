@@ -1,9 +1,17 @@
 // lib/presentation/screens/admin/admin_transaction_status_page.dart
-// Status Update — UI only. Pick a transaction, change its status with a note.
+// Status Update: pick a transaction and change its status with a note
+// (PATCH /api/admin/transactions/:id/status). Failing or refunding a payment
+// returns the money; approving a pending top-up credits the wallet. Pending
+// bill payments can be re-checked with the provider.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import '../../widgets/async_view.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminTransactionStatusPage extends StatefulWidget {
@@ -21,16 +29,83 @@ class _AdminTransactionStatusPageState
   static const _filters = ['All', 'Pending', 'Successful', 'Failed', 'Disputed'];
   static const _statuses = [
     'Pending',
-    'Processing',
     'Successful',
     'Failed',
     'Refunded',
     'Disputed',
   ];
+  static const _billTypes = {
+    'airtime', 'data', 'electricity', 'cable', 'education', 'insurance', 'international',
+  };
+
+  List<AdminTxn> _items = [];
+  Map<String, dynamic> _counts = {};
+  bool _loading = true;
+  Object? _error;
+  Timer? _debounce;
+  int _req = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final id = ++_req;
+    try {
+      final r = asMap(await api.get('/api/admin/transactions', query: {
+        'q': _query.trim(),
+        'status': kStatusValues[_filter],
+        'limit': 60,
+      }));
+      if (!mounted || id != _req) return;
+      setState(() {
+        _items = itemsOf(r).map(AdminTxn.fromJson).toList();
+        _counts = asMap(r['counts']);
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || id != _req) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  Future<void> _requery(AdminTxn t) async {
+    final r = await runWithFeedback(
+        context, () => api.post('/api/admin/transactions/${t.id}/requery'));
+    if (r == null || !mounted) return;
+    final res = str(asMap(r)['result']);
+    dpSnack(
+      context,
+      res == 'success'
+          ? 'Provider confirmed it — marked successful'
+          : res == 'failed'
+              ? 'Provider says it failed — the user was refunded'
+              : 'Still pending at the provider',
+      success: res == 'success',
+    );
+    _load();
+  }
 
   void _change(AdminTxn t) {
     var next = t.status;
+    var saving = false;
     final note = TextEditingController();
+    final isFunding = t.type == 'wallet_funding';
+    final options = isFunding
+        ? const ['Pending', 'Successful', 'Failed']
+        : _statuses;
     showAdminSheet(
       context,
       title: 'Update Status',
@@ -56,7 +131,7 @@ class _AdminTransactionStatusPageState
           const SizedBox(height: 16),
           const DPLabel('Change to:'),
           DPChipGrid(
-            options: _statuses,
+            options: options,
             selected: next,
             columns: 3,
             height: 42,
@@ -69,7 +144,7 @@ class _AdminTransactionStatusPageState
             hint: 'Reason for status change',
             maxLines: 2,
           ),
-          if (next == 'Refunded') ...[
+          if (!isFunding && (next == 'Refunded' || next == 'Failed') && !t.refunded) ...[
             const SizedBox(height: 12),
             DPBanner(
               '${DP.naira(t.amount)} will be returned to ${t.userName}\'s wallet.',
@@ -77,21 +152,50 @@ class _AdminTransactionStatusPageState
               icon: DPIcons.info,
             ),
           ],
+          if (isFunding && next == 'Successful') ...[
+            const SizedBox(height: 12),
+            DPBanner(
+              '${DP.naira(t.amount)} will be added to ${t.userName}\'s wallet. Only do this once the money has arrived.',
+              tone: DPTone.warning,
+              icon: DPIcons.info,
+            ),
+          ],
           const SizedBox(height: 18),
           DPButton(
             label: 'Confirm Status Change',
-            onPressed: next == t.status
+            loading: saving,
+            onPressed: next == t.status || saving
                 ? null
-                : () {
+                : () async {
                     final old = t.status;
-                    setState(() {
-                      t.status = next;
-                      if (note.text.trim().isNotEmpty) t.note = note.text.trim();
-                    });
-                    Navigator.pop(ctx);
+                    setSheet(() => saving = true);
+                    try {
+                      await api.patch('/api/admin/transactions/${t.id}/status', {
+                        'status': kStatusValues[next],
+                        if (note.text.trim().isNotEmpty) 'note': note.text.trim(),
+                      });
+                    } catch (e) {
+                      setSheet(() => saving = false);
+                      if (ctx.mounted) dpSnack(ctx, errorMessage(e), error: true);
+                      return;
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (!mounted) return;
                     dpSnack(context, '${t.ref}: $old → $next', success: true);
+                    _load();
                   },
           ),
+          if (t.status == 'Pending' && _billTypes.contains(t.type)) ...[
+            const SizedBox(height: 10),
+            DPOutlineButton(
+              label: 'Check with provider',
+              icon: DPIcons.refresh,
+              onPressed: () {
+                Navigator.pop(ctx);
+                _requery(t);
+              },
+            ),
+          ],
           if (t.status == 'Disputed') ...[
             const SizedBox(height: 10),
             DPOutlineButton(
@@ -110,20 +214,17 @@ class _AdminTransactionStatusPageState
 
   @override
   Widget build(BuildContext context) {
-    final q = _query.toLowerCase();
-    final items = kAdminTxns.where((t) {
-      if (_filter != 'All' && t.status != _filter) return false;
-      return q.isEmpty ||
-          t.ref.toLowerCase().contains(q) ||
-          t.userName.toLowerCase().contains(q) ||
-          t.service.toLowerCase().contains(q);
-    }).toList();
-    int count(String s) => kAdminTxns.where((t) => t.status == s).length;
+    final items = _items;
+    int count(String s) => toInt(_counts[kStatusValues[s]]);
 
     return AdminScaffold(
       title: 'Status Update',
       breadcrumb: 'Admin / Status Update',
-      body: ListView(
+      body: RefreshIndicator(
+        color: DP.green,
+        onRefresh: _load,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
           AdminStatGrid(
@@ -145,19 +246,30 @@ class _AdminTransactionStatusPageState
           const SizedBox(height: 16),
           AdminSearch(
             hint: 'Search by reference, customer, type...',
-            onChanged: (v) => setState(() => _query = v),
+            onChanged: (v) {
+              _query = v;
+              _debounce?.cancel();
+              _debounce = Timer(const Duration(milliseconds: 400), _load);
+            },
           ),
           const SizedBox(height: 12),
           DPChipScroller(
             options: _filters,
             selected: _filter,
-            onSelect: (f) => setState(() => _filter = f),
+            onSelect: (f) {
+              setState(() => _filter = f);
+              _load();
+            },
           ),
           const SizedBox(height: 8),
           Text('Tap on a transaction to change its status',
               style: DP.caption),
           const SizedBox(height: 10),
-          if (items.isEmpty)
+          if (_loading)
+            const DPLoading()
+          else if (_error != null && items.isEmpty)
+            DPLoadError(error: _error, onRetry: _load)
+          else if (items.isEmpty)
             const DPEmptyState(
               icon: Icons.update_rounded,
               title: 'No Transactions Found',
@@ -179,7 +291,7 @@ class _AdminTransactionStatusPageState
                           StatusPill.colorFor(t.status).withValues(alpha: 0.12),
                     ),
                     title: t.ref,
-                    subtitle: '${t.userName} · ${t.service} · ${adminAgo(t.minutesAgo)}',
+                    subtitle: '${t.userName} · ${t.service} · ${agoOf(t.date)}',
                     trailing: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -199,6 +311,7 @@ class _AdminTransactionStatusPageState
               ],
             ),
         ],
+      ),
       ),
     );
   }

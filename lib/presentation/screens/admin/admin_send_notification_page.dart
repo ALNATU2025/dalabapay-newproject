@@ -1,9 +1,14 @@
 // lib/presentation/screens/admin/admin_send_notification_page.dart
-// Send Notification — UI only. Compose a message for all or selected users.
+// Send Notification: compose a message for all active users or selected
+// ones (POST /api/admin/broadcasts). It appears in their Notifications.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminSendNotificationPage extends StatefulWidget {
@@ -21,7 +26,34 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
   bool _allUsers = true;
   final Set<String> _selected = {};
   bool _sending = false;
-  int _sent = 1284;
+  int _sent = 0;
+  int _broadcasts = 0;
+  int _activeUsers = 0;
+  List<Map<String, dynamic>> _recent = [];
+
+  static const _typeValues = {
+    'Announcement': 'announcement',
+    'Promotional': 'promotional',
+    'Alert': 'alert',
+    'Transaction': 'transaction',
+    'Commission': 'commission',
+    'Referral': 'referral',
+    'Welcome/Onboarding': 'welcome',
+    'Custom': 'custom',
+  };
+
+  Future<void> _loadStats() async {
+    try {
+      final r = asMap(await api.get('/api/admin/broadcasts'));
+      if (!mounted) return;
+      setState(() {
+        _sent = toInt(r['sent']);
+        _broadcasts = toInt(r['broadcasts']);
+        _activeUsers = toInt(r['activeUsers']);
+        _recent = asList(r['recent']);
+      });
+    } catch (_) {}
+  }
 
   static const _types = [
     'Announcement',
@@ -39,6 +71,7 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
     super.initState();
     _title.addListener(() => setState(() {}));
     _message.addListener(() => setState(() {}));
+    _loadStats();
   }
 
   @override
@@ -48,29 +81,41 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
     super.dispose();
   }
 
-  int get _recipients => _allUsers
-      ? kAdminUsers.where((u) => u.active).length
-      : _selected.length;
+  int get _recipients => _allUsers ? _activeUsers : _selected.length;
 
   void _pickUsers() {
-    var query = '';
+    List<AdminUser> users = [];
+    var loading = true;
+    Timer? debounce;
+    StateSetter? sheetSetter;
+
+    Future<void> search(String q) async {
+      try {
+        final r = await api.get('/api/admin/users',
+            query: {'q': q.trim(), 'filter': 'active', 'limit': 50});
+        users = itemsOf(r).map(AdminUser.fromJson).toList();
+      } catch (_) {
+        users = [];
+      }
+      loading = false;
+      sheetSetter?.call(() {});
+    }
+
+    search('');
     showAdminSheet(
       context,
       title: 'Select Users',
       builder: (ctx, setSheet) {
-        final q = query.toLowerCase();
-        final users = kAdminUsers
-            .where((u) =>
-                q.isEmpty ||
-                u.name.toLowerCase().contains(q) ||
-                u.email.toLowerCase().contains(q))
-            .toList();
+        sheetSetter = setSheet;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AdminSearch(
               hint: 'Search users...',
-              onChanged: (v) => setSheet(() => query = v),
+              onChanged: (v) {
+                debounce?.cancel();
+                debounce = Timer(const Duration(milliseconds: 400), () => search(v));
+              },
             ),
             const SizedBox(height: 8),
             Row(
@@ -98,7 +143,12 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
               ],
             ),
             const SizedBox(height: 6),
-            if (users.isEmpty)
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(child: CircularProgressIndicator(color: DP.green)),
+              )
+            else if (users.isEmpty)
               const DPEmptyState(
                 icon: Icons.group_outlined,
                 title: 'No matching users',
@@ -142,16 +192,31 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
       return;
     }
     setState(() => _sending = true);
-    await Future.delayed(const Duration(milliseconds: 1000));
+    Map<String, dynamic> r;
+    try {
+      r = asMap(await api.post('/api/admin/broadcasts', {
+        'title': _title.text.trim(),
+        'message': _message.text.trim(),
+        'type': _typeValues[_type],
+        'audience': _allUsers ? 'all' : 'selected',
+        if (!_allUsers) 'userIds': _selected.toList(),
+      }));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
     if (!mounted) return;
-    final n = _recipients;
+    final n = toInt(r['sent']);
     setState(() {
       _sending = false;
-      _sent += n;
       _title.clear();
       _message.clear();
+      _selected.clear();
     });
-    dpSnack(context, 'Notification sent to $n users', success: true);
+    dpSnack(context, 'Notification sent to $n user${n == 1 ? '' : 's'}', success: true);
+    _loadStats();
   }
 
   @override
@@ -165,14 +230,14 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
           AdminStatGrid(
             stats: [
               AdminStat(
-                label: 'Sent',
+                label: 'Delivered',
                 value: '$_sent',
                 icon: Icons.send_rounded,
                 color: DP.green,
               ),
-              const AdminStat(
-                label: 'Success Rate',
-                value: '98.6%',
+              AdminStat(
+                label: 'Broadcasts',
+                value: '$_broadcasts',
                 icon: Icons.insights_rounded,
               ),
             ],
@@ -262,6 +327,24 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
               ],
             ),
           ),
+          if (_recent.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            const DPSectionHeader('Recently sent'),
+            AdminListCard(
+              children: [
+                for (final b in _recent.take(10))
+                  DPListRow(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    subtitleMaxLines: 2,
+                    leading: const DPIconBadge.blue(Icons.campaign_outlined,
+                        size: 40, iconSize: 19),
+                    title: str(b['title']),
+                    subtitle:
+                        '${toInt(b['recipients'])} recipients · ${str(b['sender'], 'Admin')} · ${agoOf(parseDate(b['createdAt']))}',
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
       bottom: DPBottomAction(
@@ -271,7 +354,7 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
               : 'Send to $_recipients user${_recipients == 1 ? '' : 's'}',
           icon: Icons.send_rounded,
           loading: _sending,
-          onPressed: _send,
+          onPressed: _sending ? null : _send,
         ),
       ),
     );

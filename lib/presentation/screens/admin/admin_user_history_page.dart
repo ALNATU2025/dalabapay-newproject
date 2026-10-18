@@ -1,9 +1,13 @@
 // lib/presentation/screens/admin/admin_user_history_page.dart
-// User History — UI only. Balance movement, transactions and admin activity.
+// User History: GET /api/admin/users/:id/history — balance movement,
+// transactions and the admin activity log for this user.
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import '../../widgets/async_view.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminUserHistoryPage extends StatefulWidget {
@@ -17,29 +21,65 @@ class AdminUserHistoryPage extends StatefulWidget {
 class _AdminUserHistoryPageState extends State<AdminUserHistoryPage> {
   int _tab = 0;
 
-  static const _activity = [
-    ('APPROVED', 'Account approved by Adaeze Okafor', 4320),
-    ('CREDIT', 'Bonus / Goodwill · ₦500.00', 2880),
-    ('EDITED', 'Phone number updated', 1440),
-    ('ACTIVATED', 'Account re-activated', 600),
-  ];
+  static String _actionLabel(String a) => switch (a) {
+        'user.approve' => 'APPROVED',
+        'user.update' => 'EDITED',
+        'wallet.credit' => 'CREDIT',
+        'wallet.debit' => 'DEBIT',
+        'wallet.self_fund' => 'SELF FUND',
+        'pin.unlock' => 'PIN UNLOCK',
+        'pin.reset' => 'PIN RESET',
+        'role.change' => 'ROLE',
+        'transaction.status' => 'STATUS',
+        'transaction.refund' => 'REFUND',
+        'transaction.requery' => 'REQUERY',
+        'payment.manual' => 'MANUAL CREDIT',
+        'payment.verify' => 'VERIFIED',
+        'limits.user' => 'LIMITS',
+        _ => a.split('.').last.toUpperCase(),
+      };
+
+  static String _actionText(Map<String, dynamic> a) {
+    final d = asMap(a['details']);
+    final by = str(asMap(a['actor'])['fullName'], 'an admin');
+    final what = switch (str(a['action'])) {
+      'wallet.credit' || 'wallet.debit' =>
+        '${d['reason'] ?? ''} · ${DP.naira(toDouble(d['amount']))}',
+      'transaction.status' => 'Status ${d['from']} → ${d['to']}',
+      'role.change' => 'Role ${roleLabel(str(d['from']))} → ${roleLabel(str(d['to']))}',
+      'transaction.refund' => 'Refunded ${DP.naira(toDouble(d['amount']))}',
+      'payment.manual' => 'Manual credit ${DP.naira(toDouble(d['amount']))}',
+      'user.update' => 'Profile updated',
+      _ => _actionLabel(str(a['action'])).toLowerCase(),
+    };
+    return '$what · by $by';
+  }
 
   @override
   Widget build(BuildContext context) {
     final u = widget.user;
-    final txns = kAdminTxns
-        .where((t) => t.userEmail == u.email)
-        .toList(growable: false);
-    final shown = txns.isEmpty ? kAdminTxns.take(4).toList() : txns;
-    final credits =
-        shown.where((t) => t.credit).fold<double>(0, (a, t) => a + t.amount);
-    final debits =
-        shown.where((t) => !t.credit).fold<double>(0, (a, t) => a + t.amount);
-
     return AdminScaffold(
       title: 'User History',
       breadcrumb: 'Admin / Users / ${u.name}',
-      body: ListView(
+      body: AsyncView<Map<String, dynamic>>(
+        load: () async =>
+            asMap(await api.get('/api/admin/users/${u.id}/history')),
+        builder: (context, d, reload) => _body(u, d, reload),
+      ),
+    );
+  }
+
+  Widget _body(AdminUser u, Map<String, dynamic> d, Future<void> Function() reload) {
+    final shown = asList(d['transactions']).map(AdminTxn.fromJson).toList();
+    final activity = asList(d['activity']);
+    final credits = toDouble(d['credits']);
+    final debits = toDouble(d['debits']);
+    final balance = toDouble(asMap(d['user'])['balance']);
+    return RefreshIndicator(
+      color: DP.green,
+      onRefresh: reload,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
           Container(
@@ -70,7 +110,7 @@ class _AdminUserHistoryPageState extends State<AdminUserHistoryPage> {
                         style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 12),
                       ),
                       Text(
-                        DP.naira(u.balance),
+                        DP.naira(balance),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 22,
@@ -107,7 +147,14 @@ class _AdminUserHistoryPageState extends State<AdminUserHistoryPage> {
             onChanged: (i) => setState(() => _tab = i),
           ),
           const SizedBox(height: 14),
-          if (_tab == 0)
+          if (_tab == 0 && shown.isEmpty)
+            const DPEmptyState(icon: DPIcons.receipt, title: 'No transactions yet')
+          else if (_tab == 1 && activity.isEmpty)
+            const DPEmptyState(
+              icon: Icons.admin_panel_settings_outlined,
+              title: 'No admin activity on this account',
+            )
+          else if (_tab == 0)
             AdminListCard(
               children: [
                 for (final t in shown)
@@ -143,17 +190,18 @@ class _AdminUserHistoryPageState extends State<AdminUserHistoryPage> {
           else
             AdminListCard(
               children: [
-                for (final a in _activity)
+                for (final a in activity)
                   DPListRow(
                     padding: const EdgeInsets.symmetric(vertical: 12),
+                    subtitleMaxLines: 2,
                     leading: const DPIconBadge.blue(
                       Icons.admin_panel_settings_outlined,
                       size: 40,
                       iconSize: 19,
                     ),
-                    title: a.$2,
-                    subtitle: adminAgo(a.$3),
-                    trailing: StatusPill(a.$1),
+                    title: _actionText(a),
+                    subtitle: agoOf(parseDate(a['createdAt'])),
+                    trailing: StatusPill(_actionLabel(str(a['action']))),
                   ),
               ],
             ),

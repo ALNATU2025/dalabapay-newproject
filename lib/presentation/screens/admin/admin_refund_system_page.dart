@@ -1,10 +1,15 @@
 // lib/presentation/screens/admin/admin_refund_system_page.dart
-// Refund & Dispute — UI only. Resolve disputes and process refunds.
+// Refund & Dispute: resolve user disputes (GET/POST /api/admin/disputes)
+// and refund pending or disputed payments
+// (GET /api/admin/transactions/refund-queue, POST .../:id/refund).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import '../../widgets/async_view.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminRefundSystemPage extends StatefulWidget {
@@ -16,11 +21,62 @@ class AdminRefundSystemPage extends StatefulWidget {
 
 class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
   int _tab = 0;
+  List<AdminDispute> _disputes = [];
+  List<AdminTxn> _queue = [];
+  List<AdminTxn> _refundedList = [];
+  bool _loading = true;
+  Object? _error;
 
-  List<AdminTxn> get _refundable => kAdminTxns
-      .where((t) => t.status == 'Failed' || t.status == 'Pending')
-      .where((t) => !t.credit)
-      .toList();
+  bool get _canRefund => adminCan('refunds:process');
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final d = asMap(await api.get('/api/admin/disputes', query: {'status': 'all'}));
+      Map<String, dynamic> q = {};
+      if (_canRefund) {
+        q = asMap(await api.get('/api/admin/transactions/refund-queue'));
+      }
+      if (!mounted) return;
+      setState(() {
+        _disputes = itemsOf(d).map(AdminDispute.fromJson).toList();
+        _queue = asList(q['queue']).map(AdminTxn.fromJson).toList();
+        _refundedList = asList(q['refunded']).map(AdminTxn.fromJson).toList();
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  Future<void> _resolveCall(AdminDispute d, String action, String resolution,
+      BuildContext ctx) async {
+    try {
+      await api.post('/api/admin/disputes/${d.id}/resolve', {
+        'action': action,
+        'resolution': resolution,
+      });
+    } catch (e) {
+      if (ctx.mounted) dpSnack(ctx, errorMessage(e), error: true);
+      return;
+    }
+    if (ctx.mounted) Navigator.pop(ctx);
+    if (!mounted) return;
+    dpSnack(context,
+        action == 'approve' ? 'Dispute approved and refunded' : 'Dispute rejected',
+        success: action == 'approve');
+    _load();
+  }
 
   void _resolve(AdminDispute d) {
     final notes = TextEditingController();
@@ -38,8 +94,10 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
                 DPSummaryRow('Customer', d.user),
                 DPSummaryRow('Dispute Type', d.type),
                 DPSummaryRow('Reason', d.reason),
+                if (d.description.isNotEmpty)
+                  DPSummaryRow('Details', d.description),
                 DPSummaryRow('Amount', DP.naira(d.amount), strong: true),
-                DPSummaryRow('Evidence', d.hasEvidence ? 'Attached' : 'None'),
+                DPSummaryRow('Opened', dateTimeLabel(d.date)),
               ],
             ),
           ),
@@ -53,16 +111,14 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
           const SizedBox(height: 18),
           DPButton(
             label: 'Approve & Refund ${DP.naira(d.amount)}',
-            onPressed: () {
-              setState(() {
-                d.status = 'resolved';
-                d.resolution = notes.text.trim().isEmpty
-                    ? 'Refunded ${DP.naira(d.amount)}'
-                    : notes.text.trim();
-              });
-              Navigator.pop(ctx);
-              dpSnack(context, 'Dispute approved and resolved', success: true);
-            },
+            onPressed: () => _resolveCall(
+              d,
+              'approve',
+              notes.text.trim().length < 3
+                  ? 'Refunded ${DP.naira(d.amount)} to your wallet'
+                  : notes.text.trim(),
+              ctx,
+            ),
           ),
           const SizedBox(height: 10),
           DPOutlineButton(
@@ -70,16 +126,11 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
             color: DP.red,
             icon: DPIcons.failed,
             onPressed: () {
-              if (notes.text.trim().isEmpty) {
+              if (notes.text.trim().length < 3) {
                 dpSnack(ctx, 'Please enter resolution details', error: true);
                 return;
               }
-              setState(() {
-                d.status = 'rejected';
-                d.resolution = notes.text.trim();
-              });
-              Navigator.pop(ctx);
-              dpSnack(context, 'Dispute rejected');
+              _resolveCall(d, 'reject', notes.text.trim(), ctx);
             },
           ),
         ],
@@ -90,6 +141,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
   void _refund(AdminTxn t) {
     final amount = TextEditingController(text: t.amount.toStringAsFixed(0));
     final reason = TextEditingController();
+    var saving = false;
     showAdminSheet(
       context,
       title: 'Process Refund',
@@ -125,13 +177,26 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
             const SizedBox(height: 18),
             DPButton(
               label: 'Refund ${DP.naira(a)}',
-              onPressed: a <= 0 || a > t.amount
+              loading: saving,
+              onPressed: a <= 0 || a > t.amount || saving
                   ? null
-                  : () {
-                      setState(() => t.status = 'Refunded');
-                      Navigator.pop(ctx);
+                  : () async {
+                      setSheet(() => saving = true);
+                      try {
+                        await api.post('/api/admin/transactions/${t.id}/refund', {
+                          'amount': a,
+                          if (reason.text.trim().isNotEmpty) 'reason': reason.text.trim(),
+                        });
+                      } catch (e) {
+                        setSheet(() => saving = false);
+                        if (ctx.mounted) dpSnack(ctx, errorMessage(e), error: true);
+                        return;
+                      }
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (!mounted) return;
                       dpSnack(context, 'Refunded ${DP.naira(a)} to ${t.userName}',
                           success: true);
+                      _load();
                     },
             ),
           ],
@@ -142,15 +207,34 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
 
   @override
   Widget build(BuildContext context) {
-    final open = kAdminDisputes.where((d) => d.status == 'pending').toList();
-    final closed = kAdminDisputes.where((d) => d.status != 'pending').toList();
-    final refundable = _refundable;
-    final refunded = kAdminTxns.where((t) => t.status == 'Refunded').toList();
+    final open = _disputes.where((d) => d.open).toList();
+    final closed = _disputes.where((d) => !d.open).toList();
+    final refundable = _queue;
+    final refunded = _refundedList;
+
+    if (_loading) {
+      return const AdminScaffold(
+        title: 'Refund & Dispute',
+        breadcrumb: 'Admin / Refund System',
+        body: DPLoading(),
+      );
+    }
+    if (_error != null && _disputes.isEmpty) {
+      return AdminScaffold(
+        title: 'Refund & Dispute',
+        breadcrumb: 'Admin / Refund System',
+        body: DPLoadError(error: _error, onRetry: _load),
+      );
+    }
 
     return AdminScaffold(
       title: 'Refund & Dispute',
       breadcrumb: 'Admin / Refund System',
-      body: ListView(
+      body: RefreshIndicator(
+        color: DP.green,
+        onRefresh: _load,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
           AdminStatGrid(
@@ -170,11 +254,12 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
             ],
           ),
           const SizedBox(height: 16),
-          DPSegmented(
-            options: const ['Disputes', 'Refund Queue', 'Refunded'],
-            index: _tab,
-            onChanged: (i) => setState(() => _tab = i),
-          ),
+          if (_canRefund)
+            DPSegmented(
+              options: const ['Disputes', 'Refund Queue', 'Refunded'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
+            ),
           const SizedBox(height: 14),
           if (_tab == 0) ...[
             if (open.isEmpty)
@@ -214,6 +299,8 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
                               style: TextStyle(
                                   fontWeight: FontWeight.w700, color: DP.ink)),
                           const SizedBox(height: 3),
+                          StatusPill(t.status),
+                          const SizedBox(height: 3),
                           DPTextLink(
                             label: 'Refund',
                             fontSize: 13,
@@ -246,11 +333,12 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
           ],
         ],
       ),
+      ),
     );
   }
 
   Widget _disputeCard(AdminDispute d) {
-    final open = d.status == 'pending';
+    final open = d.open;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: DPCard(
@@ -262,12 +350,8 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
             Row(
               children: [
                 Expanded(child: Text(d.user, style: DP.bodyStrong)),
-                if (d.hasEvidence) ...[
-                  const StatusPill('HAS EVIDENCE', color: DP.navyIcon),
-                  const SizedBox(width: 6),
-                ],
                 StatusPill(open
-                    ? 'Pending'
+                    ? (d.status == 'investigating' ? 'Under Review' : 'Pending')
                     : (d.status == 'resolved' ? 'Resolved' : 'Rejected')),
               ],
             ),
@@ -289,7 +373,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
                       fontWeight: FontWeight.w700, color: DP.ink),
                 ),
                 const Spacer(),
-                Text(adminAgo(d.hoursAgo * 60),
+                Text(agoOf(d.date),
                     style: DP.caption.copyWith(fontSize: 12)),
                 if (open) ...[
                   const SizedBox(width: 10),

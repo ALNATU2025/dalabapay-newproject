@@ -1,10 +1,14 @@
 // lib/presentation/screens/admin/admin_edit_user_page.dart
-// Edit User — UI only. Profile fields, account controls and PIN management.
+// Edit User: profile fields and account status (PATCH /api/admin/users/:id)
+// and PIN unlock / reset. The balance changes only through Credit / Debit
+// Wallet, so every change is recorded.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class AdminEditUserPage extends StatefulWidget {
@@ -22,9 +26,51 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
   late final _balance =
       TextEditingController(text: widget.user.balance.toStringAsFixed(2));
   late bool _active = widget.user.active;
-  late bool _admin = widget.user.isAdmin;
   late bool _pinLocked = widget.user.pinLocked;
+  late bool _pinSet = widget.user.pinSet;
+  DateTime? _lockedUntil;
   bool _saving = false;
+  bool _pinBusy = false;
+
+  bool get _canEdit => adminCan('users:write');
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final j = asMap(await api.get('/api/admin/users/${widget.user.id}'));
+      if (!mounted) return;
+      setState(() {
+        _pinLocked = j['pinLocked'] == true;
+        _pinSet = j['pinSet'] == true;
+        _lockedUntil = j['pinLockedUntil'] == null ? null : parseDate(j['pinLockedUntil']);
+        _balance.text = toDouble(j['balance']).toStringAsFixed(2);
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _pinAction(String action, String done) async {
+    setState(() => _pinBusy = true);
+    try {
+      final j = asMap(await api.post('/api/admin/users/${widget.user.id}/pin/$action'));
+      if (!mounted) return;
+      setState(() {
+        _pinBusy = false;
+        _pinLocked = j['pinLocked'] == true;
+        _pinSet = j['pinSet'] == true;
+        _lockedUntil = null;
+      });
+      dpSnack(context, done, success: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _pinBusy = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
+  }
 
   @override
   void dispose() {
@@ -40,21 +86,30 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
           error: true);
       return;
     }
+    final u = widget.user;
+    final body = <String, dynamic>{
+      if (_name.text.trim() != u.name) 'fullName': _name.text.trim(),
+      if (_email.text.trim().toLowerCase() != u.email) 'email': _email.text.trim().toLowerCase(),
+      if (_phone.text.trim() != u.phone) 'phone': _phone.text.trim(),
+      if (_active != u.active) 'isActive': _active,
+    };
+    if (body.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
     setState(() => _saving = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      await api.patch('/api/admin/users/${u.id}', body);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
     if (!mounted) return;
-    final u = widget.user
-      ..name = _name.text.trim()
-      ..email = _email.text.trim()
-      ..phone = _phone.text.trim()
-      ..balance = double.tryParse(_balance.text) ?? widget.user.balance
-      ..active = _active
-      ..pinLocked = _pinLocked;
-    if (!_admin) u.role = 'user';
-    if (_admin && u.role == 'user') u.role = 'admin';
     setState(() => _saving = false);
     dpSnack(context, 'User updated', success: true);
-    Navigator.pop(context);
+    Navigator.pop(context, true);
   }
 
   Widget _switch(String title, String sub, bool v, ValueChanged<bool> on,
@@ -76,8 +131,10 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
-          const DPBanner(
-            'Super Admin Mode - Full Edit Access',
+          DPBanner(
+            _canEdit
+                ? 'You can edit this user\'s details. Every change is logged.'
+                : 'View only — your role can\'t edit users.',
             tone: DPTone.info,
             icon: Icons.admin_panel_settings_outlined,
           ),
@@ -91,7 +148,7 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(u.name, style: DP.bodyStrong),
-                    Text('${u.id} · Joined ${adminAgo(u.joinedDaysAgo * 1440)}',
+                    Text('${roleLabel(u.role)} · Joined ${dateLabel(u.joined)}',
                         style: DP.caption),
                   ],
                 ),
@@ -128,10 +185,11 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
           const DPLabel('Wallet Balance (₦)'),
           DPField(
             controller: _balance,
-            hint: 'Enter wallet balance',
+            hint: 'Wallet balance',
             prefixText: '₦  ',
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            readOnly: true,
           ),
+          const DPHelper('Use Credit / Debit Wallet on the user to change the balance.'),
           const SizedBox(height: 22),
           const DPSectionHeader('Account Controls'),
           DPCard(
@@ -144,16 +202,17 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
                       ? 'User can access the system'
                       : 'User account is disabled',
                   _active,
-                  (v) => setState(() => _active = v),
+                  (v) {
+                    if (_canEdit) setState(() => _active = v);
+                  },
                   DPIcons.user,
                 ),
                 Divider(height: 1, color: DP.borderSoft),
-                _switch(
-                  'Admin Privileges',
-                  _admin ? 'User has admin access' : 'User has regular access',
-                  _admin,
-                  (v) => setState(() => _admin = v),
-                  Icons.admin_panel_settings_outlined,
+                DPMenuRow(
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: 'Role',
+                  subtitle: 'Change roles in Admin Control (Super Admin)',
+                  trailing: StatusPill(roleLabel(u.role)),
                 ),
               ],
             ),
@@ -168,19 +227,27 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
                   children: [
                     Text('Lock Status', style: DP.body),
                     const Spacer(),
-                    StatusPill(_pinLocked ? 'LOCKED' : 'UNLOCKED',
-                        color: _pinLocked ? DP.red : DP.green),
+                    StatusPill(
+                        _pinLocked ? 'LOCKED' : (_pinSet ? 'UNLOCKED' : 'NOT SET'),
+                        color: _pinLocked ? DP.red : (_pinSet ? DP.green : DP.amber)),
                   ],
                 ),
-                if (_pinLocked) ...[
+                if (_pinLocked && _lockedUntil != null) ...[
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       Text('Lock Remaining', style: DP.caption),
-                      Spacer(),
-                      Text('24 min', style: DP.bodyStrong),
+                      const Spacer(),
+                      Text(
+                        '${_lockedUntil!.difference(DateTime.now()).inMinutes.clamp(0, 9999)} min',
+                        style: DP.bodyStrong,
+                      ),
                     ],
                   ),
+                ],
+                if (_pinBusy) ...[
+                  const SizedBox(height: 10),
+                  const LinearProgressIndicator(color: DP.green),
                 ],
                 const SizedBox(height: 14),
                 Row(
@@ -190,12 +257,8 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
                         label: 'Unlock PIN',
                         icon: Icons.lock_open_rounded,
                         height: 46,
-                        onPressed: _pinLocked
-                            ? () {
-                                setState(() => _pinLocked = false);
-                                dpSnack(context, 'PIN unlocked',
-                                    success: true);
-                              }
+                        onPressed: _pinLocked && !_pinBusy && adminCan('users:pin')
+                            ? () => _pinAction('unlock', 'PIN unlocked')
                             : null,
                       ),
                     ),
@@ -206,19 +269,20 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
                         icon: DPIcons.refresh,
                         color: DP.amber,
                         height: 46,
-                        onPressed: () async {
+                        onPressed: !_pinSet || _pinBusy || !adminCan('users:pin')
+                            ? null
+                            : () async {
                           final ok = await dpDialog(
                             context,
                             title: 'Reset PIN?',
                             message:
-                                'Reset ${u.name}\'s PIN to the default (123456). They\'ll be asked to change it.',
+                                'This removes ${u.name}\'s payment PIN. They\'ll create a new one before their next payment.',
                             confirmLabel: 'Reset',
                             cancelLabel: 'Cancel',
                             tone: DPTone.warning,
                           );
                           if (ok == true && mounted) {
-                            dpSnack(context, 'PIN reset to default',
-                                success: true);
+                            _pinAction('reset', 'PIN reset — the user will create a new one');
                           }
                         },
                       ),
@@ -234,7 +298,7 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
         child: DPButton(
           label: _saving ? 'Saving...' : 'Save Changes',
           loading: _saving,
-          onPressed: _save,
+          onPressed: _canEdit && !_saving ? _save : null,
         ),
       ),
     );

@@ -1,10 +1,14 @@
 // lib/presentation/screens/admin/admin_dashboard_screen.dart
-// Admin console home — UI only. Stats, charts, recent transactions and a
-// grid of every admin tool.
+// Admin console home: GET /api/admin/dashboard (stats, 7-day charts,
+// recent transactions) and the tools this staff role may use.
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-import 'admin_mock.dart';
+import '../../widgets/async_view.dart';
+import 'admin_models.dart';
 import 'admin_widgets.dart';
 
 class _Tool {
@@ -13,7 +17,9 @@ class _Tool {
   final IconData icon;
   final Color color;
   final String route;
-  const _Tool(this.title, this.subtitle, this.icon, this.color, this.route);
+  final String permission;
+  const _Tool(this.title, this.subtitle, this.icon, this.color, this.route,
+      this.permission);
 }
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -25,37 +31,115 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _period = 'Today';
+  Map<String, dynamic> _data = {};
+  int _unreadAlerts = 0;
+  bool _loading = true;
+  Object? _error;
 
   static const _periods = ['Today', 'This Week', 'This Month', 'This Year'];
+  static const _periodValues = {
+    'Today': 'today',
+    'This Week': 'week',
+    'This Month': 'month',
+    'This Year': 'year',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final d = asMap(await api.get('/api/admin/dashboard',
+          query: {'period': _periodValues[_period]}));
+      int unread = _unreadAlerts;
+      if (adminCan('alerts:read')) {
+        try {
+          unread = toInt(asMap(await api.get('/api/admin/alerts',
+              query: {'limit': 1}))['unread']);
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      setState(() {
+        _data = d;
+        _unreadAlerts = unread;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  Future<void> _open(String route) async {
+    await Navigator.pushNamed(context, route);
+    if (mounted) _load();
+  }
+
+  String _change(dynamic v) {
+    final n = toDouble(v);
+    return '${n >= 0 ? '+' : ''}${n.toStringAsFixed(n % 1 == 0 ? 0 : 1)}%';
+  }
 
   static const _tools = [
-    _Tool('Manage Users', 'View, edit, fund, approve', Icons.group_outlined, DP.green, '/admin/users'),
-    _Tool('Transactions', 'All payments & export', Icons.receipt_long_outlined, DP.navyIcon, '/admin/transactions'),
-    _Tool('Status Update', 'Change transaction status', Icons.update_rounded, DP.navyIcon, '/admin/status'),
-    _Tool('Refund System', 'Disputes & refunds', Icons.currency_exchange_rounded, DP.red, '/admin/refunds'),
-    _Tool('Fund Wallet', 'Credit a user wallet', Icons.account_balance_wallet_outlined, DP.green, '/admin/fund-wallet'),
-    _Tool('Self Fund', 'Top up admin wallet', Icons.attach_money_rounded, DP.amber, '/admin/self-fund'),
-    _Tool('Verify Payments', 'Check & credit transfers', Icons.verified_outlined, Color(0xFF0D9488), '/admin/verify'),
-    _Tool('Send Notification', 'Message users', Icons.campaign_outlined, DP.navyIcon, '/admin/send-notification'),
-    _Tool('Admin Alerts', 'Activity & warnings', Icons.notifications_active_outlined, DP.amber, '/admin/alerts'),
-    _Tool('Admin Control', 'Roles & permissions', Icons.admin_panel_settings_outlined, DP.navyIcon, '/admin/control'),
-    _Tool('VTpass Settings', 'Provider & services', Icons.api_rounded, DP.amber, '/admin/vtpass'),
-    _Tool('Service Commission', 'Rates & revenue', Icons.trending_up_rounded, DP.green, '/admin/commission'),
-    _Tool('Transaction Limits', 'Caps & maintenance', Icons.speed_rounded, DP.amber, '/admin/limits'),
+    _Tool('Manage Users', 'View, edit, fund, approve', Icons.group_outlined, DP.green, '/admin/users', 'users:read'),
+    _Tool('Transactions', 'All payments & export', Icons.receipt_long_outlined, DP.navyIcon, '/admin/transactions', 'transactions:read'),
+    _Tool('Status Update', 'Change transaction status', Icons.update_rounded, DP.navyIcon, '/admin/status', 'transactions:status'),
+    _Tool('Refund System', 'Disputes & refunds', Icons.currency_exchange_rounded, DP.red, '/admin/refunds', 'disputes:manage'),
+    _Tool('Fund Wallet', 'Credit a user wallet', Icons.account_balance_wallet_outlined, DP.green, '/admin/fund-wallet', 'wallet:fund'),
+    _Tool('Self Fund', 'Top up admin wallet', Icons.attach_money_rounded, DP.amber, '/admin/self-fund', 'wallet:self-fund'),
+    _Tool('Verify Payments', 'Check & credit transfers', Icons.verified_outlined, Color(0xFF0D9488), '/admin/verify', 'payments:verify'),
+    _Tool('Send Notification', 'Message users', Icons.campaign_outlined, DP.navyIcon, '/admin/send-notification', 'notifications:send'),
+    _Tool('Admin Alerts', 'Activity & warnings', Icons.notifications_active_outlined, DP.amber, '/admin/alerts', 'alerts:read'),
+    _Tool('Admin Control', 'Roles & permissions', Icons.admin_panel_settings_outlined, DP.navyIcon, '/admin/control', 'roles:manage'),
+    _Tool('Provider Settings', 'Bill provider & services', Icons.api_rounded, DP.amber, '/admin/vtpass', 'settings:read'),
+    _Tool('Service Commission', 'Rates & revenue', Icons.trending_up_rounded, DP.green, '/admin/commission', 'commission:read'),
+    _Tool('Transaction Limits', 'Caps & maintenance', Icons.speed_rounded, DP.amber, '/admin/limits', 'limits:read'),
   ];
 
-  double get _factor => switch (_period) {
-        'This Week' => 6.4,
-        'This Month' => 27,
-        'This Year' => 310,
-        _ => 1,
-      };
+  List<_Tool> get _allowedTools =>
+      _tools.where((t) => adminCan(t.permission)).toList();
 
   @override
   Widget build(BuildContext context) {
-    final revenue = kRevenue7d.last * _factor;
-    final txns = (148 * _factor).round();
-    final pending = kAdminTxns.where((t) => t.status == 'Pending').length;
+    final user = Session.instance.user;
+    if (user == null || !user.isAdmin) {
+      return AdminScaffold(
+        title: 'Admin Dashboard',
+        breadcrumb: 'Admin / Dashboard',
+        body: const DPEmptyState(
+          icon: Icons.lock_outline_rounded,
+          title: 'Staff only',
+          message: 'Your account doesn\'t have access to the admin console.',
+        ),
+      );
+    }
+    if (_loading) {
+      return const AdminScaffold(
+        title: 'Admin Dashboard',
+        breadcrumb: 'Admin / Dashboard',
+        body: DPLoading(),
+      );
+    }
+    if (_error != null && _data.isEmpty) {
+      return AdminScaffold(
+        title: 'Admin Dashboard',
+        breadcrumb: 'Admin / Dashboard',
+        body: DPLoadError(error: _error, onRetry: _load),
+      );
+    }
+    final revenue = toDouble(_data['revenue']);
+    final txns = toInt(_data['transactions']);
+    final pending = toInt(_data['pending']);
+    final volume7d = asList(_data['volume7d']).map((d) => toDouble(d['value'])).toList();
+    final users7d = asList(_data['users7d']).map((d) => toDouble(d['value'])).toList();
+    final recent = asList(_data['recentTransactions']).map(AdminTxn.fromJson).toList();
     return AdminScaffold(
       title: 'Admin Dashboard',
       breadcrumb: 'Admin / Dashboard',
@@ -66,21 +150,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           color: DP.navyInk,
           background: Colors.transparent,
           semanticLabel: 'Admin alerts',
-          onTap: () => Navigator.pushNamed(context, '/admin/alerts'),
-          badge: Container(
-            width: 9,
-            height: 9,
-            decoration: const BoxDecoration(
-              color: DP.red,
-              shape: BoxShape.circle,
-            ),
-          ),
+          onTap: () => _open('/admin/alerts'),
+          badge: _unreadAlerts > 0
+              ? Container(
+                  width: 9,
+                  height: 9,
+                  decoration: const BoxDecoration(
+                    color: DP.red,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              : null,
         ),
       ],
       body: RefreshIndicator(
         color: DP.green,
-        onRefresh: () => Future.delayed(const Duration(milliseconds: 600)),
+        onRefresh: _load,
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
           children: [
             DPAppear(child: _welcome()),
@@ -88,30 +175,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             DPChipScroller(
               options: _periods,
               selected: _period,
-              onSelect: (p) => setState(() => _period = p),
+              onSelect: (p) {
+                setState(() => _period = p);
+                _load();
+              },
             ),
             const SizedBox(height: 14),
             AdminStatGrid(
               stats: [
                 AdminStat(
-                  label: 'Total Revenue',
+                  label: 'Revenue',
                   value: DP.naira(revenue, decimals: false),
                   icon: Icons.payments_outlined,
                   color: DP.green,
-                  sub: '+12.4%',
+                  sub: _change(_data['revenueChange']),
                 ),
                 AdminStat(
                   label: 'Total Users',
-                  value: '${kAdminUsers.length * 124 + 8}',
+                  value: '${toInt(_data['totalUsers'])}',
                   icon: Icons.group_outlined,
-                  sub: '+8',
+                  sub: '+${toInt(_data['newUsers'])}',
                 ),
                 AdminStat(
-                  label: 'Transactions',
-                  value: '$txns',
+                  label: 'Sales Volume',
+                  value: DP.naira(toDouble(_data['volume']), decimals: false),
                   icon: Icons.receipt_long_outlined,
                   color: DP.navyInk,
-                  sub: '+5.1%',
+                  sub: '$txns txns · ${_change(_data['volumeChange'])}',
                 ),
                 AdminStat(
                   label: 'Pending',
@@ -123,9 +213,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
             const SizedBox(height: 22),
             _chartCard(
-              'Revenue Trend (Last 7 Days)',
+              'Sales Volume (Last 7 Days)',
               AdminBarChart(
-                values: kRevenue7d,
+                values: volume7d.isEmpty ? List.filled(7, 0.0) : volume7d,
                 format: (v) => DP.naira(v, decimals: false),
               ),
             ),
@@ -133,7 +223,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _chartCard(
               'User Growth (Last 7 Days)',
               AdminBarChart(
-                values: kUsers7d.map((e) => e.toDouble()).toList(),
+                values: users7d.isEmpty ? List.filled(7, 0.0) : users7d,
                 format: (v) => '${v.toInt()} new users',
                 color: DP.navyIcon,
               ),
@@ -145,12 +235,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             DPSectionHeader(
               'Recent Transactions',
               actionLabel: 'See All',
-              onAction: () =>
-                  Navigator.pushNamed(context, '/admin/transactions'),
+              onAction: adminCan('transactions:read')
+                  ? () => _open('/admin/transactions')
+                  : null,
             ),
+            if (recent.isEmpty)
+              const DPCard(
+                child: DPEmptyState(
+                  icon: DPIcons.receipt,
+                  title: 'No transactions yet',
+                ),
+              ),
+            if (recent.isNotEmpty)
             AdminListCard(
               children: [
-                for (final t in kAdminTxns.take(5))
+                for (final t in recent.take(8))
                   DPListRow(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     leading: DPIconBadge(
@@ -187,6 +286,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _welcome() {
+    final user = Session.instance.user;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -195,22 +295,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       child: Row(
         children: [
-          const DPAvatar(name: 'Adaeze Okafor', size: 48),
+          DPAvatar(name: user?.fullName ?? '', size: 48),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Welcome, Adaeze',
-                  style: TextStyle(
+                  'Welcome, ${user?.firstName ?? ''}',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                SizedBox(height: 3),
-                Text(
+                const SizedBox(height: 3),
+                const Text(
                   'Here\'s what\'s happening on Dalabapay.',
                   style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
                 ),
@@ -223,9 +323,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               color: Colors.white.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Text(
-              'SUPER ADMIN',
-              style: TextStyle(
+            child: Text(
+              roleLabel(user?.role ?? '').toUpperCase(),
+              style: const TextStyle(
                 color: Color(0xFF7FE3BC),
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
@@ -256,7 +356,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _tools.length,
+      itemCount: _allowedTools.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 10,
@@ -264,12 +364,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         mainAxisExtent: 76,
       ),
       itemBuilder: (_, i) {
-        final t = _tools[i];
+        final t = _allowedTools[i];
         return DPAppear(
           delay: DPMotion.stagger(i),
           child: DPCard(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            onTap: () => Navigator.pushNamed(context, t.route),
+            onTap: () => _open(t.route),
             child: Row(
               children: [
                 Container(
