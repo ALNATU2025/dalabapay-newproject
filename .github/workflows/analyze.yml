@@ -1,0 +1,49 @@
+name: Flutter analyze
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install packages
+        run: flutter pub get
+
+      - name: Analyze
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos --no-fatal-warnings > analyze.txt 2>&1
+          cat analyze.txt
+          # "  error • message • lib/file.dart:10:5 • code"  ->  annotation lines
+          grep -E '^\s*(error|warning) • ' analyze.txt \
+            | sed -E 's/^\s*(error|warning) • (.*) • ([^ ]+):([0-9]+):([0-9]+) • ([a-z_]+)\s*$/\1|\3|\4|\5|\2 (\6)/' \
+            > issues.txt
+          grep -c '^error|' issues.txt > errors.count || true
+          grep -c '^warning|' issues.txt > warnings.count || true
+          true
+
+      - name: Summary
+        run: echo "::notice title=Analyzer::errors=$(cat errors.count) warnings=$(cat warnings.count)"
+
+      # GitHub shows at most 10 error annotations per step, so report in slices.
+      - name: Issues 1-10
+        run: sed -n '1,10p' issues.txt | while IFS='|' read -r lvl file line col msg; do echo "::$lvl file=$file,line=$line,col=$col::$msg"; done
+      - name: Issues 11-20
+        run: sed -n '11,20p' issues.txt | while IFS='|' read -r lvl file line col msg; do echo "::$lvl file=$file,line=$line,col=$col::$msg"; done
+      - name: Issues 21-30
+        run: sed -n '21,30p' issues.txt | while IFS='|' read -r lvl file line col msg; do echo "::$lvl file=$file,line=$line,col=$col::$msg"; done
+      - name: Issues 31-40
+        run: sed -n '31,40p' issues.txt | while IFS='|' read -r lvl file line col msg; do echo "::$lvl file=$file,line=$line,col=$col::$msg"; done
+
+      - name: Fail on errors
+        run: test "$(cat errors.count)" = "0"
