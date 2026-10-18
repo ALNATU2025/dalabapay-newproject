@@ -676,6 +676,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         onTap: () =>
                                             _openServiceRoute('/cable'),
                                       ),
+                                      _HomeBannerData(
+                                        title: 'Refer a Friend',
+                                        subtitle:
+                                            'Invite friends and you both earn ₦200.',
+                                        image: DPAssets.bannerRefer,
+                                        icon: DPIcons.gift,
+                                        onTap: () =>
+                                            Navigator.pushNamed(context, '/referral'),
+                                      ),
                                     ],
                                   ),
                                 ),
