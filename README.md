@@ -32,6 +32,15 @@ My Wallet / Transactions · Commission & earnings · Refer & earn ·
 Notifications · Profile / Security · KYC · My Disputes ·
 Transaction validation · Help & support
 
+### Admin console (UI only)
+Open it from the side menu (**Admin Console**) or Profile → Admin Console.
+Dashboard · Manage Users (approve, activate, credit/debit, edit, history) ·
+All Transactions (search, filter, sort, export) · Status Update ·
+Refund & Dispute · Fund Wallet · Self Fund · Verify Payments ·
+Send Notification · Admin Alerts · Admin Control (roles) · VTpass Settings ·
+Service Commission · Transaction Limits. Sample data lives in
+`lib/presentation/screens/admin/admin_mock.dart`.
+
 ## How "fake" actions behave
 - **Login / PIN / biometrics** – any input works and opens Home.
 - **Verify meter / smartcard / profile / recipient** – shows a sample
@@ -45,7 +54,7 @@ Transaction validation · Help & support
 API/payment/auth/socket/notification services, providers, secure storage,
 shared preferences, Firebase (Android `google-services.json`, Gradle plugin
 and manifest entries), the cleartext network config for the old backend, the
-native contacts channel, and the **admin** screens.
+native contacts channel.
 
 ## Run it
 ```

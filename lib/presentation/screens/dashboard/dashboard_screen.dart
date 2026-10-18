@@ -459,6 +459,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildDrawer() {
     final items = <(IconData, String, String?)>[
       (Icons.apps_rounded, 'All Services', null),
+      (Icons.admin_panel_settings_outlined, 'Admin Console', '/admin'),
       (DPIcons.shieldCheck, 'Transaction Validation', '/transaction-validation'),
       (Icons.gavel_rounded, 'My Disputes', '/user-disputes'),
       (DPIcons.referral, 'Refer & Earn', '/referral'),

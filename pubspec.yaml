@@ -28,7 +28,10 @@ flutter:
     # Logos, onboarding art, service icons and banners go here.
     # See IMAGES_NEEDED.md. Every missing image falls back to an icon.
     - assets/images/
-
+    - assets/images/onboarding_1.png
+    - assets/images/onboarding_2.png
+    - assets/images/onboarding_3.png
+    - assets/images/app_barlogo.png
 flutter_launcher_icons:
   android: true
   ios: true

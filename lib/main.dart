@@ -6,6 +6,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'core/theme/app_theme.dart';
+import 'presentation/screens/admin/admin_all_transactions_page.dart';
+import 'presentation/screens/admin/admin_control_page.dart';
+import 'presentation/screens/admin/admin_dashboard_screen.dart';
+import 'presentation/screens/admin/admin_fund_wallet_page.dart';
+import 'presentation/screens/admin/admin_notifications_page.dart';
+import 'presentation/screens/admin/admin_refund_system_page.dart';
+import 'presentation/screens/admin/admin_self_fund_page.dart';
+import 'presentation/screens/admin/admin_send_notification_page.dart';
+import 'presentation/screens/admin/admin_service_commission_page.dart';
+import 'presentation/screens/admin/admin_transaction_limits_page.dart';
+import 'presentation/screens/admin/admin_transaction_status_page.dart';
+import 'presentation/screens/admin/admin_users_page.dart';
+import 'presentation/screens/admin/admin_verify_payment_page.dart';
+import 'presentation/screens/admin/vtpass_settings_dashboard.dart';
 import 'presentation/screens/airtime/airtime_screen.dart';
 import 'presentation/screens/auth/change_password_screen.dart';
 import 'presentation/screens/auth/change_pin_screen.dart';
@@ -87,6 +101,21 @@ class DalabapayApp extends StatelessWidget {
     '/referral': (_) => const ReferralScreen(),
     '/wallet': (_) => const WalletTopUpScreen(),
     '/send-money': (_) => const SendMoneyScreen(),
+    // Admin console (UI only)
+    '/admin': (_) => const AdminDashboardScreen(),
+    '/admin/users': (_) => const AdminUsersPage(),
+    '/admin/transactions': (_) => const AdminAllTransactionsPage(),
+    '/admin/status': (_) => const AdminTransactionStatusPage(),
+    '/admin/refunds': (_) => const AdminRefundSystemPage(),
+    '/admin/fund-wallet': (_) => const AdminFundWalletPage(),
+    '/admin/self-fund': (_) => const AdminSelfFundPage(),
+    '/admin/verify': (_) => const AdminVerifyPaymentPage(),
+    '/admin/send-notification': (_) => const AdminSendNotificationPage(),
+    '/admin/alerts': (_) => const AdminNotificationsPage(),
+    '/admin/control': (_) => const AdminControlPage(),
+    '/admin/vtpass': (_) => const VtpassSettingsDashboard(),
+    '/admin/commission': (_) => const AdminServiceCommissionPage(),
+    '/admin/limits': (_) => const AdminTransactionLimitsPage(),
   };
 
   @override
