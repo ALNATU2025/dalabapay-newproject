@@ -170,71 +170,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ==================== SECTIONS ====================
 
+  /// App bar: menu avatar · centred logo · notifications, then the greeting.
   Widget _buildAppBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(
-            button: true,
-            label: 'Open menu',
-            child: GestureDetector(
-              onTap: () => _scaffoldKey.currentState?.openDrawer(),
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: DP.blueTint,
-                ),
-                child: const ClipOval(
-                  child: DPAvatar(name: MockUser.fullName, size: 44),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          SizedBox(
+            height: 48,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                const Text(
-                  'Hello, ${MockUser.firstName}!',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: DP.ink,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Semantics(
+                    button: true,
+                    label: 'Open menu',
+                    child: GestureDetector(
+                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: DP.blueTint,
+                        ),
+                        child: const ClipOval(
+                          child: DPAvatar(name: MockUser.fullName, size: 44),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(_greeting(), style: DP.caption.copyWith(fontSize: 13)),
+                // Centre logo: assets/images/app_barlogo.png
+                // (shows the drawn wordmark until the file is added).
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Image.asset(
+                    'assets/images/app_barlogo.png',
+                    height: 34,
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Dalabapay',
+                    errorBuilder: (_, __, ___) =>
+                        const DPWordmark(height: 28),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: DPIconSquare(
+                    icon: DPIcons.bell,
+                    size: 44,
+                    color: DP.navy,
+                    background: Colors.transparent,
+                    semanticLabel: 'Notifications',
+                    onTap: () => Navigator.pushNamed(context, '/notifications'),
+                    badge: _unreadNotificationCount > 0
+                        ? Container(
+                            width: 9,
+                            height: 9,
+                            decoration: BoxDecoration(
+                              color: DP.red,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: DP.surface, width: 1.5),
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
               ],
             ),
           ),
-          DPIconSquare(
-            icon: DPIcons.bell,
-            size: 44,
-            color: DP.navy,
-            background: Colors.transparent,
-            semanticLabel: 'Notifications',
-            onTap: () => Navigator.pushNamed(context, '/notifications'),
-            badge: _unreadNotificationCount > 0
-                ? Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: DP.red,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: DP.surface, width: 1.5),
-                    ),
-                  )
-                : null,
+          const SizedBox(height: 12),
+          const Text(
+            'Hello, ${MockUser.firstName}!',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: DP.ink,
+            ),
           ),
+          const SizedBox(height: 2),
+          Text(_greeting(), style: DP.caption.copyWith(fontSize: 13)),
         ],
       ),
     );
   }
+
 
   Widget _buildBalanceCard() {
     return Container(

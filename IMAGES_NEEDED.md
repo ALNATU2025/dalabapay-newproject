@@ -12,6 +12,7 @@ No code or `pubspec.yaml` changes are needed.
 |---|---|
 | `dabalogo.png` | Splash, login, About Dalabapay |
 | `dalabapay2.png` | Receipts, logo bar |
+| `app_barlogo.png` | Centre of the Home app bar |
 
 ## 1. Onboarding illustrations — 3 files
 Size **1080 × 1080 px**, character/object centred, transparent background.
