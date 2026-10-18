@@ -47,3 +47,53 @@ jobs:
 
       - name: Fail on errors
         run: test "$(cat errors.count)" = "0"
+
+  # Runs the app's API client against the real backend + MongoDB.
+  contract:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      NODE_ENV: development
+      PORT: 4000
+      MONGO_URI: mongodb://localhost:27017/dalabapay_contract
+      JWT_SECRET: contract-test-secret-contract-test-secret
+      BILL_PROVIDER: simulator
+      PAYMENT_PROVIDER: simulator
+      WEBHOOK_SECRET: contract-webhook
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ALNATU2025/newproject-backend
+          path: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Start backend
+        working-directory: backend
+        run: |
+          npm install --no-audit --no-fund
+          nohup node src/server.js > ../server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:4000/health && break; sleep 1; done
+          curl -sf http://localhost:4000/health
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Contract test
+        env:
+          BACKEND_DIR: ${{ github.workspace }}/backend
+        run: flutter test test/api_contract_test.dart --dart-define=API_URL=http://localhost:4000 -r github
+      - name: Backend log (on failure)
+        if: failure()
+        run: |
+          tail -n 60 server.log
+          grep -iE "error|exception" server.log | tail -n 10 | while read -r l; do echo "::warning title=server::$l"; done
