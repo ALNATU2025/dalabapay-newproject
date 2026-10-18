@@ -395,6 +395,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               _divider(),
               _tile(
+                icon: Icons.admin_panel_settings_outlined,
+                title: 'Admin Console',
+                status: 'ADMIN',
+                statusColor: DP.navy,
+                onTap: () => Navigator.pushNamed(context, '/admin'),
+              ),
+              _divider(),
+              _tile(
                 icon: DPIcons.help,
                 title: 'Help & Support',
                 onTap: () => Navigator.pushNamed(context, '/help'),
