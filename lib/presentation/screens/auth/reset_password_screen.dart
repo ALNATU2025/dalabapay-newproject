@@ -66,8 +66,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: DP.bg,
-      body: SafeArea(
+      backgroundColor: DP.surface,
+      body: DPWaveBackground(child: SafeArea(
         child: Column(
           children: [
             const DPTopBar(title: 'Create new password'),
@@ -134,7 +134,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

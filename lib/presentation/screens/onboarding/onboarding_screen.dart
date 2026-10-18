@@ -79,7 +79,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final isLast = _selectedIndex == _onboardingData.length - 1;
     return Scaffold(
       backgroundColor: DP.surface,
-      body: SafeArea(
+      body: DPWaveBackground(child: SafeArea(
         child: Column(
           children: [
             Expanded(
@@ -133,7 +133,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             const SizedBox(height: 12),
           ],
         ),
-      ),
+      )),
     );
   }
 }

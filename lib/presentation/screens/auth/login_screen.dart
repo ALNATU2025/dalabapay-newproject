@@ -57,24 +57,16 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
-    final h = MediaQuery.of(context).size.height;
 
     return Scaffold(
       backgroundColor: DP.surface,
-      body: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: DPWaves(height: h * 0.14),
-          ),
-          SafeArea(
+      body: DPWaveBackground(
+        child: SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(28, canPop ? 0 : 28, 28, h * 0.16),
+                padding: EdgeInsets.fromLTRB(28, canPop ? 0 : 28, 28, 24),
                 child: AutofillGroup(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,7 +230,6 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
-        ],
       ),
     );
   }

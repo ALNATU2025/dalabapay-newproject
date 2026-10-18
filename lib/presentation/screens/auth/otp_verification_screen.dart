@@ -58,8 +58,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: DP.bg,
-      body: SafeArea(
+      backgroundColor: DP.surface,
+      body: DPWaveBackground(child: SafeArea(
         child: Column(
           children: [
             const DPTopBar(title: 'Verify code'),
@@ -125,7 +125,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

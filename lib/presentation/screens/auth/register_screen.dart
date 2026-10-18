@@ -113,8 +113,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (!didPop && _showVerifyStep) _backToDetails();
       },
       child: Scaffold(
-        backgroundColor: DP.bg,
-        body: SafeArea(
+        backgroundColor: DP.surface,
+        body: DPWaveBackground(child: SafeArea(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: _showVerifyStep
@@ -127,7 +127,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: _buildDetails(),
                   ),
           ),
-        ),
+        )),
       ),
     );
   }

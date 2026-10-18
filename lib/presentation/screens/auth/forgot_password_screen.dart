@@ -45,8 +45,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: DP.bg,
-      body: SafeArea(
+      backgroundColor: DP.surface,
+      body: DPWaveBackground(child: SafeArea(
         child: Column(
           children: [
             const DPTopBar(title: 'Forgot password'),
@@ -112,7 +112,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }
