@@ -313,7 +313,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: List.generate(7, (i) {
               final v = totals[i];
-              final h = 10 + (maxV > 0 ? v / maxV : 0) * 70;
+              final h = 10 + (maxV > 0 ? v / maxV : 0.0) * 70;
               final isToday = i == 6;
               return Expanded(
                 child: Tooltip(
