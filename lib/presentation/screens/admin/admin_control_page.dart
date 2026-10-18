@@ -151,7 +151,7 @@ class _AdminControlPageState extends State<AdminControlPage> {
             },
           ),
           const SizedBox(height: 8),
-          const Text('Try: chidi.eze@example.com', style: DP.caption),
+          Text('Try: chidi.eze@example.com', style: DP.caption),
         ],
       ),
     );
@@ -180,7 +180,7 @@ class _AdminControlPageState extends State<AdminControlPage> {
                 label: 'Admins',
                 value: '${admins.length}',
                 icon: Icons.admin_panel_settings_outlined,
-                color: DP.navy,
+                color: DP.navyInk,
               ),
               AdminStat(
                 label: 'Regular Users',

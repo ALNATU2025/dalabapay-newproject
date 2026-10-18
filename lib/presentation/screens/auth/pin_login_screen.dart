@@ -45,7 +45,7 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                 child: DPWordmark(height: 32),
               ),
               const SizedBox(height: 28),
-              const Text('Enter your PIN.', style: DP.display),
+              Text('Enter your PIN.', style: DP.display),
               const SizedBox(height: 8),
               Text(
                 'Use your 6-digit PIN to unlock Dalabapay.',
@@ -61,7 +61,7 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(MockUser.fullName, style: DP.bodyStrong),
                           Text(MockUser.email, style: DP.caption),
                         ],

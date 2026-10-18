@@ -163,7 +163,7 @@ class DPWordmark extends StatelessWidget {
               children: [
                 TextSpan(
                   text: 'Dalaba',
-                  style: TextStyle(color: DP.navy, fontSize: height * 0.82),
+                  style: TextStyle(color: DP.navyInk, fontSize: height * 0.82),
                 ),
                 TextSpan(
                   text: 'pay',

@@ -41,6 +41,12 @@ Send Notification · Admin Alerts · Admin Control (roles) · VTpass Settings ·
 Service Commission · Transaction Limits. Sample data lives in
 `lib/presentation/screens/admin/admin_mock.dart`.
 
+## Light / dark theme
+Profile → **Appearance**: Normal, Dark or System (follows the phone).
+Surface and text colours in `lib/ui/dp_tokens.dart` switch with `DP.isDark`;
+brand greens, navy and the gradients stay the same. The choice is kept until
+the app closes (add `shared_preferences` to save it).
+
 ## How "fake" actions behave
 - **Login / PIN / biometrics** – any input works and opens Home.
 - **Verify meter / smartcard / profile / recipient** – shows a sample

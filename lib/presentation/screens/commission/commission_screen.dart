@@ -118,7 +118,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     DP.naira(v, decimals: v % 1 != 0),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
                       color: DP.ink,
@@ -152,7 +152,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
           const DPSectionHeader('Latest earnings'),
           for (final e in _earnings) _buildItem(e),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Commission is credited after an eligible payment succeeds. Rates are shown before you pay.',
             style: DP.caption,
           ),
@@ -248,7 +248,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
       children: [
         Row(
           children: [
-            const Expanded(child: Text('This week', style: DP.section)),
+            Expanded(child: Text('This week', style: DP.section)),
             Text(
               '${DP.naira(weekTotal, decimals: false)} earned',
               style: const TextStyle(
@@ -311,7 +311,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
         children: [
           const DPIconBadge.blue(DPIcons.referral, size: 44),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -333,7 +333,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
               );
               dpSnack(context, 'Referral code copied', success: true);
             },
-            icon: const Icon(DPIcons.copy, color: DP.muted, size: 20),
+            icon: Icon(DPIcons.copy, color: DP.muted, size: 20),
           ),
         ],
       ),

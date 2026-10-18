@@ -60,7 +60,7 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
           Center(
             child: Text(
               DP.naira(t.amount),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.w800,
                 color: DP.ink,
@@ -187,7 +187,7 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                 child: DPSelectField(
                   value: _sort,
                   hint: 'Sort By',
-                  leading: const Icon(Icons.sort_rounded,
+                  leading: Icon(Icons.sort_rounded,
                       size: 20, color: DP.muted),
                   onTap: () async {
                     final v = await dpPickFromList<String>(
@@ -239,7 +239,7 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                       children: [
                         Text(
                           DP.naira(t.amount),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: DP.ink,
                           ),

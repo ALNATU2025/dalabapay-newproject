@@ -140,7 +140,7 @@ class _AdminServiceCommissionPageState
                 label: 'Avg Revenue per Txn',
                 value: DP.naira(txns == 0 ? 0 : revenue / txns),
                 icon: Icons.calculate_outlined,
-                color: DP.navy,
+                color: DP.navyInk,
               ),
             ],
           ),
@@ -155,7 +155,7 @@ class _AdminServiceCommissionPageState
           ),
           const SizedBox(height: 22),
           const DPSectionHeader('Commission Rates'),
-          const Text('Tap a service to change its rates', style: DP.caption),
+          Text('Tap a service to change its rates', style: DP.caption),
           const SizedBox(height: 10),
           AdminListCard(
             children: [
@@ -166,7 +166,7 @@ class _AdminServiceCommissionPageState
                   leading: DPIconBadge.blue(s.icon, size: 40, iconSize: 19),
                   title: s.name,
                   subtitle: 'User ${s.rate}% · Platform ${s.margin}%',
-                  trailing: const Icon(DPIcons.edit, size: 18, color: DP.muted),
+                  trailing: Icon(DPIcons.edit, size: 18, color: DP.muted),
                 ),
             ],
           ),

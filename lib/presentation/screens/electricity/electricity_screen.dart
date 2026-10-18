@@ -184,7 +184,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
                         LengthLimitingTextInputFormatter(13),
                       ],
                       onChanged: (_) => setState(() => _isValidated = false),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         color: DP.ink,
                         letterSpacing: 0.6,
@@ -206,7 +206,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
                     ),
                     if (_isValidated) ...[
                       const SizedBox(height: 12),
-                      const DPCard(
+                      DPCard(
                         color: DP.mint,
                         borderColor: null,
                         padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -255,7 +255,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       onChanged: (_) =>
                           setState(() => _selectedQuickAmount = null),
-                      style: const TextStyle(fontSize: 17, color: DP.ink),
+                      style: TextStyle(fontSize: 17, color: DP.ink),
                     ),
                     const DPHelper('Minimum purchase: ₦2,000'),
                     const SizedBox(height: 12),
@@ -282,7 +282,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
-                      suffix: const Icon(DPIcons.phone, color: DP.muted),
+                      suffix: Icon(DPIcons.phone, color: DP.muted),
                     ),
                     const SizedBox(height: 20),
                     WalletCommissionCard(

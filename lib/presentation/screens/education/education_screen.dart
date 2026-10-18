@@ -250,7 +250,7 @@ class _EducationScreenState extends State<EducationScreen> {
                             child: Text(
                               '$_quantity',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 color: DP.ink,

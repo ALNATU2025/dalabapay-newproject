@@ -147,7 +147,7 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
                   (v) => setState(() => _active = v),
                   DPIcons.user,
                 ),
-                const Divider(height: 1, color: DP.borderSoft),
+                Divider(height: 1, color: DP.borderSoft),
                 _switch(
                   'Admin Privileges',
                   _admin ? 'User has admin access' : 'User has regular access',
@@ -166,7 +166,7 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
               children: [
                 Row(
                   children: [
-                    const Text('Lock Status', style: DP.body),
+                    Text('Lock Status', style: DP.body),
                     const Spacer(),
                     StatusPill(_pinLocked ? 'LOCKED' : 'UNLOCKED',
                         color: _pinLocked ? DP.red : DP.green),
@@ -174,7 +174,7 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
                 ),
                 if (_pinLocked) ...[
                   const SizedBox(height: 6),
-                  const Row(
+                  Row(
                     children: [
                       Text('Lock Remaining', style: DP.caption),
                       Spacer(),

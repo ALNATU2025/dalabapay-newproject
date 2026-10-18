@@ -87,7 +87,7 @@ class _KYCScreenState extends State<KYCScreen> {
               const SizedBox(height: 12),
               const DPStatusHero(size: 84),
               const SizedBox(height: 14),
-              const Text('Account created!', style: DP.title),
+              Text('Account created!', style: DP.title),
               const SizedBox(height: 6),
               Text(
                 'Your dedicated account has been set up successfully',
@@ -163,7 +163,7 @@ class _KYCScreenState extends State<KYCScreen> {
                       subtitle:
                           'Provide your identification details to create your dedicated account.',
                     ),
-                    const DPCard(
+                    DPCard(
                       padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,7 +255,7 @@ class _KYCScreenState extends State<KYCScreen> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          const Expanded(
+                          Expanded(
                             child: Text.rich(
                               TextSpan(
                                 text: 'I agree to the ',
@@ -284,7 +284,7 @@ class _KYCScreenState extends State<KYCScreen> {
                       onPressed: _valid ? _submit : null,
                     ),
                     const SizedBox(height: 12),
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(DPIcons.lock, size: 15, color: DP.muted),

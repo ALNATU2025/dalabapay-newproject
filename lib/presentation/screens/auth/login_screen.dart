@@ -84,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       Center(child: _buildLogo()),
                       const SizedBox(height: 30),
-                      const DPAppear(
+                      DPAppear(
                         child: Text(
                           'Welcome Back',
                           style: TextStyle(
@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen>
                             child: Checkbox(
                               value: _rememberMe,
                               activeColor: DP.green,
-                              side: const BorderSide(color: DP.faint),
+                              side: BorderSide(color: DP.faint),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(5),
                               ),
@@ -153,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen>
                           GestureDetector(
                             onTap: () =>
                                 setState(() => _rememberMe = !_rememberMe),
-                            child: const Text(
+                            child: Text(
                               'Remember me',
                               style:
                                   TextStyle(fontSize: 13.5, color: DP.inkSoft),
@@ -196,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ),
                       const SizedBox(height: 14),
-                      const Row(
+                      Row(
                         children: [
                           Expanded(child: Divider(color: DP.border)),
                           Padding(
@@ -213,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen>
                             Navigator.pushReplacementNamed(context, '/register'),
                       ),
                       const SizedBox(height: 26),
-                      const Center(
+                      Center(
                         child: Text(
                           'Safe  •  Secure  •  Fast',
                           style: TextStyle(
@@ -235,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildLogo() {
-    return const DPAppear(
+    return DPAppear(
       scaleFrom: 0.9,
       offsetY: 0,
       child: Column(
@@ -245,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen>
           Text.rich(
             TextSpan(
               children: [
-                TextSpan(text: 'Dalaba', style: TextStyle(color: DP.navy)),
+                TextSpan(text: 'Dalaba', style: TextStyle(color: DP.navyInk)),
                 TextSpan(text: 'pay', style: TextStyle(color: DP.green)),
               ],
             ),

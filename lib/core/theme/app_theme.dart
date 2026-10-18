@@ -11,7 +11,7 @@ import '../../ui/dp_motion.dart';
 class AppTheme {
   static const Color primaryColor = DP.green;
   static const Color secondaryColor = DP.navy;
-  static const Color accentColor = DP.mint;
+  static Color get accentColor => DP.mint;
   static const Color successColor = DP.green;
   static const Color errorColor = DP.red;
   static const Color warningColor = DP.amber;
@@ -40,21 +40,27 @@ class AppTheme {
         borderSide: BorderSide(color: c, width: w),
       );
 
-  static final TextTheme _text = GoogleFonts.interTextTheme().apply(
-    bodyColor: DP.ink,
-    displayColor: DP.ink,
-  );
+  /// Theme for the current light/dark setting (reads [DP.isDark]).
+  /// ThemeController sets DP.isDark, then the app calls this again.
+  static ThemeData get current => _build();
 
-  static ThemeData lightTheme = ThemeData(
+  static ThemeData get lightTheme => _build();
+
+  static ThemeData _build() {
+    final dark = DP.isDark;
+    final text = GoogleFonts.interTextTheme(
+      dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
+    ).apply(bodyColor: DP.ink, displayColor: DP.ink);
+    return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.light,
+    brightness: dark ? Brightness.dark : Brightness.light,
     pageTransitionsTheme: DPMotion.pageTransitions,
     primaryColor: primaryColor,
     scaffoldBackgroundColor: DP.bg,
     canvasColor: DP.bg,
     dividerColor: DP.border,
     splashFactory: InkRipple.splashFactory,
-    colorScheme: const ColorScheme.light(
+    colorScheme: ColorScheme.light(
       primary: DP.green,
       onPrimary: Colors.white,
       primaryContainer: DP.mint,
@@ -68,8 +74,10 @@ class AppTheme {
       surfaceTint: Colors.transparent,
       outline: DP.border,
       outlineVariant: DP.borderSoft,
+    ).copyWith(
+      brightness: dark ? Brightness.dark : Brightness.light,
     ),
-    textTheme: _text,
+    textTheme: text,
     fontFamily: GoogleFonts.inter().fontFamily,
     appBarTheme: AppBarTheme(
       elevation: 0,
@@ -78,14 +86,14 @@ class AppTheme {
       backgroundColor: DP.bg,
       surfaceTintColor: Colors.transparent,
       foregroundColor: DP.ink,
-      iconTheme: const IconThemeData(color: DP.ink),
+      iconTheme: IconThemeData(color: DP.ink),
       titleTextStyle: GoogleFonts.inter(
         fontSize: 20,
         fontWeight: FontWeight.w400,
         color: DP.ink,
       ),
     ),
-    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
       type: BottomNavigationBarType.fixed,
       backgroundColor: DP.surface,
       selectedItemColor: DP.green,
@@ -98,7 +106,7 @@ class AppTheme {
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: DP.border),
+        side: BorderSide(color: DP.border),
       ),
     ),
     dialogTheme: DialogThemeData(
@@ -114,7 +122,7 @@ class AppTheme {
       ),
       contentTextStyle: GoogleFonts.inter(fontSize: 14.5, color: DP.inkSoft),
     ),
-    bottomSheetTheme: const BottomSheetThemeData(
+    bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: DP.bg,
       surfaceTintColor: Colors.transparent,
       modalBackgroundColor: DP.bg,
@@ -124,7 +132,7 @@ class AppTheme {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: DP.ink,
+      backgroundColor: dark ? const Color(0xFF2A3753) : DP.ink,
       contentTextStyle: GoogleFonts.inter(color: Colors.white, fontSize: 14),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DP.rMd),
@@ -140,8 +148,8 @@ class AppTheme {
       errorBorder: _border(DP.red),
       focusedErrorBorder: _border(DP.red, 1.4),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
-      hintStyle: const TextStyle(color: DP.faint),
-      labelStyle: const TextStyle(color: DP.muted),
+      hintStyle: TextStyle(color: DP.faint),
+      labelStyle: TextStyle(color: DP.muted),
       floatingLabelStyle: const TextStyle(color: DP.green),
       prefixIconColor: DP.muted,
       suffixIconColor: DP.muted,
@@ -176,7 +184,7 @@ class AppTheme {
         foregroundColor: DP.ink,
         backgroundColor: DP.surface,
         minimumSize: const Size(64, 52),
-        side: const BorderSide(color: DP.border),
+        side: BorderSide(color: DP.border),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DP.rLg),
         ),
@@ -192,15 +200,15 @@ class AppTheme {
     chipTheme: ChipThemeData(
       backgroundColor: DP.surface,
       selectedColor: DP.mint,
-      side: const BorderSide(color: DP.border),
-      labelStyle: const TextStyle(color: DP.inkSoft),
+      side: BorderSide(color: DP.border),
+      labelStyle: TextStyle(color: DP.inkSoft),
       secondaryLabelStyle: const TextStyle(color: DP.green),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DP.rSm),
       ),
     ),
-    tabBarTheme: const TabBarThemeData(
+    tabBarTheme: TabBarThemeData(
       labelColor: DP.green,
       unselectedLabelColor: DP.muted,
       indicatorColor: DP.green,
@@ -221,7 +229,7 @@ class AppTheme {
       fillColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected) ? DP.green : Colors.transparent,
       ),
-      side: const BorderSide(color: DP.faint, width: 1.4),
+      side: BorderSide(color: DP.faint, width: 1.4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
     ),
     radioTheme: RadioThemeData(
@@ -229,16 +237,16 @@ class AppTheme {
         (s) => s.contains(WidgetState.selected) ? DP.green : DP.faint,
       ),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
+    progressIndicatorTheme: ProgressIndicatorThemeData(
       color: DP.green,
       linearTrackColor: DP.mint,
       circularTrackColor: Colors.transparent,
     ),
-    listTileTheme: const ListTileThemeData(
+    listTileTheme: ListTileThemeData(
       iconColor: DP.navyIcon,
       textColor: DP.ink,
     ),
-    dividerTheme: const DividerThemeData(
+    dividerTheme: DividerThemeData(
       color: DP.border,
       thickness: 1,
       space: 1,
@@ -248,7 +256,7 @@ class AppTheme {
       foregroundColor: Colors.white,
       elevation: 0,
     ),
-    drawerTheme: const DrawerThemeData(
+    drawerTheme: DrawerThemeData(
       backgroundColor: DP.bg,
       surfaceTintColor: Colors.transparent,
     ),
@@ -257,16 +265,13 @@ class AppTheme {
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DP.rMd),
-        side: const BorderSide(color: DP.border),
+        side: BorderSide(color: DP.border),
       ),
     ),
-    datePickerTheme: const DatePickerThemeData(
+    datePickerTheme: DatePickerThemeData(
       backgroundColor: DP.bg,
       surfaceTintColor: Colors.transparent,
     ),
   );
-
-  // The app runs in light mode only (themeMode: ThemeMode.light). The dark
-  // theme is kept so existing references still compile.
-  static ThemeData darkTheme = lightTheme;
+  }
 }

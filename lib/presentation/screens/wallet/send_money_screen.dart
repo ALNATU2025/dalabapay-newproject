@@ -217,7 +217,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                       onChanged: (_) => setState(() {}),
                       errorText:
                           over ? 'This is more than your wallet balance' : null,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         color: DP.ink,
                         fontWeight: FontWeight.w600,
@@ -242,7 +242,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
         ),
       ),
       bottomNavigationBar: DPBottomAction(
-        footnote: const Row(
+        footnote: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(DPIcons.shieldCheck, size: 16, color: DP.navyIcon),

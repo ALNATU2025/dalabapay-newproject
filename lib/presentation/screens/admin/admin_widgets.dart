@@ -159,7 +159,7 @@ class AdminStat extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 19,
                 fontWeight: FontWeight.w800,
                 color: DP.ink,
@@ -271,7 +271,7 @@ class AdminSearch extends StatelessWidget {
     return TextField(
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
-      style: const TextStyle(fontSize: 15, color: DP.ink),
+      style: TextStyle(fontSize: 15, color: DP.ink),
       decoration: DPField.decoration(
         hint: hint,
         prefix: const Icon(DPIcons.search, size: 20),
@@ -421,7 +421,7 @@ class AdminListCard extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: DP.borderSoft),
+            if (i > 0) Divider(height: 1, color: DP.borderSoft),
             children[i],
           ],
         ],

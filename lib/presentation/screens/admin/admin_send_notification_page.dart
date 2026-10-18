@@ -223,7 +223,7 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
             ),
           ],
           const SizedBox(height: 18),
-          const Text('Preview', style: DP.section),
+          Text('Preview', style: DP.section),
           const SizedBox(height: 10),
           DPCard(
             padding: const EdgeInsets.all(14),

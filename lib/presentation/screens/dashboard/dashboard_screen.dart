@@ -191,7 +191,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onTap: () => _scaffoldKey.currentState?.openDrawer(),
                       child: Container(
                         padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: DP.blueTint,
                         ),
@@ -220,7 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: DPIconSquare(
                     icon: DPIcons.bell,
                     size: 44,
-                    color: DP.navy,
+                    color: DP.navyInk,
                     background: Colors.transparent,
                     semanticLabel: 'Notifications',
                     onTap: () => Navigator.pushNamed(context, '/notifications'),
@@ -241,7 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Hello, ${MockUser.firstName}!',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -445,7 +445,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               children: [
                 for (var i = 0; i < list.length; i++) ...[
-                  if (i > 0) const Divider(height: 1, color: DP.borderSoft),
+                  if (i > 0) Divider(height: 1, color: DP.borderSoft),
                   TransactionRow(tx: list[i]),
                 ],
               ],
@@ -532,7 +532,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       }
                     },
                   ),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Divider(color: DP.border),
                 ),
@@ -549,7 +549,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.all(16),
             child: Text('Version 1.6.0 (UI preview)', style: DP.caption),
           ),
@@ -565,7 +565,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Color? color,
     required VoidCallback onTap,
   }) {
-    final c = color ?? (selected ? DP.navy : DP.inkSoft);
+    final c = color ?? (selected ? DP.navyInk : DP.inkSoft);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
@@ -573,7 +573,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: selected
-              ? const BorderSide(color: DP.navy, width: 1.5)
+              ? BorderSide(color: DP.navyInk, width: 1.5)
               : BorderSide.none,
         ),
         child: InkWell(

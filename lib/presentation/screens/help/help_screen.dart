@@ -245,7 +245,7 @@ class _HelpScreenState extends State<HelpScreen> {
                         leading: DPIconBadge.blue(f.icon, size: 40, iconSize: 20),
                         title: f.title,
                         subtitle: f.subtitle,
-                        trailing: const Icon(
+                        trailing: Icon(
                           DPIcons.chevronRight,
                           color: DP.muted,
                         ),

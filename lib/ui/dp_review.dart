@@ -104,7 +104,7 @@ class DPReviewPanel extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     child: Text(
                       DP.naira(amount),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.w500,
                         color: DP.ink,
@@ -134,7 +134,7 @@ class DPReviewPanel extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Dalabapay wallet',
                                   style: DP.bodyStrong,
                                 ),
@@ -172,7 +172,7 @@ class DPReviewPanel extends StatelessWidget {
                   if (extra != null) ...[const SizedBox(height: 12), extra!],
                   if (pinRequired) ...[
                     const SizedBox(height: 24),
-                    const Text('Enter your payment PIN', style: DP.section),
+                    Text('Enter your payment PIN', style: DP.section),
                     const SizedBox(height: 12),
                     DPCodeInput(
                       controller: pinController,
@@ -281,7 +281,7 @@ class DPSuccessPanel extends StatelessWidget {
                     child: Text(
                       title,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 23,
                         fontWeight: FontWeight.w800,
                         color: DP.ink,
@@ -314,7 +314,7 @@ class DPSuccessPanel extends StatelessWidget {
               ),
             ),
             DPBottomAction(
-              footnote: const Text(
+              footnote: Text(
                 'Need help? Quote your payment reference.',
                 style: DP.caption,
               ),
@@ -383,7 +383,7 @@ class _ReceiptCard extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < all.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: DP.borderSoft),
+            if (i > 0) Divider(height: 1, color: DP.borderSoft),
             DPAppear(
               delay: rowDelay + DPMotion.stagger(i, stepMs: 50),
               offsetY: 8,
@@ -435,7 +435,7 @@ class _ReceiptCard extends StatelessWidget {
 /// Dashed hairline, like the tear line on a paper receipt.
 class DPDashedDivider extends StatelessWidget {
   final Color color;
-  const DPDashedDivider({super.key, this.color = DP.border});
+  const DPDashedDivider({super.key, this.color = DPAuto.border});
 
   @override
   Widget build(BuildContext context) {
@@ -450,7 +450,9 @@ class DPDashedDivider extends StatelessWidget {
             (_) => SizedBox(
               width: dash,
               height: 1.2,
-              child: DecoratedBox(decoration: BoxDecoration(color: color)),
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: DP.resolve(color)),
+              ),
             ),
           ),
         );
