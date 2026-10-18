@@ -1,4 +1,6 @@
 // lib/presentation/screens/splash/splash_screen.dart
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../ui/ui.dart';
@@ -93,74 +95,105 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.height;
     return Scaffold(
       backgroundColor: DP.surface,
-      body: Stack(
-        children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            width: MediaQuery.of(context).size.width * 0.75,
-            child: DPWaves(top: true, height: h * 0.18),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: DPWaves(height: h * 0.28),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                const Spacer(flex: 5),
-                FadeTransition(
-                  opacity: _fade,
-                  child: ScaleTransition(
-                    scale: _scale,
-                    child: Column(
-                      children: [
-                        const DPLogoMark(size: 110),
-                        const SizedBox(height: 20),
-                        const Text.rich(
-                          TextSpan(
+      body: LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth;
+          final h = c.maxHeight;
+          // Scale everything from the smaller side so the logo, name and
+          // tagline always fit — small phones, tall phones, tablets, web.
+          final unit = math.min(w, h * 0.6);
+          final logo = (unit * 0.28).clamp(64.0, 140.0);
+          final title = (unit * 0.11).clamp(28.0, 52.0);
+          final tagline = (unit * 0.045).clamp(14.0, 20.0);
+          // Waves never take more than a slice of the screen, so they can't
+          // cover the logo on short screens.
+          final topWave = math.min(h * 0.18, 160.0);
+          final bottomWave = math.min(h * 0.24, 220.0);
+
+          return Stack(
+            children: [
+              Positioned(
+                top: 0,
+                right: 0,
+                width: w * 0.75,
+                child: DPWaves(top: true, height: topWave),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: DPWaves(height: bottomWave),
+              ),
+              Positioned.fill(
+                top: topWave * 0.6,
+                bottom: bottomWave * 0.8,
+                child: SafeArea(
+                  bottom: false,
+                  child: Center(
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: FadeTransition(
+                        opacity: _fade,
+                        child: ScaleTransition(
+                          scale: _scale,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              TextSpan(
-                                text: 'Dalaba',
-                                style: TextStyle(color: DP.navy),
+                              DPLogoMark(size: logo),
+                              SizedBox(height: logo * 0.18),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text.rich(
+                                  const TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: 'Dalaba',
+                                        style: TextStyle(color: DP.navy),
+                                      ),
+                                      TextSpan(
+                                        text: 'pay',
+                                        style: TextStyle(color: DP.green),
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: title,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1,
+                                    height: 1.15,
+                                  ),
+                                ),
                               ),
-                              TextSpan(
-                                text: 'pay',
-                                style: TextStyle(color: DP.green),
+                              const SizedBox(height: 8),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Smart Life Fast Pay',
+                                  maxLines: 1,
+                                  style: DP.body.copyWith(
+                                    color: DP.navy,
+                                    fontSize: tagline,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
+                              SizedBox(height: logo * 0.32),
+                              _dots(),
                             ],
                           ),
-                          style: TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -1,
-                          ),
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Smart Life Fast Pay',
-                          style: DP.body.copyWith(
-                            color: DP.navy,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 40),
-                _dots(),
-                const Spacer(flex: 6),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
