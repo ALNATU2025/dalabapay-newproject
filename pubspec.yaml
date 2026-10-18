@@ -1,0 +1,37 @@
+name: dalabapay
+description: Dalabapay — UI/UX only build (no backend, sample data).
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.7.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  # Inter font used by the design system (lib/core/theme/app_theme.dart)
+  google_fonts: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    # Logos, onboarding art, service icons and banners go here.
+    # See IMAGES_NEEDED.md. Every missing image falls back to an icon.
+    - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/dabalogo.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#ffffff"
