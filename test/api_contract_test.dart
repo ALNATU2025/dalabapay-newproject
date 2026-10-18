@@ -115,10 +115,12 @@ void main() {
       'password': 'NewPassw0rd1',
     })));
     // ChangePasswordScreen returns a fresh token
-    await Session.instance.start(asMap(await api.post('/api/auth/password/change', {
+    final changed = asMap(await api.post('/api/auth/password/change', {
       'currentPassword': 'NewPassw0rd1',
       'newPassword': 'Passw0rdOk2',
-    })));
+    }));
+    await Session.instance.start(changed);
+    me['token'] = changed['token']; // older tokens are now invalid
     expect((await Session.instance.refresh())!.email, me['email']);
   });
 
