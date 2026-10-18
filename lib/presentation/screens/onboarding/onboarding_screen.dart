@@ -1,4 +1,5 @@
 // lib/presentation/screens/onboarding/onboarding_screen.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../ui/ui.dart';
@@ -45,6 +46,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'Get commission on eligible payments and rewards when friends join with your code.',
     ),
   ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    for (final d in _onboardingData) {
+      precacheImage(AssetImage(d.image), context, onError: (e, _) {
+        debugPrint('Could not precache ${d.image}: $e');
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -175,10 +186,20 @@ class OnboardingContent extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 height: c.maxHeight * 0.58,
-                child: DPImage(
+                child: Image.asset(
                   data.image,
                   fit: BoxFit.contain,
-                  fallback: _IllustrationPlaceholder(icon: data.icon),
+                  gaplessPlayback: true,
+                  errorBuilder: (context, error, stack) {
+                    // Shows why the picture didn't load (debug builds only).
+                    debugPrint('Onboarding image failed: ${data.image}\n$error');
+                    return _IllustrationPlaceholder(
+                      icon: data.icon,
+                      debugMessage: kDebugMode
+                          ? 'Could not load ${data.image}\n$error'
+                          : null,
+                    );
+                  },
                 ),
               ),
             ),
@@ -214,12 +235,12 @@ class OnboardingContent extends StatelessWidget {
 /// Shown until the illustration file is added: soft circles with an icon.
 class _IllustrationPlaceholder extends StatelessWidget {
   final IconData icon;
-  const _IllustrationPlaceholder({required this.icon});
+  final String? debugMessage;
+  const _IllustrationPlaceholder({required this.icon, this.debugMessage});
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
+    final circle = Container(
         width: 220,
         height: 220,
         decoration: const BoxDecoration(
@@ -236,6 +257,22 @@ class _IllustrationPlaceholder extends StatelessWidget {
           ),
           child: Icon(icon, size: 60, color: DP.green),
         ),
+      );
+    if (debugMessage == null) return Center(child: circle);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(child: FittedBox(child: circle)),
+          const SizedBox(height: 8),
+          Text(
+            debugMessage!,
+            textAlign: TextAlign.center,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: DP.red),
+          ),
+        ],
       ),
     );
   }
