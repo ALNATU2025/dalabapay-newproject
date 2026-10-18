@@ -1,83 +1,99 @@
-# Dalabapay — UI/UX only
+# Dalabapay app
 
-A clean copy of the Dalabapay app's screens and design system, with **all
-logic and backend calls removed**. Every screen runs on sample data, so you
-can click through the whole app, restyle it, or wire up a new backend.
+Flutter app for Dalabapay — wallet, bill payments, commission and referrals,
+plus a staff admin console. It talks to the backend in
+[newproject-backend](https://github.com/ALNATU2025/newproject-backend)
+(Node.js + MongoDB). There is no sample data: everything you see comes from
+the server.
 
-## What's inside
+## Run it
+
+1. Start the backend (see its README). In development it uses a built-in
+   **simulator** for bill payments and bank transfers, so every screen works
+   without real money.
+2. Run the app and tell it where the server is:
+
+```bash
+flutter pub get
+# Android emulator → your computer's localhost (the default)
+flutter run
+# A phone on the same Wi-Fi as your computer
+flutter run --dart-define=API_URL=http://192.168.1.20:4000
+# Production
+flutter build apk --dart-define=API_URL=https://api.yourdomain.com
+```
+
+Plain `http://` is allowed only for local addresses (10.0.2.2, localhost,
+127.0.0.1); real servers must use HTTPS.
+
+### Testing without email or money
+- **Codes**: while the backend has no SMTP settings, sign-up, password and
+  PIN-reset codes appear in a snackbar (“Test mode: your code is …”) and in
+  the server log.
+- **Adding money**: in debug builds, Add Money shows *Test mode: receive
+  ₦10,000*, and the one-time account dialog can simulate the transfer.
+- **Simulator numbers**: a phone/recipient ending in `0000` fails (wallet
+  refunded), `9999` stays pending; a meter, smartcard or JAMB profile ending
+  in `000` is “not found”.
+- **Admin console**: make your account a Super Admin on the server with
+  `npm run make-super-admin -- you@example.com`, then log in again. It shows
+  up in the side menu and in Profile.
+
+## How it's built
 
 ```
 lib/
-  main.dart                  routes for every screen
-  ui/                        the design system (colours, type, buttons,
-                             fields, chips, cards, keypad, review/success
-                             panels, motion) — copied unchanged
-  core/theme/app_theme.dart  app-wide theme (Inter font)
-  mock/mock_data.dart        ALL sample data (user, balances, transactions,
-                             plans, providers, notifications…)
+  main.dart                    routes; sends you to login when a session ends
+  core/
+    api/api.dart               HTTP client: base URL, saved token, errors
+    api/session.dart           the logged-in user (balance, role, KYC, PIN…)
+    api/catalog.dart           cached networks, limits, recent recipients
+    format.dart                dates and safe JSON readers
+  ui/                          design system (colours, type, widgets, motion)
   presentation/
-    widgets/
-      payment_flow.dart      Review payment → PIN → Payment successful
-      transaction_widgets.dart  transaction rows + receipt sheet
-    screens/                 one folder per screen
+    widgets/payment_flow.dart  Review → PIN → success / pending / failed
+    widgets/async_view.dart    loading, error and retry states
+    screens/                   one folder per screen; admin/ for staff
 ```
 
-### Screens
-Splash · Onboarding · Login · Sign up (+ email code) · Forgot password ·
-OTP · Reset password · PIN setup / PIN login / PIN lock · Change PIN ·
-Change password · Home (dashboard, drawer, banners) · All Services ·
-Pay Bills · Airtime · Data · Electricity · Cable TV · Education ·
-Insurance · International airtime · Add Money · Send Money ·
-My Wallet / Transactions · Commission & earnings · Refer & earn ·
-Notifications · Profile / Security · KYC · My Disputes ·
-Transaction validation · Help & support
+Each screen file starts with a comment naming the endpoints it uses.
+Money is in naira everywhere in the app; the server stores kobo.
 
-### Admin console (UI only)
-Open it from the side menu (**Admin Console**) or Profile → Admin Console.
-Dashboard · Manage Users (approve, activate, credit/debit, edit, history) ·
-All Transactions (search, filter, sort, export) · Status Update ·
-Refund & Dispute · Fund Wallet · Self Fund · Verify Payments ·
-Send Notification · Admin Alerts · Admin Control (roles) · VTpass Settings ·
-Service Commission · Transaction Limits. Sample data lives in
-`lib/presentation/screens/admin/admin_mock.dart`.
+### Login and security
+- Sign up → email code → create a 6-digit payment PIN.
+- The login token is kept in secure storage when “Remember me” is on. Next
+  launch asks for the PIN to unlock.
+- Every payment needs the PIN. Five wrong tries lock it for 30 minutes.
+- If the server rejects the session (password changed, account disabled),
+  the app returns to the login screen.
 
-## Light / dark theme
-Profile → **Appearance**: Normal, Dark or System (follows the phone).
-Surface and text colours in `lib/ui/dp_tokens.dart` switch with `DP.isDark`;
-brand greens, navy and the gradients stay the same. The choice is kept until
-the app closes (add `shared_preferences` to save it).
+### Admin console
+Visible only to staff. Each tool is shown according to the role
+(Support, Finance, Administrator, Super Admin), and the server checks every
+request again. It covers: Dashboard · Users (approve, activate,
+credit/debit, PIN unlock/reset, history) · Transactions (filters, CSV
+export) · Status Update · Refunds & Disputes · Fund Wallet · Self Fund ·
+Verify Payments · Send Notification · Alerts · Roles · Provider Settings ·
+Service Commission · Transaction Limits.
 
-## How "fake" actions behave
-- **Login / PIN / biometrics** – any input works and opens Home.
-- **Verify meter / smartcard / profile / recipient** – shows a sample
-  customer after a short delay.
-- **Pay** – shows the Review screen; any 4–6 digit PIN "pays" and shows
-  Payment Successful with a sample reference.
-- **Share, export, contacts, image upload, WhatsApp/email** – show a short
-  "not set up in this UI build" message.
+## Checks
+GitHub Actions runs on every push:
+- `flutter analyze`
+- a **contract test** (`test/api_contract_test.dart`) that starts the real
+  backend with MongoDB and runs every request the screens make — sign-up,
+  payments for each service, history, earnings, disputes, KYC and all admin
+  tools — checking the fields the screens read.
 
-## Removed
-API/payment/auth/socket/notification services, providers, secure storage,
-shared preferences, Firebase (Android `google-services.json`, Gradle plugin
-and manifest entries), the cleartext network config for the old backend, the
-native contacts channel.
+To run the contract test yourself, start the backend first, then:
 
-## Run it
+```bash
+BACKEND_DIR=../newproject-backend flutter test test/api_contract_test.dart \
+  --dart-define=API_URL=http://localhost:4000
 ```
-flutter pub get
-flutter run
-```
-Only two packages are used: `google_fonts` and `cupertino_icons`.
 
-The Android app id is `com.dalabapay.newproject` so it installs next to the
-live app. Change it in `android/app/build.gradle.kts` if you want.
+## Theme
+Profile → **Appearance**: Normal, Dark or System.
 
 ## Images
-Drop your images into `assets/images/` using the names in `IMAGES_NEEDED.md`
-(logo, onboarding art, service icons, provider logos, banners). Until then
-each one shows a matching icon.
-
-## Wiring a backend later
-Search for `mock_data.dart` imports — those are the places that need real
-data. `showReviewAndPay` in `payment_flow.dart` is the single place where a
-payment would be sent.
+Put images in `assets/images/` using the names in `IMAGES_NEEDED.md`. Any
+that are missing show a matching icon.
