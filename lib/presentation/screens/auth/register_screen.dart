@@ -1,11 +1,14 @@
 // lib/presentation/screens/auth/register_screen.dart
-// UI only — two steps (details → email code). Nothing is sent anywhere;
-// "Verify email" continues to PIN setup.
+// Two steps: details (POST /api/auth/register emails a code) → code
+// (POST /api/auth/register/verify creates the account and logs in).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/dev_code.dart';
 import '../../../ui/ui.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -29,6 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _agreedToTerms = false;
   bool _showVerifyStep = false;
   bool _isLoading = false;
+  String? _error;
   int _resendSeconds = 0;
   Timer? _resendTimer;
 
@@ -41,7 +45,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _fullNameController.text.trim().isNotEmpty &&
       _emailController.text.trim().isNotEmpty &&
       _phoneController.text.trim().isNotEmpty &&
-      _passwordController.text.isNotEmpty &&
+      _hasMinLength &&
+      _hasUppercase &&
+      _hasLowercase &&
+      _hasNumber &&
       _passwordController.text == _confirmPasswordController.text &&
       _agreedToTerms;
 
@@ -86,23 +93,79 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
-  void _continueToVerification() {
+  Future<void> _continueToVerification() async {
     FocusScope.of(context).unfocus();
-    setState(() => _showVerifyStep = true);
-    _startResendTimer();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final r = await api.post('/api/auth/register', {
+        'fullName': _fullNameController.text.trim(),
+        'email': _emailController.text.trim().toLowerCase(),
+        'phone': _phoneController.text.trim(),
+        'password': _passwordController.text,
+        'referralCode': _referralCodeController.text.trim(),
+      });
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _showVerifyStep = true;
+      });
+      _startResendTimer();
+      showDevCode(context, r);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = errorMessage(e);
+      });
+    }
   }
 
   void _backToDetails() {
     _otpController.clear();
-    setState(() => _showVerifyStep = false);
+    setState(() {
+      _showVerifyStep = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _resend() async {
+    try {
+      final r = await api.post('/api/auth/register/resend',
+          {'email': _emailController.text.trim().toLowerCase()});
+      _startResendTimer();
+      if (!mounted) return;
+      dpSnack(context, 'A new code is on its way.', success: true);
+      showDevCode(context, r);
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   Future<void> _verifyAndCreate() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/pin-setup');
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final data = await api.post('/api/auth/register/verify', {
+        'email': _emailController.text.trim().toLowerCase(),
+        'code': _otpController.text.trim(),
+      });
+      await Session.instance.start((data as Map).cast<String, dynamic>());
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/pin-setup', (_) => false);
+    } catch (e) {
+      if (!mounted) return;
+      _otpController.clear();
+      setState(() {
+        _isLoading = false;
+        _error = errorMessage(e);
+      });
+    }
   }
 
   @override
@@ -233,11 +296,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 18),
                 _buildTermsCheckbox(),
+                if (_error != null)
+                  DPHelper(_error!, color: DP.red, icon: DPIcons.alert),
                 const SizedBox(height: 22),
                 DPButton(
                   label: 'Create account',
                   icon: DPIcons.forward,
-                  onPressed: _detailsValid ? _continueToVerification : null,
+                  loading: _isLoading,
+                  onPressed: _detailsValid && !_isLoading
+                      ? _continueToVerification
+                      : null,
                 ),
                 const SizedBox(height: 18),
                 Center(
@@ -300,6 +368,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (!_isLoading) _verifyAndCreate();
                   },
                 ),
+                if (_error != null)
+                  DPHelper(_error!, color: DP.red, icon: DPIcons.alert),
                 const SizedBox(height: 16),
                 Center(
                   child: _resendSeconds > 0
@@ -309,14 +379,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         )
                       : DPTextLink(
                           label: 'Resend code',
-                          onTap: _startResendTimer,
+                          onTap: _resend,
                         ),
                 ),
                 const SizedBox(height: 22),
                 DPButton(
                   label: _isLoading ? 'Creating your account…' : 'Verify email',
                   loading: _isLoading,
-                  onPressed: _otpController.text.trim().length == 6
+                  onPressed: _otpController.text.trim().length == 6 && !_isLoading
                       ? _verifyAndCreate
                       : null,
                 ),

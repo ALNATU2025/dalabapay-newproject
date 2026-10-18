@@ -1,31 +1,37 @@
 // lib/presentation/screens/disputes/user_disputes_page.dart
-// My Disputes — UI only. Lists sample disputes and lets you "file" one
-// against a sample transaction (kept on screen only).
+// My Disputes: GET /api/disputes, and filing one against a recent payment
+// (GET /api/disputes/eligible → POST /api/disputes). Opening this page with
+// a transaction id as the route argument jumps straight to filing it.
 import 'package:flutter/material.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 import '../../widgets/transaction_widgets.dart';
 
 class _Dispute {
+  final String id;
   final String ref;
   final String title;
   final double amount;
   final String type;
   final String reason;
   final String status; // pending, investigating, resolved, rejected
-  final Duration ago;
+  final DateTime date;
   final String? resolution;
-  const _Dispute(
-    this.ref,
-    this.title,
-    this.amount,
-    this.type,
-    this.reason,
-    this.status,
-    this.ago, [
-    this.resolution,
-  ]);
+  _Dispute(Map<String, dynamic> j)
+      : id = str(j['id']),
+        ref = str(asMap(j['transaction'])['reference']),
+        title = str(asMap(j['transaction'])['description'], 'Payment'),
+        amount = toDouble(asMap(j['transaction'])['amount']),
+        type = _UserDisputesPageState.typeLabel(str(j['type'])),
+        reason = str(j['reason']),
+        status = str(j['status']),
+        date = parseDate(j['createdAt']),
+        resolution = (j['resolution'] == null || str(j['resolution']).isEmpty)
+            ? null
+            : str(j['resolution']);
 }
 
 class UserDisputesPage extends StatefulWidget {
@@ -37,36 +43,70 @@ class UserDisputesPage extends StatefulWidget {
 
 class _UserDisputesPageState extends State<UserDisputesPage> {
   int _tab = 0;
-  final List<_Dispute> _disputes = [
-    const _Dispute(
-      'TXN-240115-0006',
-      'Airtel Data 10GB',
-      3000,
-      'Service not delivered',
-      'Data was not credited to my line',
-      'investigating',
-      Duration(days: 2),
-    ),
-    const _Dispute(
-      'TXN-240102-0021',
-      'MTN Airtime',
-      1000,
-      'Failed transaction',
-      'Wallet debited but airtime failed',
-      'resolved',
-      Duration(days: 16),
-      'Refunded ₦1,000.00 to your wallet.',
-    ),
-  ];
+  final List<_Dispute> _disputes = [];
+  List<Map<String, dynamic>> _eligible = [];
+  bool _loading = true;
+  Object? _error;
+  bool _openedFromArgs = false;
 
-  static const _types = [
-    'Service not delivered',
-    'Incorrect amount',
-    'Failed transaction',
-    'Pending transaction',
-    'Refund request',
-    'Other',
-  ];
+  /// API value → label.
+  static const _types = {
+    'service_not_delivered': 'Service not delivered',
+    'incorrect_amount': 'Incorrect amount',
+    'failed_transaction': 'Failed transaction',
+    'pending_transaction': 'Pending transaction',
+    'refund_request': 'Refund request',
+    'other': 'Other',
+  };
+
+  static String typeLabel(String v) => _types[v] ?? 'Other';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait([
+        api.get('/api/disputes'),
+        api.get('/api/disputes/eligible'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _disputes
+          ..clear()
+          ..addAll(itemsOf(results[0]).map(_Dispute.new));
+        _eligible = asList(results[1]);
+        _loading = false;
+        _error = null;
+      });
+      _openFromArgs();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  /// "Report an issue" on a receipt passes the transaction id.
+  void _openFromArgs() {
+    if (_openedFromArgs) return;
+    _openedFromArgs = true;
+    final id = ModalRoute.of(context)?.settings.arguments?.toString();
+    if (id == null || id.isEmpty) return;
+    final tx = _eligible.where((t) => t['id'] == id).toList();
+    if (tx.isNotEmpty) {
+      setState(() => _tab = 1);
+      _openNewDispute(tx.first);
+    } else {
+      dpSnack(context,
+          'This payment can\'t be disputed (it may be refunded or already under review).');
+    }
+  }
 
   (String, Color) _statusStyle(String s) => switch (s) {
         'pending' => ('Pending Review', DP.amber),
@@ -77,7 +117,8 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
       };
 
   void _openNewDispute(Map<String, dynamic> tx) {
-    String type = _types.first;
+    String type = _types.keys.first;
+    bool submitting = false;
     final reason = TextEditingController();
     final details = TextEditingController();
     showModalBottomSheet(
@@ -113,13 +154,14 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                         Text('Transaction Details',
                             style: DP.bodyStrong),
                         const SizedBox(height: 4),
-                        Text('Ref: ${tx['id']}', style: DP.caption),
+                        Text(str(tx['description']), style: DP.caption),
+                        Text('Ref: ${tx['reference']}', style: DP.caption),
                         Text(
-                          'Amount: ${DP.naira((tx['amount'] as num).toDouble())}',
+                          'Amount: ${DP.naira(toDouble(tx['amount']))}',
                           style: DP.caption,
                         ),
                         Text(
-                          'Date: ${mockDateTime(DateTime.parse(tx['createdAt'] as String))}',
+                          'Date: ${dateTimeLabel(parseDate(tx['createdAt']))}',
                           style: DP.caption,
                         ),
                       ],
@@ -128,15 +170,15 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                   const SizedBox(height: 16),
                   const DPLabel('Dispute Type'),
                   DPSelectField(
-                    value: type,
+                    value: _types[type],
                     hint: 'Choose a type',
                     onTap: () async {
                       final v = await dpPickFromList<String>(
                         ctx,
                         title: 'Dispute Type',
-                        items: _types,
+                        items: _types.keys.toList(),
                         selected: type,
-                        labelOf: (x) => x,
+                        labelOf: (x) => _types[x]!,
                       );
                       if (v != null) setSheet(() => type = v);
                     },
@@ -154,56 +196,40 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                     hint: 'Provide more details about what happened',
                     maxLines: 4,
                   ),
-                  const SizedBox(height: 14),
-                  const DPLabel('Upload Evidence (Optional)'),
-                  DPCard(
-                    padding: const EdgeInsets.symmetric(vertical: 22),
-                    onTap: () => dpSnack(
-                      ctx,
-                      'Image picking isn\'t set up in this UI build',
-                    ),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.cloud_upload_outlined,
-                              color: DP.navyIcon, size: 30),
-                          SizedBox(height: 6),
-                          Text('Click to upload screenshot',
-                              style: DP.bodyStrong),
-                          SizedBox(height: 2),
-                          Text('PNG, JPG, WEBP • Max 1MB',
-                              style: DP.caption),
-                        ],
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 20),
                   DPButton(
                     label: 'Submit Dispute',
-                    onPressed: () {
-                      if (reason.text.trim().isEmpty) {
-                        dpSnack(ctx, 'Please enter a reason', error: true);
-                        return;
-                      }
-                      Navigator.pop(ctx);
-                      setState(() {
-                        _disputes.insert(
-                          0,
-                          _Dispute(
-                            tx['id'] as String,
-                            tx['description'] as String,
-                            (tx['amount'] as num).toDouble(),
-                            type,
-                            reason.text.trim(),
-                            'pending',
-                            Duration.zero,
-                          ),
-                        );
-                        _tab = 0;
-                      });
-                      dpSnack(context, 'Dispute created successfully!',
-                          success: true);
-                    },
+                    loading: submitting,
+                    onPressed: submitting
+                        ? null
+                        : () async {
+                            if (reason.text.trim().length < 3) {
+                              dpSnack(ctx, 'Please enter a reason', error: true);
+                              return;
+                            }
+                            setSheet(() => submitting = true);
+                            try {
+                              await api.post('/api/disputes', {
+                                'transactionId': tx['id'],
+                                'type': type,
+                                'reason': reason.text.trim(),
+                                if (details.text.trim().isNotEmpty)
+                                  'description': details.text.trim(),
+                              });
+                            } catch (e) {
+                              setSheet(() => submitting = false);
+                              if (ctx.mounted) {
+                                dpSnack(ctx, errorMessage(e), error: true);
+                              }
+                              return;
+                            }
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (!mounted) return;
+                            setState(() => _tab = 0);
+                            dpSnack(context, 'Dispute created successfully!',
+                                success: true);
+                            _load();
+                          },
                   ),
                 ],
               ),
@@ -242,6 +268,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                     DPSummaryRow('Type', d.type),
                     DPSummaryRow('Reason', d.reason),
                     DPSummaryRow('Transaction Ref', d.ref),
+                    DPSummaryRow('Opened', dateTimeLabel(d.date)),
                     if (d.resolution != null)
                       DPSummaryRow('Resolution', d.resolution!),
                   ],
@@ -258,13 +285,21 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final pending =
-        _disputes.where((d) => d.status != 'resolved' && d.status != 'rejected').length;
+    final pending = _disputes
+        .where((d) => d.status != 'resolved' && d.status != 'rejected')
+        .length;
     final resolved = _disputes.where((d) => d.status == 'resolved').length;
     return Scaffold(
       backgroundColor: DP.bg,
       body: SafeArea(
-        child: Column(
+        child: _loading
+            ? const Column(children: [DPTopBar(title: 'My Disputes'), Expanded(child: DPLoading())])
+            : _error != null && _disputes.isEmpty
+            ? Column(children: [
+                const DPTopBar(title: 'My Disputes'),
+                Expanded(child: DPLoadError(error: _error, onRetry: _load)),
+              ])
+            : Column(
           children: [
             const DPTopBar(title: 'My Disputes'),
             Padding(
@@ -328,7 +363,11 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
         ),
       );
     }
-    return ListView.separated(
+    return RefreshIndicator(
+      color: DP.green,
+      onRefresh: _load,
+      child: ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       itemCount: _disputes.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -376,7 +415,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                   ),
                   const Spacer(),
                   Text(
-                    mockTimeAgo(DateTime.now().subtract(d.ago)),
+                    timeAgo(d.date),
                     style: DP.caption.copyWith(fontSize: 12),
                   ),
                 ],
@@ -385,11 +424,12 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
           ),
         );
       },
+      ),
     );
   }
 
   Widget _buildNew() {
-    final debits = kMockTransactions.where((t) => !mockIsCredit(t)).toList();
+    final debits = _eligible;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
@@ -398,6 +438,12 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
           style: DP.caption,
         ),
         const SizedBox(height: 10),
+        if (debits.isEmpty)
+          const DPEmptyState(
+            icon: DPIcons.receipt,
+            title: 'No payments to report',
+            message: 'Payments from the last 90 days show here.',
+          ),
         for (final tx in debits)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -406,15 +452,15 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
               onTap: () => _openNewDispute(tx),
               child: DPListRow(
                 leading: DPIconBadge(
-                  transactionIcon(tx['type'] as String),
+                  transactionIcon(str(tx['type'])),
                   size: 40,
                   iconSize: 19,
                   color: DP.red,
                   background: DP.redBg,
                 ),
-                title: tx['description'] as String,
+                title: str(tx['description'], transactionTypeLabel(str(tx['type']))),
                 subtitle:
-                    '${DP.naira((tx['amount'] as num).toDouble())} · ${DPStatus.labelFor(tx['status'] as String?)}',
+                    '${DP.naira(toDouble(tx['amount']))} · ${DPStatus.labelFor(tx['status'] as String?)} · ${timeAgo(parseDate(tx['createdAt']))}',
                 trailing: const DPTextLink(label: 'Dispute'),
               ),
             ),

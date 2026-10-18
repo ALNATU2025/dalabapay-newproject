@@ -1,11 +1,34 @@
 // lib/presentation/screens/international_airtime/international_airtime_screen.dart
-// UI only — country → type → network → amount with a sample exchange rate.
+// Country → type → network → plan/amount, all from
+// /api/services/international/*, priced with the provider's exchange rate;
+// payment is POST /api/services/international.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 import '../../widgets/payment_flow.dart';
+
+class _Country {
+  final String code, name, flag, dialCode, currency;
+  const _Country(this.code, this.name, this.flag, this.dialCode, this.currency);
+  factory _Country.fromJson(Map<String, dynamic> j) => _Country(
+        str(j['code']),
+        str(j['name']),
+        str(j['flag']),
+        str(j['dialCode']),
+        str(j['currency']),
+      );
+
+  @override
+  bool operator ==(Object other) => other is _Country && other.code == code;
+
+  @override
+  int get hashCode => code.hashCode;
+}
 
 class InternationalAirtimeScreen extends StatefulWidget {
   const InternationalAirtimeScreen({super.key});
@@ -17,29 +40,83 @@ class InternationalAirtimeScreen extends StatefulWidget {
 
 class _InternationalAirtimeScreenState
     extends State<InternationalAirtimeScreen> {
-  static const _types = ['Mobile Top Up', 'Mobile Data'];
-  static const _operatorsByCountry = {
-    'Ghana': ['MTN Ghana', 'Vodafone Ghana', 'AirtelTigo'],
-    'Kenya': ['Safaricom', 'Airtel Kenya'],
-    'Sierra Leone': ['Orange Sierra Leone', 'Africell Sierra Leone'],
-    'United Kingdom': ['EE', 'O2', 'Vodafone UK', 'Three'],
-    'United States': ['AT&T', 'T-Mobile', 'Verizon'],
-    'South Africa': ['Vodacom', 'MTN South Africa', 'Cell C'],
-    'Cameroon': ['MTN Cameroon', 'Orange Cameroon'],
-  };
-
   final _phone = TextEditingController();
   final _amount = TextEditingController();
   final _email = TextEditingController();
-  MockCountry? _country;
+
+  List<_Country> _countries = [];
+  Map<String, String> _types = {}; // name → id
+  Map<String, String> _operators = {}; // name → id
+  List<Map<String, dynamic>> _variations = [];
+  double _rate = 0;
+  bool _loadingStep = false;
+
+  _Country? _country;
   String? _type;
   String? _operator;
+  Map<String, dynamic>? _variation;
 
   @override
   void initState() {
     super.initState();
     _amount.addListener(() => setState(() {}));
+    _loadCountries();
   }
+
+  Future<T?> _step<T>(Future<T> Function() call) async {
+    setState(() => _loadingStep = true);
+    try {
+      return await call();
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+      return null;
+    } finally {
+      if (mounted) setState(() => _loadingStep = false);
+    }
+  }
+
+  Future<void> _loadCountries() async {
+    final r = await _step(() => api.get('/api/services/international/countries'));
+    if (r == null || !mounted) return;
+    setState(() => _countries = asList(r).map(_Country.fromJson).toList());
+  }
+
+  Future<void> _loadTypes() async {
+    final c = _country!;
+    final r = await _step(() => api.get('/api/services/international/product-types',
+        query: {'country': c.code}));
+    if (r == null || !mounted || _country != c) return;
+    setState(() => _types = {for (final t in asList(r)) str(t['name']): str(t['id'])});
+  }
+
+  Future<void> _loadOperators() async {
+    final c = _country!;
+    final type = _types[_type]!;
+    final r = await _step(() => api.get('/api/services/international/operators',
+        query: {'country': c.code, 'productType': type}));
+    if (r == null || !mounted || _country != c) return;
+    setState(() => _operators = {for (final o in asList(r)) str(o['name']): str(o['id'])});
+  }
+
+  Future<void> _loadVariations() async {
+    final c = _country!;
+    final r = await _step(() => api.get('/api/services/international/variations', query: {
+          'country': c.code,
+          'operator': _operators[_operator],
+          'productType': _types[_type],
+        }));
+    if (r == null || !mounted || _country != c) return;
+    final m = asMap(r);
+    setState(() {
+      _rate = toDouble(m['rate']);
+      _variations = asList(m['variations']);
+      _variation = _variations.length == 1 ? _variations.first : null;
+    });
+  }
+
+  bool get _fixed => _variation?['fixed'] == true;
+  double get _min => toDouble(_variation?['min']);
+  double get _max => toDouble(_variation?['max']);
 
   @override
   void dispose() {
@@ -49,8 +126,10 @@ class _InternationalAirtimeScreenState
     super.dispose();
   }
 
-  double get _foreign => double.tryParse(_amount.text.trim()) ?? 0;
-  double get _naira => _foreign * (_country?.rate ?? 0);
+  double get _foreign => _fixed
+      ? toDouble(_variation?['amount'])
+      : (double.tryParse(_amount.text.trim()) ?? 0);
+  double get _naira => _foreign * _rate;
 
   String _money(String cur, double v) => '$cur ${v.toStringAsFixed(2)}';
 
@@ -59,11 +138,28 @@ class _InternationalAirtimeScreenState
       dpSnack(context, 'Choose a country, type and network', error: true);
       return;
     }
+    if (_variation == null) {
+      dpSnack(context, 'Choose a plan', error: true);
+      return;
+    }
     if (_phone.text.trim().length < 5 || _foreign <= 0) {
       dpSnack(context, 'Enter the phone number and amount', error: true);
       return;
     }
+    if (!_fixed && (_foreign < _min || (_max > 0 && _foreign > _max))) {
+      dpSnack(context, 'Enter an amount between ${_money(_country!.currency, _min)} and ${_money(_country!.currency, _max)}', error: true);
+      return;
+    }
     final c = _country!;
+    final body = <String, dynamic>{
+      'country': c.code,
+      'productType': _types[_type],
+      'operator': _operators[_operator],
+      'variationCode': str(_variation!['code']),
+      'phone': _phone.text.trim(),
+      if (!_fixed) 'amount': _foreign,
+      if (_email.text.trim().isNotEmpty) 'email': _email.text.trim(),
+    };
     showReviewAndPay(
       context,
       icon: DPIcons.globe,
@@ -75,11 +171,16 @@ class _InternationalAirtimeScreenState
         DPReviewRow('Phone number', '${c.dialCode} ${_phone.text.trim()}'),
         DPReviewRow('Network', _operator!),
         DPReviewRow('Recipient receives', _money(c.currency, _foreign)),
-        DPReviewRow('Exchange rate', '1 ${c.currency} ≈ ${DP.naira(c.rate)}'),
+        if (_fixed) DPReviewRow('Plan', str(_variation!['name'])),
+        DPReviewRow('Exchange rate', '1 ${c.currency} ≈ ${DP.naira(_rate)}'),
         const DPReviewRow('Service fee', '₦0.00'),
         DPReviewRow('You pay', DP.naira(_naira), strong: true),
       ],
       footnote: 'International airtime can\'t be reversed once delivered.',
+      onPay: (pin) async {
+        final r = await api.post('/api/services/international', {...body, 'pin': pin});
+        return asMap(asMap(r)['transaction']);
+      },
     );
   }
 
@@ -115,10 +216,10 @@ class _InternationalAirtimeScreenState
                               color: DP.navyIcon, size: 20)
                           : null,
                       onTap: () async {
-                        final picked = await dpPickFromList<MockCountry>(
+                        final picked = await dpPickFromList<_Country>(
                           context,
                           title: 'Destination country',
-                          items: kMockCountries,
+                          items: _countries,
                           selected: c,
                           labelOf: (x) => '${x.flag}  ${x.name}',
                           subtitleOf: (x) => '${x.dialCode} · ${x.currency}',
@@ -129,17 +230,32 @@ class _InternationalAirtimeScreenState
                           _country = picked;
                           _type = null;
                           _operator = null;
+                          _variation = null;
+                          _types = {};
+                          _operators = {};
+                          _variations = [];
                         });
+                        _loadTypes();
                       },
                     ),
+                    if (_loadingStep) const LinearProgressIndicator(color: DP.green),
                     if (c != null) ...[
                       const SizedBox(height: 16),
                       const DPLabel('Top-up type'),
                       DPChipRow(
-                        options: _types,
+                        options: _types.keys.toList(),
                         selected: _type,
                         height: 46,
-                        onSelect: (t) => setState(() => _type = t),
+                        onSelect: (t) {
+                          setState(() {
+                            _type = t;
+                            _operator = null;
+                            _variation = null;
+                            _operators = {};
+                            _variations = [];
+                          });
+                          _loadOperators();
+                        },
                       ),
                     ],
                     if (c != null && _type != null) ...[
@@ -154,12 +270,17 @@ class _InternationalAirtimeScreenState
                           final picked = await dpPickFromList<String>(
                             context,
                             title: 'Mobile network',
-                            items: _operatorsByCountry[c.name] ?? const [],
+                            items: _operators.keys.toList(),
                             selected: _operator,
                             labelOf: (x) => x,
                           );
                           if (picked == null || !mounted) return;
-                          setState(() => _operator = picked);
+                          setState(() {
+                            _operator = picked;
+                            _variation = null;
+                            _variations = [];
+                          });
+                          _loadVariations();
                         },
                       ),
                     ],
@@ -176,6 +297,36 @@ class _InternationalAirtimeScreenState
                           LengthLimitingTextInputFormatter(13),
                         ],
                       ),
+                      if (_variations.length > 1) ...[
+                        const SizedBox(height: 16),
+                        const DPLabel('Choose a plan'),
+                        for (final v in _variations)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: DPCard(
+                              color: _variation == v ? DP.mint : DP.surface,
+                              borderColor: _variation == v ? DP.green : DP.border,
+                              padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+                              onTap: () => setState(() => _variation = v),
+                              child: Row(
+                                children: [
+                                  Expanded(child: Text(str(v['name']), style: DP.bodyStrong)),
+                                  if (v['fixed'] == true)
+                                    Text(
+                                      _money(c.currency, toDouble(v['amount'])),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: DP.green,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                      if (_variations.isEmpty && !_loadingStep)
+                        DPLoadError(error: null, onRetry: _loadVariations),
+                      if (_variation != null && !_fixed) ...[
                       const SizedBox(height: 16),
                       DPLabel('Amount (${c.currency})'),
                       DPField(
@@ -191,8 +342,9 @@ class _InternationalAirtimeScreenState
                         ],
                       ),
                       DPHelper(
-                        'Minimum ${_money(c.currency, 1)} · Maximum ${_money(c.currency, 500)}',
+                        'Minimum ${_money(c.currency, _min)} · Maximum ${_money(c.currency, _max)}',
                       ),
+                      ],
                       const SizedBox(height: 16),
                       const DPLabel('Email for receipt (optional)'),
                       DPField(
@@ -211,7 +363,7 @@ class _InternationalAirtimeScreenState
                             ),
                             DPSummaryRow(
                               'Estimated exchange rate',
-                              '1 ${c.currency} ≈ ${DP.naira(c.rate)}',
+                              '1 ${c.currency} ≈ ${DP.naira(_rate)}',
                             ),
                             DPSummaryRow('Airtime value', DP.naira(_naira)),
                             const DPSummaryRow('Service fee', '₦0.00'),
@@ -222,7 +374,7 @@ class _InternationalAirtimeScreenState
                             ),
                             DPSummaryRow(
                               'Wallet balance',
-                              DP.naira(MockUser.walletBalance),
+                              DP.naira(Session.instance.user?.balance ?? 0),
                             ),
                           ],
                         ),

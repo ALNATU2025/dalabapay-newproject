@@ -1,10 +1,14 @@
 // lib/presentation/screens/referral/referral_screen.dart
-// Refer & earn — UI only, sample numbers.
+// Refer & earn: GET /api/referrals (code, totals, tier, breakdown and the
+// people you referred).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 
 class ReferralScreen extends StatelessWidget {
   const ReferralScreen({super.key});
@@ -18,28 +22,47 @@ class ReferralScreen extends StatelessWidget {
           children: [
             const DPLogoBar(),
             Expanded(
+              child: AsyncView<Map<String, dynamic>>(
+                load: () async => asMap(await api.get('/api/referrals')),
+                builder: (context, d, reload) => _body(context, d, reload),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context, Map<String, dynamic> d,
+      Future<void> Function() reload) {
+    final b = asMap(d['breakdown']);
+    final referrals = asList(d['referrals']);
+    return RefreshIndicator(
+              color: DP.green,
+              onRefresh: reload,
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 30),
                 children: [
-                  const DPAppear(scaleFrom: 0.97, child: _EarningsCard()),
+                  DPAppear(scaleFrom: 0.97, child: _EarningsCard(d)),
                   const SizedBox(height: 24),
                   Text('Bonus Breakdown', style: DP.section),
                   const SizedBox(height: 12),
-                  const Row(
+                  Row(
                     children: [
                       Expanded(
                         child: _BonusCard(
                           'Direct Referral',
-                          1500,
+                          toDouble(b['direct']),
                           DP.green,
                           Icons.person_add_alt_1,
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: _BonusCard(
                           'Indirect Referral',
-                          160,
+                          toDouble(b['indirect']),
                           DP.amber,
                           Icons.people_outline,
                         ),
@@ -47,21 +70,21 @@ class ReferralScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Row(
+                  Row(
                     children: [
                       Expanded(
                         child: _BonusCard(
                           'Welcome Bonus',
-                          200,
+                          toDouble(b['welcome']),
                           DP.navyIcon,
                           Icons.card_giftcard,
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: _BonusCard(
                           'Commission',
-                          1560.5,
+                          toDouble(b['commission']),
                           DP.navyIcon,
                           Icons.monetization_on_outlined,
                         ),
@@ -69,7 +92,7 @@ class ReferralScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  _codeCard(context),
+                  _codeCard(context, d),
                   const SizedBox(height: 24),
                   DPSectionHeader(
                     'Recent Referrals',
@@ -79,28 +102,33 @@ class ReferralScreen extends StatelessWidget {
                   ),
                   DPCard(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < kMockReferrals.length; i++) ...[
-                          if (i > 0)
-                            Divider(height: 1, color: DP.borderSoft),
-                          _referralRow(kMockReferrals[i]),
-                        ],
-                      ],
-                    ),
+                    child: referrals.isEmpty
+                        ? const DPEmptyState(
+                            icon: DPIcons.referral,
+                            title: 'No referrals yet',
+                            message: 'Share your code to start earning.',
+                          )
+                        : Column(
+                            children: [
+                              for (var i = 0; i < referrals.length && i < 20; i++) ...[
+                                if (i > 0)
+                                  Divider(height: 1, color: DP.borderSoft),
+                                _referralRow(referrals[i]),
+                              ],
+                            ],
+                          ),
                   ),
                   const SizedBox(height: 24),
-                  _guideCard(),
+                  _guideCard(d),
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _codeCard(BuildContext context) {
+  Widget _codeCard(BuildContext context, Map<String, dynamic> d) {
+    final code = str(d['code']);
+    final bonus = DP.naira(toDouble(d['bonus']), decimals: false);
+    final minDeposit = DP.naira(toDouble(d['minFirstDeposit']), decimals: false);
     return DPCard(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -118,10 +146,10 @@ class ReferralScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    MockUser.referralCode,
-                    style: TextStyle(
+                    code,
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: DP.greenDeep,
@@ -133,9 +161,7 @@ class ReferralScreen extends StatelessWidget {
                   tooltip: 'Copy code',
                   icon: const Icon(DPIcons.copy, color: DP.green),
                   onPressed: () {
-                    Clipboard.setData(
-                      const ClipboardData(text: MockUser.referralCode),
-                    );
+                    Clipboard.setData(ClipboardData(text: code));
                     dpSnack(
                       context,
                       'Referral code copied to clipboard!',
@@ -150,12 +176,13 @@ class ReferralScreen extends StatelessWidget {
           DPButton(
             label: 'Share code',
             icon: DPIcons.share,
-            onPressed: () =>
-                dpSnack(context, 'Sharing isn\'t set up in this UI build'),
+            onPressed: () => Share.share(
+              'Join me on Dalabapay — pay bills, buy airtime and earn commission. Use my referral code $code when you sign up and we both get $bonus after your first deposit of $minDeposit.',
+            ),
           ),
           const SizedBox(height: 12),
           Text(
-            'Share this code with friends. When they join and make their first deposit (₦5000+), you both earn ₦200!',
+            'Share this code with friends. When they join and make their first deposit ($minDeposit+), you both earn $bonus!',
             style: DP.caption,
           ),
         ],
@@ -163,29 +190,35 @@ class ReferralScreen extends StatelessWidget {
     );
   }
 
-  Widget _referralRow(MockReferral r) {
+  Widget _referralRow(Map<String, dynamic> r) {
+    final name = str(r['name']);
+    final earned = toDouble(r['earned']);
+    final active = r['active'] == true;
     return DPListRow(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      leading: DPAvatar(name: r.name, size: 40),
-      title: r.name,
+      leading: DPAvatar(name: name, size: 40),
+      title: name,
       subtitle:
-          'Joined ${mockTimeAgo(DateTime.now().subtract(r.joined))} · ${r.active ? 'Active' : 'No deposit yet'}',
+          'Joined ${timeAgo(parseDate(r['joinedAt']))} · ${active ? 'Active' : 'No deposit yet'}',
       trailing: Text(
-        r.earned > 0 ? '+${DP.naira(r.earned, decimals: false)}' : 'Pending',
+        earned > 0 ? '+${DP.naira(earned, decimals: false)}' : 'Pending',
         style: TextStyle(
           fontWeight: FontWeight.w700,
-          color: r.earned > 0 ? DP.green : DP.amber,
+          color: earned > 0 ? DP.green : DP.amber,
         ),
       ),
     );
   }
 
-  Widget _guideCard() {
-    const steps = [
+  Widget _guideCard(Map<String, dynamic> d) {
+    final bonus = DP.naira(toDouble(d['bonus']), decimals: false);
+    final indirect = DP.naira(toDouble(d['indirectBonus']), decimals: false);
+    final minDeposit = DP.naira(toDouble(d['minFirstDeposit']), decimals: false);
+    final steps = [
       'Share your referral code with friends',
-      'They sign up and make first deposit (₦5000+)',
-      'You both earn ₦200 instantly',
-      'Earn ₦20 when your referrals invite others',
+      'They sign up and make first deposit ($minDeposit+)',
+      'You both earn $bonus instantly',
+      'Earn $indirect when your referrals invite others',
     ];
     return DPCard(
       color: DP.blueTint,
@@ -242,7 +275,8 @@ class ReferralScreen extends StatelessWidget {
 }
 
 class _EarningsCard extends StatelessWidget {
-  const _EarningsCard();
+  final Map<String, dynamic> d;
+  const _EarningsCard(this.d);
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +332,7 @@ class _EarningsCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           DPCountUp(
-            value: 1860,
+            value: toDouble(d['totalEarned']),
             format: (v) => DP.naira(v),
             style: const TextStyle(
               fontSize: 32,
@@ -310,12 +344,13 @@ class _EarningsCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              stat('Total Referrals', '${MockUser.referrals}',
+              stat('Total Referrals', '${toInt(d['totalReferrals'])}',
                   Icons.people_outline),
               sep(),
-              stat('Tier', 'Bronze', Icons.emoji_events_outlined),
+              stat('Tier', str(d['tier'], 'Bronze'), Icons.emoji_events_outlined),
               sep(),
-              stat('Pending', '₦400.00', Icons.pending_actions),
+              stat('Pending', DP.naira(toDouble(d['pendingEarnings'])),
+                  Icons.pending_actions),
             ],
           ),
         ],

@@ -1,12 +1,14 @@
 // lib/presentation/screens/dashboard/dashboard_screen.dart
-// Home — UI only. Balance card, essential services, promo banners, recent
-// transactions, Services tab and bottom menu, all from sample data.
+// Home: balance card, essential services, promo banners, recent
+// transactions (GET /api/me/home), Services tab and bottom menu.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/transaction_widgets.dart';
 import '../bills/pay_bills_screen.dart';
@@ -22,7 +24,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
   bool _isBalanceVisible = true;
-  final int _unreadNotificationCount = 2;
+  List<Map<String, dynamic>> _recent = [];
+  bool _loading = true;
+  String? _loadError;
+  String? _maintenance;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = asMap(await api.get('/api/me/home'));
+      final u = data['user'];
+      if (u is Map) Session.instance.setUser(u.cast<String, dynamic>());
+      Session.instance.unread.value = toInt(data['unreadNotifications']);
+      if (!mounted) return;
+      setState(() {
+        _recent = asList(data['recentTransactions']);
+        _maintenance = data['maintenance']?.toString();
+        _loading = false;
+        _loadError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = errorMessage(e);
+      });
+    }
+  }
+
+  /// Opens a page and refreshes the home data when it closes.
+  Future<Object?> _go(String route, {Object? arguments}) async {
+    final r = await Navigator.pushNamed(context, route, arguments: arguments);
+    if (mounted) _load();
+    return r;
+  }
 
   static const TextStyle _balanceStyle = TextStyle(
     color: Colors.white,
@@ -72,20 +112,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
         return;
       case '/wallet:add':
-        Navigator.pushNamed(context, '/wallet');
+        _go('/wallet');
         return;
       case '/wallet:send':
-        Navigator.pushNamed(context, '/send-money');
+        _go('/send-money');
         return;
       default:
-        Navigator.pushNamed(context, route);
+        _go(route);
     }
   }
 
   /// Transactions and Profile are pushed pages with their own bottom menu.
   /// When they close they say which tab to show next.
   Future<void> _pushTab(String route) async {
-    final result = await Navigator.pushNamed(context, route);
+    final result = await _go(route);
     if (!mounted) return;
     switch (result) {
       case 'transactions':
@@ -98,7 +138,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _onNavTap(3);
         break;
       case 'send':
-        Navigator.pushNamed(context, '/send-money');
+        _go('/send-money');
         setState(() => _selectedIndex = 0);
         break;
       default:
@@ -195,8 +235,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           shape: BoxShape.circle,
                           color: DP.blueTint,
                         ),
-                        child: const ClipOval(
-                          child: DPAvatar(name: MockUser.fullName, size: 44),
+                        child: ClipOval(
+                          child: DPAvatar(
+                              name: Session.instance.user?.fullName ?? '',
+                              size: 44),
                         ),
                       ),
                     ),
@@ -223,8 +265,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     color: DP.navyInk,
                     background: Colors.transparent,
                     semanticLabel: 'Notifications',
-                    onTap: () => Navigator.pushNamed(context, '/notifications'),
-                    badge: _unreadNotificationCount > 0
+                    onTap: () => _go('/notifications'),
+                    badge: Session.instance.unread.value > 0
                         ? Container(
                             width: 9,
                             height: 9,
@@ -242,7 +284,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Hello, ${MockUser.firstName}!',
+            'Hello, ${Session.instance.user?.firstName ?? 'there'}!',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -317,7 +359,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   fit: BoxFit.scaleDown,
                   child: _isBalanceVisible
                       ? DPCountUp(
-                          value: MockUser.walletBalance,
+                          value: Session.instance.user?.balance ?? 0,
                           format: (v) => DP.naira(v),
                           style: _balanceStyle,
                         )
@@ -328,14 +370,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 4),
           GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/commission'),
+            onTap: () => _go('/commission'),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(DPIcons.sparkle, size: 14, color: Color(0xFF7FE3BC)),
                 const SizedBox(width: 5),
                 Text(
-                  'Earnings ${_isBalanceVisible ? DP.naira(MockUser.commissionBalance) : '₦ ••••'}',
+                  'Earnings ${_isBalanceVisible ? DP.naira(Session.instance.user?.commissionBalance ?? 0) : '₦ ••••'}',
                   style: const TextStyle(
                     color: Color(0xFF7FE3BC),
                     fontSize: 12.5,
@@ -359,7 +401,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   leadingIcon: DPIcons.plus,
                   height: 46,
                   background: DP.greenBright,
-                  onPressed: () => Navigator.pushNamed(context, '/wallet'),
+                  onPressed: () => _go('/wallet'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -368,7 +410,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'Send Money',
                   height: 46,
                   background: DP.blue,
-                  onPressed: () => Navigator.pushNamed(context, '/send-money'),
+                  onPressed: () => _go('/send-money'),
                 ),
               ),
             ],
@@ -428,8 +470,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildNotices() {
+    final user = Session.instance.user;
+    final notices = <Widget>[
+      if (_maintenance != null && _maintenance!.isNotEmpty)
+        DPBanner(_maintenance!, tone: DPTone.warning, icon: DPIcons.info),
+      if (user != null && !user.isApproved)
+        const DPBanner(
+          'Your account is waiting for approval. You can look around, but payments are paused until it\'s approved.',
+          tone: DPTone.warning,
+          icon: DPIcons.info,
+        ),
+      if (user != null && !user.pinSet)
+        GestureDetector(
+          onTap: () => _go('/pin-setup'),
+          child: const DPBanner(
+            'Create your payment PIN to start paying. Tap here.',
+            tone: DPTone.info,
+            icon: DPIcons.lock,
+          ),
+        ),
+    ];
+    if (notices.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: Column(
+        children: [
+          for (final n in notices) ...[n, const SizedBox(height: 8)],
+        ],
+      ),
+    );
+  }
+
   Widget _buildRecentTransactions() {
-    final list = kMockTransactions.take(5).toList();
+    final list = _recent.take(5).toList();
+    Widget content;
+    if (_loading) {
+      content = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 14),
+        child: Column(
+          children: [
+            DPSkeleton(height: 44),
+            SizedBox(height: 12),
+            DPSkeleton(height: 44),
+          ],
+        ),
+      );
+    } else if (_loadError != null && list.isEmpty) {
+      content = DPEmptyState(
+        icon: DPIcons.alert,
+        title: 'Couldn\'t load your activity',
+        message: _loadError,
+        actionLabel: 'Try again',
+        onAction: _load,
+      );
+    } else if (list.isEmpty) {
+      content = DPEmptyState(
+        icon: DPIcons.receipt,
+        title: 'No transactions yet',
+        message: 'Add money to your wallet to start paying bills.',
+        actionLabel: 'Add Money',
+        onAction: () => _go('/wallet'),
+      );
+    } else {
+      content = Column(
+        children: [
+          for (var i = 0; i < list.length; i++) ...[
+            if (i > 0) Divider(height: 1, color: DP.borderSoft),
+            TransactionRow(tx: list[i]),
+          ],
+        ],
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -442,14 +554,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           DPCard(
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Column(
-              children: [
-                for (var i = 0; i < list.length; i++) ...[
-                  if (i > 0) Divider(height: 1, color: DP.borderSoft),
-                  TransactionRow(tx: list[i]),
-                ],
-              ],
-            ),
+            child: content,
           ),
         ],
       ),
@@ -457,9 +562,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildDrawer() {
+    final user = Session.instance.user;
     final items = <(IconData, String, String?)>[
       (Icons.apps_rounded, 'All Services', null),
-      (Icons.admin_panel_settings_outlined, 'Admin Console', '/admin'),
+      if (user?.isAdmin ?? false)
+        (Icons.admin_panel_settings_outlined, 'Admin Console', '/admin'),
       (DPIcons.shieldCheck, 'Transaction Validation', '/transaction-validation'),
       (Icons.gavel_rounded, 'My Disputes', '/user-disputes'),
       (DPIcons.referral, 'Refer & Earn', '/referral'),
@@ -477,30 +584,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(20, 48, 20, 20),
             color: DP.navy,
-            child: const Row(
+            child: Row(
               children: [
-                DPAvatar(name: MockUser.fullName, size: 48),
-                SizedBox(width: 12),
+                DPAvatar(name: user?.fullName ?? '', size: 48),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        MockUser.fullName,
+                        user?.fullName ?? '',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        MockUser.email,
+                        user?.email ?? '',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Color(0xB3FFFFFF),
                           fontSize: 12.5,
                         ),
@@ -528,7 +635,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       } else if (route == '/settings') {
                         _onNavTap(3);
                       } else {
-                        Navigator.pushNamed(context, route);
+                        _go(route);
                       }
                     },
                   ),
@@ -540,18 +647,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   DPIcons.logout,
                   'Logout',
                   color: DP.red,
-                  onTap: () => Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/login',
-                    (_) => false,
-                  ),
+                  onTap: () async {
+                    await Session.instance.logout();
+                    if (!context.mounted) return;
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/login',
+                      (_) => false,
+                    );
+                  },
                 ),
               ],
             ),
           ),
           Padding(
             padding: EdgeInsets.all(16),
-            child: Text('Version 1.6.0 (UI preview)', style: DP.caption),
+            child: Text('Version 1.0.0', style: DP.caption),
           ),
         ],
       ),
@@ -605,6 +716,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([Session.instance, Session.instance.unread]),
+      builder: (context, _) => _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: DP.bg,
@@ -626,7 +744,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: _selectedIndex == 2
                 ? ServicesView(
                     key: const ValueKey('services'),
-                    recentTransactions: kMockTransactions,
+                    recentTransactions: _recent,
                     onSelect: _openServiceRoute,
                   )
                 : Column(
@@ -636,8 +754,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Expanded(
                         child: RefreshIndicator(
                           color: DP.green,
-                          onRefresh: () =>
-                              Future.delayed(const Duration(milliseconds: 600)),
+                          onRefresh: _load,
                           child: SingleChildScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.only(top: 6, bottom: 24),
@@ -649,6 +766,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   child: _buildBalanceCard(),
                                 ),
                                 const SizedBox(height: 20),
+                                _buildNotices(),
                                 DPAppear(
                                   delay: const Duration(milliseconds: 120),
                                   child: _buildServicesGrid(),
@@ -684,7 +802,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         image: DPAssets.bannerRefer,
                                         icon: DPIcons.gift,
                                         onTap: () =>
-                                            Navigator.pushNamed(context, '/referral'),
+                                            _go('/referral'),
                                       ),
                                     ],
                                   ),
@@ -708,7 +826,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         index: _selectedIndex,
         items: kDPTabs,
         onTap: _onNavTap,
-        onCenter: () => Navigator.pushNamed(context, '/send-money'),
+        onCenter: () => _go('/send-money'),
       ),
     );
   }

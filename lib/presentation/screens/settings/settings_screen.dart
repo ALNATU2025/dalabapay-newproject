@@ -1,9 +1,11 @@
 // lib/presentation/screens/settings/settings_screen.dart
-// Profile + Security — UI only. Toggles change on screen only.
+// Profile + Security. Details come from the session (GET /api/me); the
+// notifications switch saves to PATCH /api/me/preferences.
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
 import '../../../core/theme/theme_controller.dart';
-import '../../../mock/mock_data.dart';
 import '../../../ui/ui.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -15,9 +17,52 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _securityView = false;
-  bool _biometricEnabled = true;
-  bool _notificationsEnabled = true;
-  final bool _kycVerified = true;
+  bool _savingPush = false;
+
+  AppUser? get _user => Session.instance.user;
+  bool get _kycVerified => _user?.kycStatus == 'verified';
+
+  @override
+  void initState() {
+    super.initState();
+    Session.instance.addListener(_onSession);
+    Session.instance.refreshQuietly();
+  }
+
+  @override
+  void dispose() {
+    Session.instance.removeListener(_onSession);
+    super.dispose();
+  }
+
+  void _onSession() {
+    if (mounted) setState(() {});
+  }
+
+  String get _kycLabel => switch (_user?.kycStatus) {
+        'verified' => 'Verified',
+        'pending' => 'Pending',
+        'rejected' => 'Rejected',
+        _ => 'Not started',
+      };
+
+  Color get _kycColor => switch (_user?.kycStatus) {
+        'verified' => DP.green,
+        'rejected' => DP.red,
+        _ => DP.amber,
+      };
+
+  Future<void> _setPush(bool v) async {
+    setState(() => _savingPush = true);
+    try {
+      final u = await api.patch('/api/me/preferences', {'pushEnabled': v});
+      if (u is Map) Session.instance.setUser(u.cast<String, dynamic>());
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    } finally {
+      if (mounted) setState(() => _savingPush = false);
+    }
+  }
 
   Widget _divider() => Divider(height: 1, color: DP.borderSoft);
 
@@ -133,7 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Dalabapay · Version 1.6.0',
+                'Dalabapay · Version 1.0.0',
                 style: DP.caption.copyWith(fontSize: 12),
               ),
             ],
@@ -162,23 +207,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 8),
               Text('Personal information', style: DP.title),
               const SizedBox(height: 16),
-              const DPCard(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+              DPCard(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: Column(
                   children: [
-                    DPSummaryRow('Full name', MockUser.fullName),
-                    DPSummaryRow('Email', MockUser.email),
-                    DPSummaryRow('Phone', MockUser.phone),
+                    DPSummaryRow('Full name', _user?.fullName ?? ''),
+                    DPSummaryRow('Email', _user?.email ?? ''),
+                    DPSummaryRow('Phone', _user?.phone ?? ''),
+                    DPSummaryRow('Referral code', _user?.referralCode ?? ''),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              DPOutlineButton(
-                label: 'Change profile photo',
-                icon: DPIcons.edit,
-                onPressed: () => Navigator.pop(ctx),
-              ),
-              const SizedBox(height: 10),
               Text(
                 'To change your name, email or phone number, contact support from Help.',
                 style: DP.caption,
@@ -202,6 +242,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       destructive: true,
     );
     if (ok == true && mounted) {
+      await Session.instance.logout();
+      if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
     }
   }
@@ -302,24 +344,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               _divider(),
               DPMenuRow(
-                icon: DPIcons.fingerprint,
-                title: 'Biometric login',
-                subtitle: _biometricEnabled
-                    ? 'On for login and payments'
-                    : 'Use your fingerprint or face',
-                trailing: Switch(
-                  value: _biometricEnabled,
-                  onChanged: (v) => setState(() => _biometricEnabled = v),
-                ),
-              ),
-              _divider(),
-              DPMenuRow(
                 icon: DPIcons.bell,
                 title: 'Push Notifications',
                 subtitle: 'Payment alerts on this phone',
                 trailing: Switch(
-                  value: _notificationsEnabled,
-                  onChanged: (v) => setState(() => _notificationsEnabled = v),
+                  value: _user?.pushEnabled ?? true,
+                  onChanged: _savingPush ? null : _setPush,
                 ),
               ),
               _divider(),
@@ -368,8 +398,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _tile(
                 icon: DPIcons.shieldCheck,
                 title: 'KYC Verification',
-                status: _kycVerified ? 'Verified' : 'Pending',
-                statusColor: _kycVerified ? DP.green : DP.amber,
+                status: _kycLabel,
+                statusColor: _kycColor,
                 onTap: () => Navigator.pushNamed(context, '/kyc'),
               ),
               _divider(),
@@ -396,14 +426,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: 'Notifications',
                 onTap: () => Navigator.pushNamed(context, '/notifications'),
               ),
-              _divider(),
-              _tile(
-                icon: Icons.admin_panel_settings_outlined,
-                title: 'Admin Console',
-                status: 'ADMIN',
-                statusColor: DP.navyInk,
-                onTap: () => Navigator.pushNamed(context, '/admin'),
-              ),
+              if (_user?.isAdmin ?? false) ...[
+                _divider(),
+                _tile(
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: 'Admin Console',
+                  status: (_user?.role ?? 'admin').toUpperCase(),
+                  statusColor: DP.navyInk,
+                  onTap: () => Navigator.pushNamed(context, '/admin'),
+                ),
+              ],
               _divider(),
               _tile(
                 icon: DPIcons.help,
@@ -489,29 +521,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: DP.blueTint,
                 shape: BoxShape.circle,
               ),
-              child: const ClipOval(
+              child: ClipOval(
                 child: SizedBox(
                   width: 72,
                   height: 72,
-                  child: DPAvatar(name: MockUser.fullName, size: 72),
-                ),
-              ),
-            ),
-            Positioned(
-              right: -2,
-              bottom: 0,
-              child: Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: DP.green,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: DP.surface, width: 2),
-                ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  size: 13,
-                  color: Colors.white,
+                  child: DPAvatar(name: _user?.fullName ?? '', size: 72),
                 ),
               ),
             ),
@@ -523,7 +537,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                MockUser.fullName,
+                _user?.fullName ?? '',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -533,10 +547,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 3),
-              Text(MockUser.phone, style: DP.caption),
+              Text(_user?.phone ?? '', style: DP.caption),
               const SizedBox(height: 2),
               Text(
-                MockUser.email,
+                _user?.email ?? '',
                 style: DP.caption,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -559,7 +573,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 )
               else
-                _statusChip('Not verified', DP.amber),
+                _statusChip(_kycLabel == 'Not started' ? 'Not verified' : _kycLabel, _kycColor),
             ],
           ),
         ),

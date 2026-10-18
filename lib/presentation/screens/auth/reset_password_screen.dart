@@ -1,7 +1,9 @@
 // lib/presentation/screens/auth/reset_password_screen.dart
-// UI only — choose a new password after the OTP step.
+// Choose a new password after the OTP step (POST /api/auth/password/reset).
+// The reset token arrives as the route argument.
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
 import '../../../ui/ui.dart';
 import 'password_widgets.dart';
 
@@ -45,8 +47,24 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
+    final token = ModalRoute.of(context)?.settings.arguments?.toString() ?? '';
+    if (token.isEmpty) {
+      dpSnack(context, 'Please request a new reset code.', error: true);
+      Navigator.pushReplacementNamed(context, '/forgot-password');
+      return;
+    }
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
+    try {
+      await api.post('/api/auth/password/reset', {
+        'resetToken': token,
+        'password': _newController.text,
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
     if (!mounted) return;
     setState(() => _isLoading = false);
     showDoneSheet(
@@ -105,7 +123,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     DPButton(
                       label: 'Reset password',
                       loading: _isLoading,
-                      onPressed: _strong && _matches ? _submit : null,
+                      onPressed: _strong && _matches && !_isLoading ? _submit : null,
                     ),
                     const SizedBox(height: 18),
                     Center(

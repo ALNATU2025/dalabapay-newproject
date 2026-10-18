@@ -1,7 +1,9 @@
 // lib/presentation/screens/auth/pin_setup_screen.dart
-// UI only — create + confirm a 6-digit PIN. Nothing is stored.
+// Create + confirm a 6-digit payment PIN (POST /api/auth/pin/set).
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
 
 class PinSetupScreen extends StatefulWidget {
@@ -17,8 +19,45 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
   String _confirmPin = '';
   bool _isConfirming = false;
   String _errorMessage = '';
+  bool _saving = false;
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await api.post('/api/auth/pin/set', {'pin': _pin});
+    } on ApiException catch (e) {
+      if (e.code != 'PIN_ALREADY_SET') {
+        if (!mounted) return;
+        setState(() {
+          _saving = false;
+          _errorMessage = e.message;
+          _pin = '';
+          _confirmPin = '';
+          _isConfirming = false;
+        });
+        return;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _errorMessage = errorMessage(e);
+        _confirmPin = '';
+      });
+      return;
+    }
+    await Session.instance.refreshQuietly();
+    if (!mounted) return;
+    dpSnack(context, 'Your payment PIN is set.', success: true);
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
+    } else {
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    }
+  }
 
   void _onPinDigitPressed(String digit) {
+    if (_saving) return;
     setState(() {
       _errorMessage = '';
       if (!_isConfirming) {
@@ -33,9 +72,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
       });
     } else if (_isConfirming && _confirmPin.length == 6) {
       if (_confirmPin == _pin) {
-        Future.delayed(const Duration(milliseconds: 250), () {
-          if (mounted) Navigator.pushReplacementNamed(context, '/dashboard');
-        });
+        _save();
       } else {
         setState(() {
           _errorMessage = 'PINs do not match. Try again.';
@@ -127,25 +164,26 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
               DPKeypad(
                 onDigit: _onPinDigitPressed,
                 onBackspace: _onBackspacePressed,
-                leftAction: IconButton(
-                  tooltip: 'Set up biometrics',
-                  onPressed: () {},
-                  icon: const Icon(
-                    DPIcons.fingerprint,
-                    color: DP.green,
-                    size: 30,
-                  ),
-                ),
               ),
+              if (_saving) const LinearProgressIndicator(color: DP.green),
               const SizedBox(height: 8),
               const DPBanner(
                 'Never share your PIN. Dalabapay staff will never ask for it.',
               ),
               Center(
                 child: DPTextLink(
-                  label: 'Back to log in',
+                  label: Navigator.of(context).canPop() ? 'Not now' : 'Log out',
                   color: DP.muted,
-                  onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+                  onTap: () async {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                      return;
+                    }
+                    await Session.instance.logout();
+                    if (context.mounted) {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    }
+                  },
                 ),
               ),
             ],

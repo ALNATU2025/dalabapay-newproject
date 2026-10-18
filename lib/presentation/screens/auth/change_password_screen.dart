@@ -1,7 +1,9 @@
 // lib/presentation/screens/auth/change_password_screen.dart
-// UI only — change password from Profile → Security.
+// Change password from Profile → Security (POST /api/auth/password/change).
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
 import 'password_widgets.dart';
 
@@ -49,7 +51,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
+    try {
+      final data = await api.post('/api/auth/password/change', {
+        'currentPassword': _currentController.text,
+        'newPassword': _newController.text,
+      });
+      // The old login is invalid now; keep the new one.
+      await Session.instance.start((data as Map).cast<String, dynamic>());
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
     if (!mounted) return;
     setState(() => _isLoading = false);
     showDoneSheet(

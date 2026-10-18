@@ -2,8 +2,9 @@
 // "Help & support" from the redesign. Uses features the app already has:
 // disputes (/user-disputes), payment validation (/transaction-validation),
 // activity (/transactions) and the support WhatsApp line / email.
-// UI only: the WhatsApp / email buttons just show a message.
+// The WhatsApp / email buttons open those apps.
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../ui/ui.dart';
 
@@ -80,12 +81,22 @@ class _HelpScreenState extends State<HelpScreen> {
     ),
   ];
 
+  Future<void> _open(Uri uri, String fallback) async {
+    var opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!opened && mounted) dpSnack(context, fallback);
+  }
+
   void _openWhatsApp() {
-    dpSnack(context, 'WhatsApp support: +$_supportWhatsApp');
+    _open(Uri.parse('https://wa.me/$_supportWhatsApp'),
+        'WhatsApp support: +$_supportWhatsApp');
   }
 
   void _emailSupport() {
-    dpSnack(context, 'Email us at $_supportEmail');
+    _open(Uri(scheme: 'mailto', path: _supportEmail, queryParameters: {'subject': 'Dalabapay support'}),
+        'Email us at $_supportEmail');
   }
 
   void _openFaq(_Faq f) {

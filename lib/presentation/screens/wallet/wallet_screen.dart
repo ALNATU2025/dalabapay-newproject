@@ -1,14 +1,35 @@
 // lib/presentation/screens/wallet/wallet_screen.dart
-// "Add Money" — UI only. Three tabs: Bank Transfer (sample personal
-// account), One-time (shows a sample one-time account with a countdown)
-// and Assisted (shows a confirmation). No money moves.
+// "Add Money". Three tabs: Bank Transfer (your personal account from
+// GET /api/wallet, issued after KYC), One-time (POST /api/wallet/fund/one-time
+// returns an account for an exact amount) and Assisted
+// (POST /api/wallet/fund/assisted, approved by the team).
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+
+/// Test mode only: pretends a bank transfer arrived (POST /api/dev/simulate-transfer).
+Future<void> simulateTransfer(BuildContext context, double amount,
+    {String? reference}) async {
+  try {
+    await api.post('/api/dev/simulate-transfer', {
+      'amount': amount,
+      if (reference != null) 'reference': reference,
+    });
+    await Session.instance.refreshQuietly();
+    if (context.mounted) {
+      dpSnack(context, 'Test transfer received', success: true);
+    }
+  } catch (e) {
+    if (context.mounted) dpSnack(context, errorMessage(e), error: true);
+  }
+}
 
 class WalletTopUpScreen extends StatefulWidget {
   const WalletTopUpScreen({super.key});
@@ -22,8 +43,29 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
   int _method = 0;
   final _amountController = TextEditingController();
   final _pinController = TextEditingController();
-  bool _useBiometric = false;
   bool _isLoading = false;
+  Map<String, dynamic> _wallet = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final w = asMap(await api.get('/api/wallet'));
+      if (mounted) setState(() => _wallet = w);
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  double get _feePercent => toDouble(_wallet['fundingFeePercent'] ?? 1.5);
+  double get _minFunding => toDouble(_wallet['minFunding'] ?? 100);
+  double get _maxFunding => toDouble(_wallet['maxFunding'] ?? 1000000);
+  Map<String, dynamic>? get _account =>
+      _wallet['dedicatedAccount'] is Map ? asMap(_wallet['dedicatedAccount']) : null;
 
   @override
   void dispose() {
@@ -34,36 +76,52 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
 
   Future<void> _proceed() async {
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
-    if (amount < 100 || amount > 1000000) {
-      dpSnack(context, 'Enter an amount between ₦100 and ₦1,000,000',
+    if (amount < _minFunding || amount > _maxFunding) {
+      dpSnack(context,
+          'Enter an amount between ${DP.naira(_minFunding)} and ${DP.naira(_maxFunding)}',
           error: true);
       return;
     }
-    if (!_useBiometric && _pinController.text.length < 6) {
+    if (_pinController.text.length < 6) {
       dpSnack(context, 'Enter your 6-digit payment PIN', error: true);
       return;
     }
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    if (_method == 1) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => _OneTimeAccountDialog(amount: amount),
-      );
-    } else {
-      dpDialog(
-        context,
-        title: 'Request sent',
-        message:
-            'Our team will reach out to help you fund ${DP.naira(amount)}. We\'ll credit your wallet once your payment is confirmed.',
-        confirmLabel: 'OK',
-      );
-    }
+    final pin = _pinController.text;
     _pinController.clear();
+    try {
+      if (_method == 1) {
+        final r = asMap(await api.post('/api/wallet/fund/one-time', {'amount': amount, 'pin': pin}));
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _OneTimeAccountDialog(
+            account: asMap(r['account']),
+            feePercent: _feePercent,
+          ),
+        );
+        await Session.instance.refreshQuietly();
+      } else {
+        await api.post('/api/wallet/fund/assisted', {'amount': amount, 'pin': pin});
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        _amountController.clear();
+        dpDialog(
+          context,
+          title: 'Request sent',
+          message:
+              'Our team will reach out to help you fund ${DP.naira(amount)}. We\'ll credit your wallet once your payment is confirmed.',
+          confirmLabel: 'OK',
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   @override
@@ -161,6 +219,47 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
   }
 
   Widget _buildDedicatedAccount() {
+    final account = _account;
+    if (account == null) {
+      return DPCard(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const DPIconBadge(DPIcons.bank, size: 48, iconSize: 22),
+            const SizedBox(height: 12),
+            Text('Get your personal account number', style: DP.bodyStrong),
+            const SizedBox(height: 6),
+            Text(
+              _wallet.isEmpty
+                  ? 'Loading…'
+                  : 'Verify your identity (BVN or NIN) and we\'ll give you a bank account number. Money you send to it lands in your wallet automatically.',
+              style: DP.caption,
+            ),
+            const SizedBox(height: 14),
+            DPButton(
+              label: 'Verify identity',
+              icon: DPIcons.forward,
+              onPressed: () async {
+                await Navigator.pushNamed(context, '/kyc');
+                _load();
+              },
+            ),
+            if (kDebugMode) ...[
+              const SizedBox(height: 8),
+              DPOutlineButton(
+                label: 'Test mode: receive ₦10,000',
+                onPressed: () async {
+                  await simulateTransfer(context, 10000);
+                  _load();
+                },
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+    final number = str(account['accountNumber']);
     return Column(
       children: [
         Container(
@@ -206,12 +305,12 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              const FittedBox(
+              FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: SelectableText(
-                  MockUser.accountNumber,
-                  style: TextStyle(
+                  number,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
@@ -220,13 +319,13 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Dalabapay - ${MockUser.fullName}',
-                style: TextStyle(color: Colors.white, fontSize: 15),
+              Text(
+                str(account['accountName']),
+                style: const TextStyle(color: Colors.white, fontSize: 15),
               ),
               const SizedBox(height: 10),
               Text(
-                MockUser.bankName,
+                str(account['bankName']),
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.75),
                   fontSize: 13,
@@ -240,13 +339,21 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
           label: 'Copy account number',
           icon: DPIcons.copy,
           onPressed: () {
-            Clipboard.setData(
-              const ClipboardData(text: MockUser.accountNumber),
-            );
+            Clipboard.setData(ClipboardData(text: number));
             HapticFeedback.lightImpact();
             dpSnack(context, 'Account number copied', success: true);
           },
         ),
+        if (kDebugMode) ...[
+          const SizedBox(height: 8),
+          DPOutlineButton(
+            label: 'Test mode: receive ₦10,000',
+            onPressed: () async {
+              await simulateTransfer(context, 10000);
+              _load();
+            },
+          ),
+        ],
       ],
     );
   }
@@ -275,7 +382,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const DPHelper('Minimum ₦100 · Maximum ₦1,000,000'),
+        DPHelper('Minimum ${DP.naira(_minFunding, decimals: false)} · Maximum ${DP.naira(_maxFunding, decimals: false)}'),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -302,30 +409,9 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Row(
-            children: [
-              const Icon(DPIcons.fingerprint, color: DP.green),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text('Confirm with biometrics', style: DP.body),
-              ),
-              Switch(
-                value: _useBiometric,
-                onChanged: (v) => setState(() {
-                  _useBiometric = v;
-                  if (v) _pinController.clear();
-                }),
-              ),
-            ],
-          ),
-        ),
-        if (!_useBiometric) ...[
-          Text('Enter your payment PIN', style: DP.section),
-          const SizedBox(height: 12),
-          DPCodeInput(controller: _pinController, length: 6),
-        ],
+        Text('Enter your payment PIN', style: DP.section),
+        const SizedBox(height: 12),
+        DPCodeInput(controller: _pinController, length: 6),
       ],
     );
   }
@@ -338,26 +424,58 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
           if (_method == 0)
             const DPSummaryRow('Transfer processing', 'Usually within minutes'),
           if (_method != 2)
-            const DPSummaryRow('Dalabapay funding fee', '1.5% per transfer'),
-          DPSummaryRow('Wallet balance', DP.naira(MockUser.walletBalance)),
+            DPSummaryRow('Dalabapay funding fee',
+                '${_feePercent.toStringAsFixed(_feePercent % 1 == 0 ? 0 : 1)}% per transfer'),
+          DPSummaryRow('Wallet balance',
+              DP.naira(Session.instance.user?.balance ?? toDouble(_wallet['balance']))),
         ],
       ),
     );
   }
 }
 
-/// Sample one-time account with a 30-minute countdown.
+/// One-time account from the server, with a countdown to its expiry.
 class _OneTimeAccountDialog extends StatefulWidget {
-  final double amount;
-  const _OneTimeAccountDialog({required this.amount});
+  final Map<String, dynamic> account;
+  final double feePercent;
+  const _OneTimeAccountDialog({required this.account, required this.feePercent});
 
   @override
   State<_OneTimeAccountDialog> createState() => _OneTimeAccountDialogState();
 }
 
 class _OneTimeAccountDialogState extends State<_OneTimeAccountDialog> {
-  int _seconds = 30 * 60;
+  late int _seconds = parseDate(widget.account['expiresAt'])
+      .difference(DateTime.now())
+      .inSeconds
+      .clamp(0, 24 * 3600)
+      .toInt();
   Timer? _timer;
+  bool _checking = false;
+
+  Future<void> _checkPayment() async {
+    setState(() => _checking = true);
+    try {
+      final r = asMap(await api.post('/api/wallet/verify-payment',
+          {'reference': str(widget.account['reference'])}));
+      if (!mounted) return;
+      setState(() => _checking = false);
+      if (r['status'] == 'success') {
+        await Session.instance.refreshQuietly();
+        if (!mounted) return;
+        dpSnack(context, 'Payment received. Your wallet has been credited.',
+            success: true);
+        Navigator.pop(context);
+      } else {
+        dpSnack(context,
+            'We haven\'t received it yet. Your wallet updates as soon as the transfer lands.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _checking = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
+  }
 
   @override
   void initState() {
@@ -423,7 +541,9 @@ class _OneTimeAccountDialogState extends State<_OneTimeAccountDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final fee = widget.amount * 0.015;
+    final a = widget.account;
+    final fee = toDouble(a['fee']);
+    final pct = widget.feePercent;
     final mm = (_seconds ~/ 60).toString().padLeft(2, '0');
     final ss = (_seconds % 60).toString().padLeft(2, '0');
     final soon = _seconds < 300;
@@ -451,9 +571,9 @@ class _OneTimeAccountDialogState extends State<_OneTimeAccountDialog> {
                       color: DP.blueTint,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
-                      '1.5% Fee',
-                      style: TextStyle(
+                    child: Text(
+                      '${pct.toStringAsFixed(pct % 1 == 0 ? 0 : 1)}% Fee',
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: DP.navyIcon,
@@ -477,19 +597,19 @@ class _OneTimeAccountDialogState extends State<_OneTimeAccountDialog> {
                 ),
               ),
               const SizedBox(height: 10),
-              _row(DPIcons.bank, 'Bank', 'Paystack-Titan', copy: true),
-              _row(DPIcons.wallet, 'Account Number', '9876543210',
+              _row(DPIcons.bank, 'Bank', str(a['bankName']), copy: true),
+              _row(DPIcons.wallet, 'Account Number', str(a['accountNumber']),
                   highlight: true, copy: true),
-              _row(DPIcons.user, 'Account Name', 'DALABAPAY / ADAEZE OKAFOR',
+              _row(DPIcons.user, 'Account Name', str(a['accountName']),
                   copy: true),
               Divider(height: 24, color: DP.border),
               _row(Icons.payments_outlined, 'Amount to transfer',
-                  DP.naira(widget.amount + fee),
+                  DP.naira(toDouble(a['amountToPay'])),
                   highlight: true),
               Padding(
                 padding: const EdgeInsets.only(left: 48, right: 8),
                 child: Text(
-                  'Includes ${DP.naira(fee)} funding fee. You\'ll receive ${DP.naira(widget.amount)}.',
+                  'Includes ${DP.naira(fee)} funding fee. You\'ll receive ${DP.naira(toDouble(a['youReceive']))}.',
                   style: DP.caption,
                 ),
               ),
@@ -498,16 +618,23 @@ class _OneTimeAccountDialogState extends State<_OneTimeAccountDialog> {
                 padding: const EdgeInsets.only(right: 8),
                 child: DPButton(
                   label: 'I\'ve sent the money',
-                  onPressed: () {
-                    dpSnack(
-                      context,
-                      'Thanks! Your wallet updates once the transfer lands.',
-                      success: true,
-                    );
-                    Navigator.pop(context);
-                  },
+                  loading: _checking,
+                  onPressed: _checking ? null : _checkPayment,
                 ),
               ),
+              if (kDebugMode)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8, top: 8),
+                  child: DPOutlineButton(
+                    label: 'Test mode: simulate this transfer',
+                    onPressed: () async {
+                      await simulateTransfer(context,
+                          toDouble(a['amountToPay']),
+                          reference: str(a['reference']));
+                      if (context.mounted) Navigator.pop(context);
+                    },
+                  ),
+                ),
             ],
           ),
         ),

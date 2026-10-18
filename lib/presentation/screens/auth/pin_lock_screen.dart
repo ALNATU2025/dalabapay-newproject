@@ -1,9 +1,10 @@
 // lib/presentation/screens/auth/pin_lock_screen.dart
-// UI only — the "app locked" screen. Any 6 digits close it.
+// The "app locked" screen shown when returning to the app.
 import 'package:flutter/material.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
+import 'pin_unlock.dart';
 
 class PinLockScreen extends StatefulWidget {
   const PinLockScreen({super.key});
@@ -12,10 +13,10 @@ class PinLockScreen extends StatefulWidget {
   State<PinLockScreen> createState() => _PinLockScreenState();
 }
 
-class _PinLockScreenState extends State<PinLockScreen> {
-  String _pin = '';
-
-  void _unlock() {
+class _PinLockScreenState extends State<PinLockScreen>
+    with PinUnlock<PinLockScreen> {
+  @override
+  void onUnlocked() {
     if (Navigator.canPop(context)) {
       Navigator.pop(context, true);
     } else {
@@ -23,24 +24,12 @@ class _PinLockScreenState extends State<PinLockScreen> {
     }
   }
 
-  void _onDigitPressed(String d) {
-    if (_pin.length >= 6) return;
-    setState(() => _pin += d);
-    if (_pin.length == 6) {
-      Future.delayed(const Duration(milliseconds: 250), () {
-        if (mounted) _unlock();
-      });
-    }
-  }
-
-  void _onBackspacePressed() {
-    if (_pin.isEmpty) return;
-    setState(() => _pin = _pin.substring(0, _pin.length - 1));
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final user = Session.instance.user;
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       backgroundColor: DP.bg,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -48,10 +37,10 @@ class _PinLockScreenState extends State<PinLockScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const DPAvatar(name: MockUser.fullName, size: 56),
+              DPAvatar(name: user?.fullName ?? '', size: 56),
               const SizedBox(height: 18),
               Text(
-                'Welcome back, ${MockUser.firstName}.',
+                'Welcome back, ${user?.firstName ?? 'there'}.',
                 style: DP.display,
               ),
               const SizedBox(height: 8),
@@ -60,37 +49,25 @@ class _PinLockScreenState extends State<PinLockScreen> {
                 style: DP.body.copyWith(color: DP.muted),
               ),
               const SizedBox(height: 20),
-              DPPinDots(length: 6, filled: _pin.length),
+              DPPinDots(length: 6, filled: pin.length, error: error.isNotEmpty),
+              if (error.isNotEmpty)
+                DPHelper(error, color: DP.red, icon: DPIcons.alert),
+              if (checking) const LinearProgressIndicator(color: DP.green),
               const SizedBox(height: 20),
-              DPKeypad(
-                onDigit: _onDigitPressed,
-                onBackspace: _onBackspacePressed,
-                leftAction: IconButton(
-                  tooltip: 'Use biometrics',
-                  onPressed: _unlock,
-                  icon: const Icon(
-                    DPIcons.fingerprint,
-                    color: DP.green,
-                    size: 30,
-                  ),
-                ),
-              ),
+              DPKeypad(onDigit: addDigit, onBackspace: removeDigit),
               const SizedBox(height: 12),
               Center(
                 child: DPTextLink(
                   label: 'Log out',
                   color: DP.muted,
-                  onTap: () => Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/login',
-                    (_) => false,
-                  ),
+                  onTap: logOut,
                 ),
               ),
             ],
           ),
         ),
       ),
+    ),
     );
   }
 }

@@ -213,7 +213,7 @@ class DPReviewPanel extends StatelessWidget {
               child: ValueListenableBuilder<TextEditingValue>(
                 valueListenable: pinController,
                 builder: (context, v, _) {
-                  final ready = !pinRequired || v.text.trim().length >= 4;
+                  final ready = !pinRequired || v.text.trim().length >= 6;
                   return DPButton(
                     label: label,
                     icon: DPIcons.lock,

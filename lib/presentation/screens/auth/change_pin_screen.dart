@@ -1,8 +1,11 @@
 // lib/presentation/screens/auth/change_pin_screen.dart
-// UI only — current PIN → new PIN → confirm. "Forgot PIN?" swaps the first
-// step for an emailed reset code. Nothing is checked or saved.
+// Current PIN → new PIN → confirm (POST /api/auth/pin/change). "Forgot PIN?"
+// swaps the first step for an emailed code (POST /api/auth/pin/forgot, then
+// /api/auth/pin/reset).
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/dev_code.dart';
 import '../../../ui/ui.dart';
 import 'password_widgets.dart';
 
@@ -21,6 +24,81 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
   String _newPin = '';
   String _error = '';
   bool _resetting = false;
+  bool _busy = false;
+  String _currentPin = '';
+  String _resetCode = '';
+
+  Future<void> _startReset() async {
+    setState(() => _busy = true);
+    try {
+      final r = await api.post('/api/auth/pin/forgot');
+      if (!mounted) return;
+      showDevCode(context, r);
+      setState(() {
+        _busy = false;
+        _resetting = true;
+        _entry = '';
+        _error = '';
+        _step = _PinStep.resetCode;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  Future<void> _checkCurrent(String pin) async {
+    setState(() => _busy = true);
+    try {
+      await api.post('/api/auth/pin/verify', {'pin': pin});
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _currentPin = pin;
+        _entry = '';
+        _step = _PinStep.create;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _entry = '';
+        _error = errorMessage(e);
+      });
+    }
+  }
+
+  Future<void> _save(String newPin) async {
+    setState(() => _busy = true);
+    try {
+      if (_resetting) {
+        await api.post('/api/auth/pin/reset', {'code': _resetCode, 'newPin': newPin});
+      } else {
+        await api.post('/api/auth/pin/change', {'currentPin': _currentPin, 'newPin': newPin});
+      }
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _done();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final badCode = e.code.startsWith('CODE_');
+      setState(() {
+        _busy = false;
+        _entry = '';
+        _newPin = '';
+        _error = e.message;
+        _step = badCode ? _PinStep.resetCode : _PinStep.create;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _entry = '';
+        _error = errorMessage(e);
+      });
+    }
+  }
 
   String get _title => switch (_step) {
         _PinStep.current => 'Enter your current PIN.',
@@ -44,7 +122,7 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
       };
 
   void _onDigit(String d) {
-    if (_entry.length >= 6) return;
+    if (_busy || _entry.length >= 6) return;
     setState(() {
       _error = '';
       _entry += d;
@@ -55,7 +133,10 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
       setState(() {
         switch (_step) {
           case _PinStep.current:
+            _checkCurrent(_entry);
+            return;
           case _PinStep.resetCode:
+            _resetCode = _entry;
             _step = _PinStep.create;
             break;
           case _PinStep.create:
@@ -68,8 +149,8 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
               _entry = '';
               return;
             }
-            _done();
-            break;
+            _save(_entry);
+            return;
         }
         _entry = '';
       });
@@ -139,16 +220,13 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
                       DPHelper(_error, color: DP.red, icon: DPIcons.alert),
                     const SizedBox(height: 8),
                     DPKeypad(onDigit: _onDigit, onBackspace: _onBackspace),
+                    if (_busy) const LinearProgressIndicator(color: DP.green),
                     const SizedBox(height: 12),
                     if (_step == _PinStep.current)
                       Center(
                         child: DPTextLink(
                           label: 'Forgot PIN?',
-                          onTap: () => setState(() {
-                            _resetting = true;
-                            _entry = '';
-                            _step = _PinStep.resetCode;
-                          }),
+                          onTap: _busy ? null : _startReset,
                         ),
                       ),
                   ],

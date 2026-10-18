@@ -1,11 +1,16 @@
 // lib/presentation/screens/cabletv/cabletv_screen.dart
-// UI only — provider, smartcard ("Verify" shows a sample customer), renew
-// or change package, months → review → success.
+// Provider, smartcard (POST /api/services/cable/verify), renew or change
+// package (GET /api/services/cable/plans), months → review →
+// POST /api/services/cable.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/catalog.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 import '../../widgets/payment_flow.dart';
 
 class CableTvScreen extends StatefulWidget {
@@ -17,24 +22,81 @@ class CableTvScreen extends StatefulWidget {
 
 class _CableTvScreenState extends State<CableTvScreen> {
   final _smartCardController = TextEditingController();
-  final _phoneController = TextEditingController(text: MockUser.phone);
+  final _phoneController =
+      TextEditingController(text: Session.instance.user?.phone ?? '');
 
   String? _selectedProvider;
   bool _isValidating = false;
   bool _isValidated = false;
   String? _selectedAction; // 'renew' | 'change'
-  MockPlan? _selectedPlan;
+  Plan? _selectedPlan;
   int _quantity = 1;
+
+  /// name ("DSTV") → id ("dstv").
+  Map<String, String> _providers = {};
+  List<Plan> _plans = [];
+  bool _plansLoading = false;
+  Object? _plansError;
+  Map<String, dynamic> _customer = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProviders();
+  }
+
+  Future<void> _loadProviders() async {
+    try {
+      final list = asList(await api.get('/api/services/cable/providers'));
+      if (!mounted) return;
+      setState(() => _providers = {
+            for (final p in list) str(p['name']): str(p['id']),
+          });
+      if (_selectedProvider != null) _loadPlans();
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  Future<void> _loadPlans() async {
+    final provider = _selectedProvider;
+    final id = _providers[provider];
+    if (id == null) return;
+    setState(() {
+      _plansLoading = true;
+      _plansError = null;
+      _plans = [];
+    });
+    try {
+      final r = await api.get('/api/services/cable/plans', query: {'provider': id});
+      if (!mounted || provider != _selectedProvider) return;
+      setState(() {
+        _plans = Plan.listFrom(r);
+        _plansLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _plansLoading = false;
+        _plansError = e;
+      });
+    }
+  }
 
   static const _actions = {
     'renew': 'Renew current',
     'change': 'Change package',
   };
 
-  List<MockPlan> get _plans => kMockCablePlans[_selectedProvider] ?? const [];
-
-  /// The sample customer's current package (2nd plan of the provider).
-  MockPlan? get _currentPlan => _plans.length > 1 ? _plans[1] : null;
+  /// The customer's current package, from the smartcard check.
+  Plan? get _currentPlan => _customer['currentPlanCode'] == null
+      ? null
+      : Plan(
+          str(_customer['currentPlanCode']),
+          str(_customer['currentPlan']),
+          toDouble(_customer['renewalAmount']),
+          '1 month',
+        );
 
   double get _amount {
     if (_selectedAction == 'renew') return _currentPlan?.price ?? 0;
@@ -60,13 +122,24 @@ class _CableTvScreenState extends State<CableTvScreen> {
   }
 
   Future<void> _validate() async {
+    FocusScope.of(context).unfocus();
     setState(() => _isValidating = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() {
-      _isValidating = false;
-      _isValidated = true;
-    });
+    try {
+      final r = asMap(await api.post('/api/services/cable/verify', {
+        'provider': _providers[_selectedProvider],
+        'smartcardNumber': _smartCardController.text.trim(),
+      }));
+      if (!mounted) return;
+      setState(() {
+        _isValidating = false;
+        _isValidated = true;
+        _customer = r;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isValidating = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   void _openReview() {
@@ -80,8 +153,17 @@ class _CableTvScreenState extends State<CableTvScreen> {
       );
       return;
     }
+    final phone = _phoneController.text.trim();
+    if (phone.length != 11) {
+      dpSnack(context, 'Enter an 11-digit phone number', error: true);
+      return;
+    }
     final plan = _selectedAction == 'renew' ? _currentPlan! : _selectedPlan!;
     final total = _amount * _quantity;
+    final action = _selectedAction!;
+    final months = _quantity;
+    final providerId = _providers[_selectedProvider]!;
+    final card = _smartCardController.text.trim();
     showReviewAndPay(
       context,
       icon: DPIcons.tv,
@@ -90,7 +172,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
       amount: total,
       service: 'cable',
       rows: [
-        const DPReviewRow('Customer', 'ADAEZE OKAFOR'),
+        DPReviewRow('Customer', str(_customer['customerName'])),
         DPReviewRow('Smartcard', _smartCardController.text.trim()),
         DPReviewRow('Package', plan.name),
         DPReviewRow('Months', '$_quantity'),
@@ -99,6 +181,18 @@ class _CableTvScreenState extends State<CableTvScreen> {
       ],
       footnote:
           'Check the smartcard number. Subscriptions can\'t be reversed once activated.',
+      onPay: (pin) async {
+        final r = await api.post('/api/services/cable', {
+          'provider': providerId,
+          'smartcardNumber': card,
+          'action': action,
+          if (action == 'change') 'planCode': plan.code,
+          'months': months,
+          'phone': phone,
+          'pin': pin,
+        });
+        return asMap(asMap(r)['transaction']);
+      },
     );
   }
 
@@ -106,8 +200,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
   Widget build(BuildContext context) {
     final card = _smartCardController.text.trim();
     final canValidate = _selectedProvider != null &&
-        card.length >= 10 &&
-        card.length <= 11 &&
+        card.length >= 8 &&
         !_isValidating;
 
     return Scaffold(
@@ -140,7 +233,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
                         final picked = await dpPickFromList<String>(
                           context,
                           title: 'TV provider',
-                          items: kMockCableProviders,
+                          items: _providers.keys.toList(),
                           selected: _selectedProvider,
                           labelOf: (x) => x,
                           leadingOf: (x) => _providerLogo(x),
@@ -152,7 +245,9 @@ class _CableTvScreenState extends State<CableTvScreen> {
                           _selectedAction = null;
                           _selectedPlan = null;
                           _quantity = 1;
+                          _customer = {};
                         });
+                        _loadPlans();
                       },
                     ),
                     const SizedBox(height: 20),
@@ -168,11 +263,11 @@ class _CableTvScreenState extends State<CableTvScreen> {
                     ),
                     DPField(
                       controller: _smartCardController,
-                      hint: '10–11 digit number',
+                      hint: 'Smartcard / IUC number',
                       keyboardType: TextInputType.number,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(11),
+                        LengthLimitingTextInputFormatter(12),
                       ],
                       onChanged: (_) => setState(() => _isValidated = false),
                       style: TextStyle(
@@ -211,9 +306,9 @@ class _CableTvScreenState extends State<CableTvScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'ADAEZE OKAFOR',
-                                    style: TextStyle(
+                                  Text(
+                                    str(_customer['customerName']),
+                                    style: const TextStyle(
                                       color: DP.green,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 14,
@@ -227,13 +322,14 @@ class _CableTvScreenState extends State<CableTvScreen> {
                                         fontSize: 12.5,
                                       ),
                                     ),
-                                  const Text(
-                                    'Due: 28 Feb 2026',
-                                    style: TextStyle(
-                                      color: DP.green,
-                                      fontSize: 12.5,
+                                  if (_customer['dueDate'] != null)
+                                    Text(
+                                      'Due: ${dateLabel(parseDate(_customer['dueDate']))}',
+                                      style: const TextStyle(
+                                        color: DP.green,
+                                        fontSize: 12.5,
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -260,7 +356,12 @@ class _CableTvScreenState extends State<CableTvScreen> {
                     if (_isValidated && _selectedAction == 'change') ...[
                       const SizedBox(height: 18),
                       const SectionTitle('Choose a package'),
-                      for (final p in _plans) _planCard(p),
+                      if (_plansLoading)
+                        const DPLoading(padding: 24)
+                      else if (_plansError != null)
+                        DPLoadError(error: _plansError, onRetry: _loadPlans)
+                      else
+                        for (final p in _plans) _planCard(p),
                     ],
                     if (_isValidated &&
                         _selectedAction != null &&
@@ -306,7 +407,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
     );
   }
 
-  Widget _planCard(MockPlan plan) {
+  Widget _planCard(Plan plan) {
     final selected = _selectedPlan == plan;
     final current = _currentPlan == plan;
     return Padding(

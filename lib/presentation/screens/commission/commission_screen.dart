@@ -1,27 +1,15 @@
 // lib/presentation/screens/commission/commission_screen.dart
-// Commission & earnings — UI only, sample earnings.
+// Commission & earnings: GET /api/commission (balance, week chart, recent
+// earnings) and POST /api/commission/withdraw to move them to the wallet.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
-
-class _Earning {
-  final String title;
-  final String source; // airtime, data, electricity, cable, referral, wallet
-  final double amount;
-  final bool credit;
-  final int daysAgo;
-  final String ref;
-  const _Earning(
-    this.title,
-    this.source,
-    this.amount,
-    this.credit,
-    this.daysAgo,
-    this.ref,
-  );
-}
+import '../../widgets/async_view.dart';
+import '../../widgets/transaction_widgets.dart';
 
 class CommissionScreen extends StatefulWidget {
   const CommissionScreen({super.key});
@@ -33,30 +21,61 @@ class CommissionScreen extends StatefulWidget {
 class _CommissionScreenState extends State<CommissionScreen> {
   bool _isCommissionVisible = true;
   bool _isWithdrawing = false;
-  double _balance = MockUser.commissionBalance;
+  Map<String, dynamic> _data = {};
+  Map<String, dynamic> _referrals = {};
+  bool _loading = true;
+  Object? _error;
 
-  static const _earnings = [
-    _Earning('MTN airtime commission', 'airtime', 40, true, 0, 'CM-10482'),
-    _Earning('Airtel data commission', 'data', 75, true, 1, 'CM-10477'),
-    _Earning('Referral bonus — Chidi Eze', 'referral', 500, true, 3, 'RF-2201'),
-    _Earning('Moved to wallet', 'wallet', 2000, false, 3, 'WD-0915'),
-    _Earning('DSTV commission', 'cable', 157, true, 4, 'CM-10451'),
-    _Earning('Ikeja Electric commission', 'electricity', 50, true, 5, 'CM-10440'),
-    _Earning('Glo airtime commission', 'airtime', 20, true, 6, 'CM-10431'),
-  ];
+  double get _balance => toDouble(_data['balance']);
+  double get _minWithdrawal => toDouble(_data['minWithdrawal'] ?? 500);
 
-  IconData _iconFor(String s) => switch (s) {
-        'airtime' => DPIcons.phone,
-        'data' => DPIcons.wifi,
-        'electricity' => DPIcons.bolt,
-        'cable' => DPIcons.tv,
-        'referral' => DPIcons.referral,
-        _ => DPIcons.upRight,
-      };
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait([
+        api.get('/api/commission'),
+        api.get('/api/referrals').catchError((_) => <String, dynamic>{}),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _data = asMap(results[0]);
+        _referrals = asMap(results[1]);
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  IconData _iconFor(Map<String, dynamic> t) {
+    final type = str(t['type']);
+    if (type == 'referral_bonus') return DPIcons.referral;
+    if (type == 'commission_withdrawal') return DPIcons.upRight;
+    return switch (str(t['service'])) {
+      'airtime' || 'international' => DPIcons.phone,
+      'data' => DPIcons.wifi,
+      'electricity' => DPIcons.bolt,
+      'cable' => DPIcons.tv,
+      'education' => DPIcons.school,
+      'insurance' => DPIcons.shield,
+      _ => DPIcons.sparkle,
+    };
+  }
 
   Future<void> _withdraw() async {
-    if (_balance < 500) {
-      dpSnack(context, 'You can move earnings once you have ₦500 or more.');
+    if (_balance < _minWithdrawal) {
+      dpSnack(context,
+          'You can move earnings once you have ${DP.naira(_minWithdrawal)} or more.');
       return;
     }
     final ok = await dpDialog(
@@ -69,13 +88,18 @@ class _CommissionScreenState extends State<CommissionScreen> {
     );
     if (ok != true || !mounted) return;
     setState(() => _isWithdrawing = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() {
-      _isWithdrawing = false;
-      _balance = 0;
-    });
-    dpSnack(context, 'Earnings moved to your wallet', success: true);
+    try {
+      await api.post('/api/commission/withdraw');
+      await Session.instance.refreshQuietly();
+      await _load();
+      if (!mounted) return;
+      setState(() => _isWithdrawing = false);
+      dpSnack(context, 'Earnings moved to your wallet', success: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isWithdrawing = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   @override
@@ -92,7 +116,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                 context,
                 title: 'How earnings work',
                 message:
-                    'You earn a small commission on eligible payments like airtime, data, TV and electricity, plus referral bonuses. Earnings sit in a separate balance — move them to your wallet any time (minimum ₦500).',
+                    'You earn a small commission on eligible payments like airtime, data, TV and electricity, plus referral bonuses. Earnings sit in a separate balance — move them to your wallet any time (minimum ${DP.naira(_minWithdrawal)}).',
                 confirmLabel: 'Got it',
                 tone: DPTone.info,
               ),
@@ -105,6 +129,11 @@ class _CommissionScreenState extends State<CommissionScreen> {
   }
 
   Widget _buildBody() {
+    if (_loading) return const DPLoading();
+    if (_error != null && _data.isEmpty) {
+      return DPLoadError(error: _error, onRetry: _load);
+    }
+    final recent = asList(_data['recent']);
     Widget stat(String label, double v) => Expanded(
           child: DPCard(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
@@ -129,7 +158,10 @@ class _CommissionScreenState extends State<CommissionScreen> {
             ),
           ),
         );
-    return SingleChildScrollView(
+    return RefreshIndicator(
+      color: DP.green,
+      onRefresh: _load,
+      child: SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
       child: Column(
@@ -139,9 +171,9 @@ class _CommissionScreenState extends State<CommissionScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              stat('Lifetime earned', MockUser.totalEarned),
+              stat('Lifetime earned', toDouble(_data['lifetime'])),
               const SizedBox(width: 12),
-              stat('Moved to wallet', 15339.50),
+              stat('Moved to wallet', toDouble(_data['movedToWallet'])),
             ],
           ),
           const SizedBox(height: 24),
@@ -150,13 +182,21 @@ class _CommissionScreenState extends State<CommissionScreen> {
           _buildReferralCard(),
           const SizedBox(height: 22),
           const DPSectionHeader('Latest earnings'),
-          for (final e in _earnings) _buildItem(e),
+          if (recent.isEmpty)
+            const DPEmptyState(
+              icon: DPIcons.sparkle,
+              title: 'No earnings yet',
+              message: 'Pay for airtime, data, TV or electricity to start earning.',
+            )
+          else
+            for (final e in recent) _buildItem(e),
           const SizedBox(height: 16),
           Text(
             'Commission is credited after an eligible payment succeeds. Rates are shown before you pay.',
             style: DP.caption,
           ),
         ],
+      ),
       ),
     );
   }
@@ -226,9 +266,9 @@ class _CommissionScreenState extends State<CommissionScreen> {
             loading: _isWithdrawing,
             onPressed: _isWithdrawing ? null : _withdraw,
           ),
-          if (_balance < 500)
-            const DPHelper(
-              'You can move earnings once you have ₦500 or more.',
+          if (_balance < _minWithdrawal)
+            DPHelper(
+              'You can move earnings once you have ${DP.naira(_minWithdrawal)} or more.',
               color: DP.green,
             ),
         ],
@@ -237,11 +277,18 @@ class _CommissionScreenState extends State<CommissionScreen> {
   }
 
   Widget _buildWeek() {
-    const totals = [60.0, 135.0, 20.0, 157.0, 500.0, 75.0, 40.0];
+    final week = asList(_data['week']);
     final now = DateTime.now();
-    final days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
+    final totals = List.generate(
+        7, (i) => i < week.length ? toDouble(week[i]['amount']) : 0.0);
+    final days = List.generate(
+        7,
+        (i) => i < week.length
+            ? DateTime.tryParse(str(week[i]['date'])) ??
+                now.subtract(Duration(days: 6 - i))
+            : now.subtract(Duration(days: 6 - i)));
     final weekTotal = totals.fold<double>(0, (a, b) => a + b);
-    final maxV = totals.reduce((a, b) => a > b ? a : b);
+    final maxV = totals.fold<double>(0, (a, b) => a > b ? a : b);
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,7 +313,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: List.generate(7, (i) {
               final v = totals[i];
-              final h = 10 + (v / maxV) * 70;
+              final h = 10 + (maxV > 0 ? v / maxV : 0) * 70;
               final isToday = i == 6;
               return Expanded(
                 child: Tooltip(
@@ -306,7 +353,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
   Widget _buildReferralCard() {
     return DPCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-      onTap: () => Navigator.pushNamed(context, '/referral'),
+      onTap: () => Navigator.pushNamed(context, '/referral').then((_) => _load()),
       child: Row(
         children: [
           const DPIconBadge.blue(DPIcons.referral, size: 44),
@@ -318,7 +365,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
                 Text('Invite friends, earn more', style: DP.bodyStrong),
                 SizedBox(height: 2),
                 Text(
-                  '${MockUser.referrals} referrals · ₦1,500.00 earned · Code ${MockUser.referralCode}',
+                  '${toInt(_referrals['totalReferrals'])} referrals · ${DP.naira(toDouble(_referrals['totalEarned']))} earned · Code ${Session.instance.user?.referralCode ?? ''}',
                   style: DP.caption,
                   maxLines: 2,
                 ),
@@ -329,7 +376,7 @@ class _CommissionScreenState extends State<CommissionScreen> {
             tooltip: 'Copy code',
             onPressed: () {
               Clipboard.setData(
-                const ClipboardData(text: MockUser.referralCode),
+                ClipboardData(text: Session.instance.user?.referralCode ?? ''),
               );
               dpSnack(context, 'Referral code copied', success: true);
             },
@@ -340,21 +387,25 @@ class _CommissionScreenState extends State<CommissionScreen> {
     );
   }
 
-  Widget _buildItem(_Earning e) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final d = DateTime.now().subtract(Duration(days: e.daysAgo));
-    final icon = _iconFor(e.source);
+  Widget _buildItem(Map<String, dynamic> t) {
+    final d = parseDate(t['createdAt']);
+    final icon = _iconFor(t);
+    // Moving earnings out reads as a debit here even though the wallet
+    // receives it.
+    final credit = t['type'] != 'commission_withdrawal' && txIsCredit(t);
+    final amount = toDouble(t['amount']);
     return DPListRow(
-      leading: e.credit
+      onTap: () => showTransactionReceipt(context, t),
+      leading: credit
           ? DPIconBadge(icon, size: 42, iconSize: 20)
           : DPIconBadge.blue(icon, size: 42, iconSize: 20),
-      title: e.title,
-      subtitle: '${d.day} ${months[d.month - 1]} · ${e.ref}',
+      title: str(t['description'], transactionTypeLabel(str(t['type']))),
+      subtitle: '${dateLabel(d)} · ${str(t['reference'])}',
       trailing: Text(
-        '${e.credit ? '+' : '−'}${DP.naira(e.amount, decimals: e.amount % 1 != 0)}',
+        '${credit ? '+' : '−'}${DP.naira(amount, decimals: amount % 1 != 0)}',
         style: TextStyle(
           fontWeight: FontWeight.w600,
-          color: e.credit ? DP.green : DP.ink,
+          color: credit ? DP.green : DP.ink,
         ),
       ),
     );

@@ -1,10 +1,12 @@
 // lib/presentation/screens/kyc/kyc_screen.dart
-// KYC — UI only. BVN or NIN + details; "Create Dedicated Account" shows a
-// sample account. Nothing is submitted.
+// KYC: BVN or NIN + details → POST /api/kyc, which creates your personal
+// funding account (when the payment provider is connected).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 
 class KYCScreen extends StatefulWidget {
@@ -23,7 +25,7 @@ class _KYCScreenState extends State<KYCScreen> {
   bool _agreed = false;
   bool _submitting = false;
 
-  bool get _idOk => _bvn.text.length == 11 || _nin.text.length >= 11;
+  bool get _idOk => _bvn.text.length == 11 || _nin.text.length == 11;
   bool get _valid =>
       _idOk &&
       _dob.text.length == 10 &&
@@ -62,13 +64,39 @@ class _KYCScreenState extends State<KYCScreen> {
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(milliseconds: 1400));
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    _showSuccess();
+    try {
+      final r = asMap(await api.post('/api/kyc', {
+        if (_bvn.text.length == 11) 'bvn': _bvn.text,
+        if (_bvn.text.length != 11 && _nin.text.length == 11) 'nin': _nin.text,
+        'dateOfBirth': _dob.text,
+        'gender': _gender,
+        'address': _address.text.trim(),
+      }));
+      await Session.instance.refreshQuietly();
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      final account = r['dedicatedAccount'];
+      if (account is Map) {
+        _showSuccess(account.cast<String, dynamic>());
+      } else {
+        await dpDialog(
+          context,
+          title: 'Details submitted',
+          message:
+              'Thanks! We\'re checking your details. Your personal account number will appear on Add Money once it\'s ready.',
+          tone: DPTone.info,
+        );
+        if (mounted) Navigator.of(context).maybePop();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
-  void _showSuccess() {
+  void _showSuccess(Map<String, dynamic> account) {
+    final number = str(account['accountNumber']);
     showModalBottomSheet(
       context: context,
       isDismissible: false,
@@ -101,24 +129,20 @@ class _KYCScreenState extends State<KYCScreen> {
                   children: [
                     DPSummaryRow(
                       'Account Number',
-                      MockUser.accountNumber,
+                      number,
                       strong: true,
                       trailing: IconButton(
                         icon: const Icon(DPIcons.copy,
                             size: 18, color: DP.green),
                         onPressed: () {
-                          Clipboard.setData(const ClipboardData(
-                              text: MockUser.accountNumber));
+                          Clipboard.setData(ClipboardData(text: number));
                           dpSnack(ctx, 'Account details copied to clipboard',
                               success: true);
                         },
                       ),
                     ),
-                    const DPSummaryRow(
-                      'Account Name',
-                      'Dalabapay - ${MockUser.fullName}',
-                    ),
-                    const DPSummaryRow('Bank', MockUser.bankName),
+                    DPSummaryRow('Account Name', str(account['accountName'])),
+                    DPSummaryRow('Bank', str(account['bankName'])),
                   ],
                 ),
               ),
@@ -144,8 +168,78 @@ class _KYCScreenState extends State<KYCScreen> {
     );
   }
 
+  Widget _buildStatus(AppUser user) {
+    final account = user.dedicatedAccount;
+    final pending = user.kycStatus == 'pending';
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      children: [
+        Center(
+          child: DPStatusHero(
+            kind: pending ? DPStatusKind.pending : DPStatusKind.success,
+            size: 84,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          pending ? 'Verification in progress' : 'You\'re verified',
+          textAlign: TextAlign.center,
+          style: DP.title,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          pending
+              ? 'We\'re checking your details. Your account number will appear here once it\'s ready.'
+              : 'Transfer to your personal account to fund your wallet.',
+          textAlign: TextAlign.center,
+          style: DP.body.copyWith(color: DP.muted),
+        ),
+        if (account != null) ...[
+          const SizedBox(height: 18),
+          DPCard(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+            child: Column(
+              children: [
+                DPSummaryRow(
+                  'Account Number',
+                  str(account['accountNumber']),
+                  strong: true,
+                  trailing: IconButton(
+                    icon: const Icon(DPIcons.copy, size: 18, color: DP.green),
+                    onPressed: () {
+                      Clipboard.setData(
+                          ClipboardData(text: str(account['accountNumber'])));
+                      dpSnack(context, 'Account number copied', success: true);
+                    },
+                  ),
+                ),
+                DPSummaryRow('Account Name', str(account['accountName'])),
+                DPSummaryRow('Bank', str(account['bankName'])),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = Session.instance.user;
+    if (user != null &&
+        (user.dedicatedAccount != null || user.kycStatus == 'pending')) {
+      return Scaffold(
+        backgroundColor: DP.bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              const DPTopBar(title: 'Verify your identity'),
+              Expanded(child: _buildStatus(user)),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: DP.bg,
       body: SafeArea(
@@ -172,9 +266,9 @@ class _KYCScreenState extends State<KYCScreen> {
                             padding: EdgeInsets.only(top: 6, bottom: 4),
                             child: Text('Your Information', style: DP.section),
                           ),
-                          DPSummaryRow('Full Name', MockUser.fullName),
-                          DPSummaryRow('Email', MockUser.email),
-                          DPSummaryRow('Phone', MockUser.phone),
+                          DPSummaryRow('Full Name', user?.fullName ?? ''),
+                          DPSummaryRow('Email', user?.email ?? ''),
+                          DPSummaryRow('Phone', user?.phone ?? ''),
                         ],
                       ),
                     ),
@@ -211,7 +305,7 @@ class _KYCScreenState extends State<KYCScreen> {
                     if (!_idOk &&
                         (_bvn.text.isNotEmpty || _nin.text.isNotEmpty))
                       const DPHelper(
-                        'Please enter a valid BVN (11 digits) or NIN (11+ digits)',
+                        'Please enter a valid BVN or NIN (11 digits)',
                         color: DP.amber,
                       ),
                     const SizedBox(height: 16),
@@ -281,7 +375,7 @@ class _KYCScreenState extends State<KYCScreen> {
                           ? 'Create Dedicated Account'
                           : 'Fill Required Fields',
                       loading: _submitting,
-                      onPressed: _valid ? _submit : null,
+                      onPressed: _valid && !_submitting ? _submit : null,
                     ),
                     const SizedBox(height: 12),
                     Row(

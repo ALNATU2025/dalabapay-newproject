@@ -1,5 +1,5 @@
 name: dalabapay
-description: Dalabapay — UI/UX only build (no backend, sample data).
+description: Dalabapay — bills, wallet and commission app (talks to newproject-backend).
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -14,6 +14,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   # Inter font used by the design system (lib/core/theme/app_theme.dart)
   google_fonts: ^6.3.0
+  # Backend calls, saved login token and receipt sharing
+  http: ^1.2.2
+  flutter_secure_storage: ^9.2.2
+  share_plus: ^10.1.4
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

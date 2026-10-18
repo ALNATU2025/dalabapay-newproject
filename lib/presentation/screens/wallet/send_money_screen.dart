@@ -1,10 +1,12 @@
 // lib/presentation/screens/wallet/send_money_screen.dart
-// UI only — wallet-to-wallet transfer by phone or email. Typing a full
-// number "finds" a sample recipient; nothing is sent.
+// Wallet-to-wallet transfer by phone or email. The recipient's name comes
+// from POST /api/wallet/transfer/lookup; sending is POST /api/wallet/transfer.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/payment_flow.dart';
 
@@ -24,8 +26,9 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   int _mode = 0; // 0 phone, 1 email
   bool _lookingUp = false;
   String? _recipientName;
+  String? _lookupError;
 
-  static const double _balance = MockUser.walletBalance;
+  double get _balance => Session.instance.user?.balance ?? 0;
 
   double get _amount => double.tryParse(_amountController.text.trim()) ?? 0;
 
@@ -34,7 +37,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       : _emailController.text.trim();
 
   bool get _identifierValid => _mode == 0
-      ? _phoneController.text.trim().length >= 11
+      ? _phoneController.text.trim().length == 11
       : RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
           .hasMatch(_emailController.text.trim());
 
@@ -53,22 +56,42 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   void _setMode(int m) => setState(() {
         _mode = m;
         _recipientName = null;
+        _lookupError = null;
       });
+
+  Map<String, dynamic> get _target => _mode == 0
+      ? {'phone': _phoneController.text.trim()}
+      : {'email': _emailController.text.trim().toLowerCase()};
 
   Future<void> _lookup() async {
     if (!_identifierValid || _lookingUp) return;
-    setState(() => _lookingUp = true);
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
+    final asked = _recipientLabel;
     setState(() {
-      _lookingUp = false;
-      _recipientName = 'Chidi Eze';
+      _lookingUp = true;
+      _lookupError = null;
     });
+    try {
+      final r = asMap(await api.post('/api/wallet/transfer/lookup', _target));
+      if (!mounted || asked != _recipientLabel) return;
+      setState(() {
+        _lookingUp = false;
+        _recipientName = str(r['fullName']);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _lookingUp = false;
+        _lookupError = errorMessage(e);
+      });
+    }
   }
 
-  void _continue() {
+  Future<void> _continue() async {
     FocusScope.of(context).unfocus();
-    showReviewAndPay(
+    final target = _target;
+    final amount = _amount;
+    final note = _noteController.text.trim();
+    final txn = await showReviewAndPay(
       context,
       icon: DPIcons.upRight,
       title: 'To $_recipientName',
@@ -87,7 +110,19 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
         DPReviewRow('Total to pay', DP.naira(_amount), strong: true),
       ],
       footnote: 'Transfers to the wrong person may not be recoverable.',
+      onPay: (pin) async {
+        final r = await api.post('/api/wallet/transfer', {
+          ...target,
+          'amount': amount,
+          if (note.isNotEmpty) 'note': note,
+          'pin': pin,
+        });
+        return asMap(asMap(r)['transaction']);
+      },
     );
+    if (txn != null && mounted && txn['status'] == 'success') {
+      Navigator.of(context).maybePop();
+    }
   }
 
   @override
@@ -137,7 +172,10 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         ],
                         prefix: const Icon(DPIcons.user, size: 20),
                         onChanged: (_) {
-                          setState(() => _recipientName = null);
+                          setState(() {
+                            _recipientName = null;
+                            _lookupError = null;
+                          });
                           if (_identifierValid) _lookup();
                         },
                         suffix: _lookingUp ? spinner : null,
@@ -150,7 +188,10 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.done,
                         prefix: const Icon(DPIcons.mail, size: 20),
-                        onChanged: (_) => setState(() => _recipientName = null),
+                        onChanged: (_) => setState(() {
+                          _recipientName = null;
+                          _lookupError = null;
+                        }),
                         onSubmitted: (_) => _lookup(),
                         suffix: _lookingUp
                             ? spinner
@@ -201,6 +242,8 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                             )
                           : const SizedBox(width: double.infinity),
                     ),
+                    if (_lookupError != null)
+                      DPHelper(_lookupError!, color: DP.red, icon: DPIcons.alert),
                     const SizedBox(height: 18),
                     const DPLabel('Amount'),
                     DPField(

@@ -1,10 +1,14 @@
 // lib/presentation/screens/electricity/electricity_screen.dart
-// UI only — provider, meter type, meter number ("Verify meter" shows a
-// sample customer), amount → review → success.
+// Provider, meter type, meter number (POST /api/services/electricity/verify),
+// amount → review → POST /api/services/electricity. The token comes back on
+// the receipt.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/catalog.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/payment_flow.dart';
 
@@ -18,13 +22,43 @@ class ElectricityScreen extends StatefulWidget {
 class _ElectricityScreenState extends State<ElectricityScreen> {
   final _meterController = TextEditingController();
   final _amountController = TextEditingController();
-  final _phoneController = TextEditingController(text: MockUser.phone);
+  final _phoneController =
+      TextEditingController(text: Session.instance.user?.phone ?? '');
 
   String? _selectedProvider;
   String? _selectedMeterType;
   int? _selectedQuickAmount;
   bool _isValidating = false;
   bool _isValidated = false;
+  String _customerName = '';
+  String _customerAddress = '';
+
+  /// label ("Ikeja Electric (IKEDC)") → provider id.
+  Map<String, String> _discos = {};
+  ServiceLimit _limit = const ServiceLimit(minimum: 1000);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLookups();
+  }
+
+  Future<void> _loadLookups() async {
+    try {
+      final list = asList(await api.get('/api/services/electricity/providers'));
+      if (!mounted) return;
+      setState(() => _discos = {
+            for (final d in list)
+              (d['shortName'] != null
+                  ? '${d['name']} (${d['shortName']})'
+                  : str(d['name'])): str(d['id']),
+          });
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+    final limit = await Catalog.limitFor('electricity');
+    if (mounted) setState(() => _limit = limit);
+  }
 
   static const List<int> _quickAmounts = [2000, 3000, 5000, 10000, 20000];
   static const _meterLabels = {
@@ -41,13 +75,26 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
   }
 
   Future<void> _validateMeter() async {
+    FocusScope.of(context).unfocus();
     setState(() => _isValidating = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() {
-      _isValidating = false;
-      _isValidated = true;
-    });
+    try {
+      final r = asMap(await api.post('/api/services/electricity/verify', {
+        'provider': _discos[_selectedProvider],
+        'meterNumber': _meterController.text.trim(),
+        'meterType': _selectedMeterType,
+      }));
+      if (!mounted) return;
+      setState(() {
+        _isValidating = false;
+        _isValidated = true;
+        _customerName = str(r['customerName']);
+        _customerAddress = str(r['address']);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isValidating = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   void _openReview() {
@@ -60,10 +107,19 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
       dpSnack(context, 'Verify your meter number first', error: true);
       return;
     }
-    if (amount < 2000) {
-      dpSnack(context, 'Minimum purchase is ₦2,000', error: true);
+    final limitError = _limit.check(amount, DP.naira);
+    if (limitError != null) {
+      dpSnack(context, limitError, error: true);
       return;
     }
+    final phone = _phoneController.text.trim();
+    if (phone.length != 11) {
+      dpSnack(context, 'Enter the 11-digit phone number for the token', error: true);
+      return;
+    }
+    final providerId = _discos[_selectedProvider]!;
+    final meter = _meterController.text.trim();
+    final meterType = _selectedMeterType!;
     showReviewAndPay(
       context,
       icon: DPIcons.bolt,
@@ -72,7 +128,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
       amount: amount,
       service: 'electricity',
       rows: [
-        const DPReviewRow('Customer', 'ADAEZE OKAFOR'),
+        DPReviewRow('Customer', _customerName),
         DPReviewRow('Meter number', _meterController.text.trim()),
         DPReviewRow('Meter type', _meterLabels[_selectedMeterType]!),
         DPReviewRow('Token sent to', _phoneController.text.trim()),
@@ -81,13 +137,27 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
       ],
       successRows: [
         DPReviewRow('Provider', _selectedProvider!),
-        DPReviewRow('Meter number', _meterController.text.trim()),
-        if (_selectedMeterType == 'prepaid') ...const [
-          DPReviewRow('Token', '1234-5678-9012-3456-7890'),
-          DPReviewRow('Units', '48.6 kWh'),
-        ],
+        DPReviewRow('Meter number', meter),
       ],
+      resultRows: (txn) {
+        final m = asMap(txn['metadata']);
+        return [
+          if (m['token'] != null) DPReviewRow('Token', str(m['token'])),
+          if (m['units'] != null) DPReviewRow('Units', str(m['units'])),
+        ];
+      },
       footnote: 'Check the meter number. Electricity tokens can\'t be reversed.',
+      onPay: (pin) async {
+        final r = await api.post('/api/services/electricity', {
+          'provider': providerId,
+          'meterNumber': meter,
+          'meterType': meterType,
+          'amount': amount,
+          'phone': phone,
+          'pin': pin,
+        });
+        return asMap(asMap(r)['transaction']);
+      },
     );
   }
 
@@ -95,7 +165,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
   Widget build(BuildContext context) {
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
     final canVerify = !_isValidating &&
-        _meterController.text.trim().length >= 11 &&
+        _meterController.text.trim().length >= 6 &&
         _selectedProvider != null &&
         _selectedMeterType != null;
     final quickLabels =
@@ -133,7 +203,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
                         final picked = await dpPickFromList<String>(
                           context,
                           title: 'Electricity provider',
-                          items: kMockDiscos,
+                          items: _discos.keys.toList(),
                           selected: _selectedProvider,
                           labelOf: (x) => x,
                         );
@@ -221,17 +291,18 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'ADAEZE OKAFOR',
+                                    _customerName,
                                     style: TextStyle(
                                       color: DP.green,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 14,
                                     ),
                                   ),
+                                  if (_customerAddress.isNotEmpty)
                                   Padding(
                                     padding: EdgeInsets.only(top: 3),
                                     child: Text(
-                                      '12 Admiralty Way, Lekki, Lagos',
+                                      _customerAddress,
                                       style: TextStyle(
                                         color: DP.green,
                                         fontSize: 12.5,
@@ -257,7 +328,7 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
                           setState(() => _selectedQuickAmount = null),
                       style: TextStyle(fontSize: 17, color: DP.ink),
                     ),
-                    const DPHelper('Minimum purchase: ₦2,000'),
+                    DPHelper(_limit.describe(DP.naira)),
                     const SizedBox(height: 12),
                     DPChipScroller(
                       options: quickLabels,

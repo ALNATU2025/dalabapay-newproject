@@ -1,7 +1,9 @@
 // lib/presentation/screens/auth/login_screen.dart
-// UI only — no authentication. "Login" just opens the dashboard.
+// Email/phone + password login (POST /api/auth/login).
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   bool _rememberMe = true;
   bool _isLoading = false;
+  String? _error;
 
   late final AnimationController _fadeController = AnimationController(
     duration: const Duration(milliseconds: 800),
@@ -47,11 +50,30 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _handleLogin() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/dashboard');
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final data = await api.post('/api/auth/login', {
+        'identifier': _emailController.text.trim(),
+        'password': _passwordController.text,
+      });
+      await Session.instance.start(
+        (data as Map).cast<String, dynamic>(),
+        remember: _rememberMe,
+      );
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+          context, Session.instance.homeRoute, (_) => false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = errorMessage(e);
+      });
+    }
   }
 
   @override
@@ -168,34 +190,15 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ],
                       ),
+                      if (_error != null)
+                        DPHelper(_error!, color: DP.red, icon: DPIcons.alert),
                       const SizedBox(height: 22),
                       DPButton(
                         label: 'Login',
                         loading: _isLoading,
-                        onPressed: _formValid ? _handleLogin : null,
+                        onPressed: _formValid && !_isLoading ? _handleLogin : null,
                       ),
-                      const SizedBox(height: 10),
-                      _buildQuickBiometricButton(),
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: () =>
-                              Navigator.pushNamed(context, '/pin-login'),
-                          icon: const Icon(
-                            DPIcons.lock,
-                            size: 18,
-                            color: DP.green,
-                          ),
-                          label: const Text(
-                            'Unlock with PIN',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: DP.green,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 24),
                       Row(
                         children: [
                           Expanded(child: Divider(color: DP.border)),
@@ -256,33 +259,6 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuickBiometricButton() {
-    return Center(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(DP.rMd),
-        onTap: () => Navigator.pushReplacementNamed(context, '/dashboard'),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(DPIcons.fingerprint, color: DP.green, size: 26),
-              SizedBox(width: 10),
-              Text(
-                'Login with biometrics',
-                style: TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w600,
-                  color: DP.green,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

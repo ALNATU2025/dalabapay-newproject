@@ -3,7 +3,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
+import '../auth/login_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -49,15 +52,29 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  // UI-only: always continue to onboarding after the splash animation.
+  /// Saved login → unlock with PIN; first launch → onboarding; else login.
   Future<void> _checkRouteAfterSplash() async {
-    await Future.delayed(_splashDuration);
+    final results = await Future.wait([
+      Session.instance.restore(),
+      api.readFlag('onboarded'),
+      Future.delayed(_splashDuration),
+    ]);
     if (!mounted) return;
+    final loggedIn = results[0] == true;
+    final onboarded = results[1] == true;
+    if (loggedIn) {
+      Navigator.pushReplacementNamed(
+        context,
+        Session.instance.user!.pinSet ? '/pin-login' : '/pin-setup',
+      );
+      return;
+    }
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 500),
-        pageBuilder: (_, __, ___) => const OnboardingScreen(),
+        pageBuilder: (_, __, ___) =>
+            onboarded ? const LoginScreen() : const OnboardingScreen(),
         transitionsBuilder: (_, animation, __, child) =>
             FadeTransition(opacity: animation, child: child),
       ),

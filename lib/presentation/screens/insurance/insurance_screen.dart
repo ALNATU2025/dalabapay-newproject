@@ -1,17 +1,36 @@
 // lib/presentation/screens/insurance/insurance_screen.dart
-// UI only — third-party motor insurance form with sample dropdown values.
+// Third-party motor insurance. Types, makes, colours and states come from
+// GET /api/services/insurance/options (models and LGAs load on demand);
+// payment is POST /api/services/insurance.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 import '../../widgets/payment_flow.dart';
 
 class _InsType {
+  final String code;
   final String name;
   final IconData icon;
   final double amount;
-  const _InsType(this.name, this.icon, this.amount);
+  const _InsType(this.code, this.name, this.icon, this.amount);
+
+  static IconData iconFor(String code) => switch (code) {
+        'commercial' => Icons.local_shipping_outlined,
+        'tricycle' => Icons.electric_rickshaw_outlined,
+        'motorcycle' => Icons.two_wheeler_outlined,
+        _ => Icons.directions_car_outlined,
+      };
+
+  @override
+  bool operator ==(Object other) => other is _InsType && other.code == code;
+
+  @override
+  int get hashCode => code.hashCode;
 }
 
 class InsuranceScreen extends StatefulWidget {
@@ -22,27 +41,87 @@ class InsuranceScreen extends StatefulWidget {
 }
 
 class _InsuranceScreenState extends State<InsuranceScreen> {
-  static const _types = [
-    _InsType('Private', Icons.directions_car_outlined, 3000),
-    _InsType('Commercial', Icons.local_shipping_outlined, 5000),
-    _InsType('Tricycle', Icons.electric_rickshaw_outlined, 1500),
-    _InsType('Motorcycle', Icons.two_wheeler_outlined, 3000),
-  ];
-  static const _makes = ['Toyota', 'Honda', 'Lexus', 'Hyundai', 'Kia', 'Mercedes-Benz', 'Ford', 'Volkswagen'];
-  static const _models = ['Corolla', 'Camry', 'Highlander', 'RAV4', 'Sienna'];
-  static const _colors = ['Black', 'White', 'Silver', 'Grey', 'Blue', 'Red'];
-  static const _engines = ['1.0 – 1.5L', '1.6 – 2.0L', '2.1 – 3.0L', 'Above 3.0L'];
-  static const _states = ['Abuja (FCT)', 'Lagos', 'Ogun', 'Oyo', 'Rivers', 'Kano', 'Enugu'];
-  static const _lgas = ['Ikeja', 'Eti-Osa', 'Alimosho', 'Surulere', 'Kosofe'];
+  List<_InsType> _types = [];
+  Map<String, String> _makeIds = {}; // name → id
+  List<String> _models = [];
+  List<String> _colors = [];
+  List<String> _engines = [];
+  List<String> _states = [];
+  List<String> _lgas = [];
+  bool _loading = true;
+  Object? _loadError;
 
-  _InsType? _type = _types.first;
+  _InsType? _type;
   final _plate = TextEditingController();
   final _chassis = TextEditingController();
   final _year = TextEditingController();
-  final _name = TextEditingController(text: MockUser.fullName);
-  final _email = TextEditingController(text: MockUser.email);
-  final _phone = TextEditingController(text: MockUser.phone);
+  final _name = TextEditingController(text: Session.instance.user?.fullName ?? '');
+  final _email = TextEditingController(text: Session.instance.user?.email ?? '');
+  final _phone = TextEditingController(text: Session.instance.user?.phone ?? '');
   String? _make, _model, _color, _engine, _state, _lga;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOptions();
+  }
+
+  Future<void> _loadOptions() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final o = asMap(await api.get('/api/services/insurance/options'));
+      List<String> strings(dynamic v) =>
+          (v as List? ?? const []).map((e) => '$e').toList();
+      if (!mounted) return;
+      setState(() {
+        _types = [
+          for (final t in asList(o['types']))
+            _InsType(str(t['code']), str(t['name']),
+                _InsType.iconFor(str(t['code'])), toDouble(t['amount'])),
+        ];
+        _type ??= _types.isEmpty ? null : _types.first;
+        _makeIds = {for (final m in asList(o['makes'])) str(m['name']): str(m['id'])};
+        _colors = strings(o['colors']);
+        _engines = strings(o['engineCapacities']);
+        _states = strings(o['states']);
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = e;
+      });
+    }
+  }
+
+  Future<void> _loadModels(String make) async {
+    setState(() => _models = []);
+    try {
+      final r = asList(await api.get('/api/services/insurance/models',
+          query: {'make': _makeIds[make] ?? make}));
+      if (mounted && _make == make) {
+        setState(() => _models = r.map((m) => str(m['name'])).toList());
+      }
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  Future<void> _loadLgas(String state) async {
+    setState(() => _lgas = []);
+    try {
+      final r = await api.get('/api/services/insurance/lgas', query: {'state': state});
+      if (mounted && _state == state) {
+        setState(() => _lgas = (r as List? ?? const []).map((e) => '$e').toList());
+      }
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+  }
 
   @override
   void dispose() {
@@ -119,11 +198,35 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
   }
 
   void _openReview() {
-    if (_type == null || _plate.text.trim().isEmpty || _name.text.trim().isEmpty) {
+    if (_type == null || _plate.text.trim().length < 5 || _name.text.trim().isEmpty) {
       dpSnack(context, 'Fill in the plate number and insured name', error: true);
       return;
     }
+    if (_phone.text.trim().length != 11 || !_email.text.contains('@')) {
+      dpSnack(context, 'Enter a valid email and 11-digit phone number', error: true);
+      return;
+    }
+    final year = _year.text.trim();
+    if (year.isNotEmpty && year.length != 4) {
+      dpSnack(context, 'Enter the 4-digit year of make', error: true);
+      return;
+    }
     final amount = _type!.amount;
+    final body = <String, dynamic>{
+      'typeCode': _type!.code,
+      'plateNumber': _plate.text.trim().toUpperCase(),
+      if (_chassis.text.trim().isNotEmpty) 'chassisNumber': _chassis.text.trim(),
+      if (year.isNotEmpty) 'yearOfMake': year,
+      if (_make != null) 'make': _make,
+      if (_model != null) 'model': _model,
+      if (_color != null) 'color': _color,
+      if (_engine != null) 'engineCapacity': _engine,
+      if (_state != null) 'state': _state,
+      if (_lga != null) 'lga': _lga,
+      'insuredName': _name.text.trim(),
+      'email': _email.text.trim().toLowerCase(),
+      'phone': _phone.text.trim(),
+    };
     showReviewAndPay(
       context,
       icon: DPIcons.shield,
@@ -147,9 +250,16 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
       successRows: [
         DPReviewRow('Cover', '${_type!.name} third party'),
         DPReviewRow('Plate number', _plate.text.trim().toUpperCase()),
-        const DPReviewRow('Certificate', 'TPM-2026-0048213'),
       ],
+      resultRows: (txn) {
+        final cert = asMap(txn['metadata'])['certificateNumber'];
+        return [if (cert != null) DPReviewRow('Certificate', str(cert))];
+      },
       footnote: 'Your certificate is emailed to you after payment.',
+      onPay: (pin) async {
+        final r = await api.post('/api/services/insurance', {...body, 'pin': pin});
+        return asMap(asMap(r)['transaction']);
+      },
     );
   }
 
@@ -177,6 +287,11 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
                     ),
                     const SizedBox(height: 20),
                     const SectionTitle('Select Insurance Type'),
+                    if (_loading)
+                      const DPLoading(padding: 24)
+                    else if (_loadError != null)
+                      DPLoadError(error: _loadError, onRetry: _loadOptions)
+                    else
                     GridView.count(
                       crossAxisCount: 2,
                       shrinkWrap: true,
@@ -202,13 +317,14 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
                         LengthLimitingTextInputFormatter(4),
                       ],
                     ),
-                    _select('Vehicle Make', _make, _makes, (v) {
+                    _select('Vehicle Make', _make, _makeIds.keys.toList(), (v) {
                       _make = v;
                       _model = null;
+                      _loadModels(v);
                     }),
                     _select('Vehicle Model', _model, _models,
                         (v) => _model = v,
-                        enabled: _make != null),
+                        enabled: _make != null && _models.isNotEmpty),
                     _select('Vehicle Color', _color, _colors,
                         (v) => _color = v),
                     _select('Engine Capacity', _engine, _engines,
@@ -218,10 +334,11 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
                     _select('State', _state, _states, (v) {
                       _state = v;
                       _lga = null;
+                      _loadLgas(v);
                     }),
                     _select('Local Government Area', _lga, _lgas,
                         (v) => _lga = v,
-                        enabled: _state != null),
+                        enabled: _state != null && _lgas.isNotEmpty),
                     const SizedBox(height: 8),
                     const SectionTitle('Personal Information'),
                     _field('Insured Name', _name, 'Enter full name',

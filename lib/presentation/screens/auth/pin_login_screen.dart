@@ -1,9 +1,10 @@
 // lib/presentation/screens/auth/pin_login_screen.dart
-// UI only — any 6 digits unlock and open the dashboard.
+// Opening the app with a saved login: the PIN unlocks it.
 import 'package:flutter/material.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
+import 'pin_unlock.dart';
 
 class PinLoginScreen extends StatefulWidget {
   const PinLoginScreen({super.key});
@@ -12,26 +13,15 @@ class PinLoginScreen extends StatefulWidget {
   State<PinLoginScreen> createState() => _PinLoginScreenState();
 }
 
-class _PinLoginScreenState extends State<PinLoginScreen> {
-  String _pin = '';
-
-  void _onPinDigitPressed(String digit) {
-    if (_pin.length >= 6) return;
-    setState(() => _pin += digit);
-    if (_pin.length == 6) {
-      Future.delayed(const Duration(milliseconds: 250), () {
-        if (mounted) Navigator.pushReplacementNamed(context, '/dashboard');
-      });
-    }
-  }
-
-  void _onBackspacePressed() {
-    if (_pin.isEmpty) return;
-    setState(() => _pin = _pin.substring(0, _pin.length - 1));
-  }
+class _PinLoginScreenState extends State<PinLoginScreen>
+    with PinUnlock<PinLoginScreen> {
+  @override
+  void onUnlocked() =>
+      Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (_) => false);
 
   @override
   Widget build(BuildContext context) {
+    final user = Session.instance.user;
     return Scaffold(
       backgroundColor: DP.bg,
       body: SafeArea(
@@ -56,14 +46,14 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
-                    const DPAvatar(name: MockUser.fullName, size: 44),
+                    DPAvatar(name: user?.fullName ?? '', size: 44),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(MockUser.fullName, style: DP.bodyStrong),
-                          Text(MockUser.email, style: DP.caption),
+                          Text(user?.fullName ?? '', style: DP.bodyStrong),
+                          Text(user?.email ?? '', style: DP.caption),
                         ],
                       ),
                     ),
@@ -72,30 +62,20 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
-                child: DPPinDots(length: 6, filled: _pin.length),
+                child: DPPinDots(
+                    length: 6, filled: pin.length, error: error.isNotEmpty),
               ),
+              if (error.isNotEmpty)
+                DPHelper(error, color: DP.red, icon: DPIcons.alert),
+              if (checking) const LinearProgressIndicator(color: DP.green),
               const SizedBox(height: 16),
-              DPKeypad(
-                onDigit: _onPinDigitPressed,
-                onBackspace: _onBackspacePressed,
-                leftAction: IconButton(
-                  tooltip: 'Use biometrics',
-                  onPressed: () =>
-                      Navigator.pushReplacementNamed(context, '/dashboard'),
-                  icon: const Icon(
-                    DPIcons.fingerprint,
-                    color: DP.green,
-                    size: 30,
-                  ),
-                ),
-              ),
+              DPKeypad(onDigit: addDigit, onBackspace: removeDigit),
               const SizedBox(height: 8),
               Center(
                 child: DPTextLink(
                   label: 'Log in with email or phone instead',
                   color: DP.muted,
-                  onTap: () =>
-                      Navigator.pushReplacementNamed(context, '/login'),
+                  onTap: logOut,
                 ),
               ),
             ],

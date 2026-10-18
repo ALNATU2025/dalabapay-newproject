@@ -1,5 +1,5 @@
 // lib/core/theme/theme_controller.dart
-// Light / Dark / System theme switch (UI only — the choice lasts until the
+// Light / Dark / System theme switch (the choice lasts until the
 // app is closed; save it with shared_preferences later if you want).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

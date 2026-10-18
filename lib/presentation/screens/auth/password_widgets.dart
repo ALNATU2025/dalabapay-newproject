@@ -1,5 +1,5 @@
 // lib/presentation/screens/auth/password_widgets.dart
-// Shared pieces for the password screens (UI only).
+// Shared pieces for the password screens .
 import 'package:flutter/material.dart';
 
 import '../../../ui/ui.dart';

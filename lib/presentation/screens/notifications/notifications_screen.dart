@@ -1,9 +1,13 @@
 // lib/presentation/screens/notifications/notifications_screen.dart
-// UI only — sample notifications; read / delete change the list on screen.
+// Notifications: GET /api/notifications, mark read, mark all read and
+// delete.
 import 'package:flutter/material.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -13,25 +17,87 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _Item {
-  final MockNotification n;
+  final String id;
+  final String title;
+  final String body;
+  final String kind;
+  final DateTime date;
   bool read;
-  _Item(this.n) : read = n.read;
+  _Item(Map<String, dynamic> j)
+      : id = str(j['id']),
+        title = str(j['title']),
+        body = str(j['body']),
+        kind = str(j['kind']),
+        date = parseDate(j['createdAt']),
+        read = j['read'] == true;
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final List<_Item> _items = [for (final n in kMockNotifications) _Item(n)];
+  final List<_Item> _items = [];
+  bool _loading = true;
+  bool _hasMore = false;
+  int _page = 1;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load({bool more = false}) async {
+    try {
+      final r = asMap(await api.get('/api/notifications',
+          query: {'page': more ? _page + 1 : 1, 'limit': 30}));
+      if (!mounted) return;
+      setState(() {
+        if (!more) _items.clear();
+        _items.addAll(itemsOf(r).map(_Item.new));
+        _page = more ? _page + 1 : 1;
+        _hasMore = r['hasMore'] == true;
+        _loading = false;
+        _error = null;
+      });
+      Session.instance.unread.value = toInt(r['unread']);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  void _syncUnread() =>
+      Session.instance.unread.value = _items.where((i) => !i.read).length;
+
+  Future<void> _markAllRead() async {
+    setState(() {
+      for (final i in _items) {
+        i.read = true;
+      }
+    });
+    _syncUnread();
+    await runWithFeedback(context, () => api.post('/api/notifications/read-all'));
+  }
 
   (IconData, Color, Color, String) _style(String kind) => switch (kind) {
         'payment' => (DPIcons.checkCircle, DP.green, DP.mint, 'Payment Success'),
         'wallet' => (DPIcons.downLeft, DP.green, DP.mint, 'Wallet Funded'),
         'promo' => (DPIcons.gift, DP.amber, DP.amberBg, 'Promotion'),
+        'commission' => (DPIcons.sparkle, DP.green, DP.mint, 'Earnings'),
+        'referral' => (DPIcons.referral, DP.green, DP.mint, 'Referral'),
         'security' => (DPIcons.shieldCheck, DP.navyIcon, DP.blueTint, 'System'),
         _ => (DPIcons.bell, DP.navyIcon, DP.blueTint, 'General'),
       };
 
   void _open(_Item it) {
-    setState(() => it.read = true);
-    final s = _style(it.n.kind);
+    if (!it.read) {
+      setState(() => it.read = true);
+      _syncUnread();
+      api.patch('/api/notifications/${it.id}/read').catchError((_) => null);
+    }
+    final s = _style(it.kind);
     showModalBottomSheet(
       context: context,
       backgroundColor: DP.bg,
@@ -55,10 +121,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(it.n.title, style: DP.title),
+                        Text(it.title, style: DP.title),
                         const SizedBox(height: 2),
                         Text(
-                          '${s.$4} · ${mockDateTime(DateTime.now().subtract(it.n.ago))}',
+                          '${s.$4} · ${dateTimeLabel(it.date)}',
                           style: DP.caption,
                         ),
                       ],
@@ -67,7 +133,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(it.n.body, style: DP.body.copyWith(height: 1.5)),
+              Text(it.body, style: DP.body.copyWith(height: 1.5)),
               const SizedBox(height: 24),
               DPButton(label: 'Close', onPressed: () => Navigator.pop(ctx)),
             ],
@@ -88,7 +154,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       tone: DPTone.error,
       destructive: true,
     );
-    if (ok == true && mounted) setState(() => _items.remove(it));
+    if (ok != true || !mounted) return;
+    final index = _items.indexOf(it);
+    setState(() => _items.remove(it));
+    _syncUnread();
+    try {
+      await api.delete('/api/notifications/${it.id}');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _items.insert(index.clamp(0, _items.length).toInt(), it));
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   @override
@@ -102,14 +178,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             DPTopBar(
               title: 'Notifications',
               actionLabel: unread > 0 ? 'Mark all read' : null,
-              onAction: () => setState(() {
-                for (final i in _items) {
-                  i.read = true;
-                }
-              }),
+              onAction: _markAllRead,
             ),
             Expanded(
-              child: _items.isEmpty
+              child: _loading
+                  ? const DPLoading()
+                  : _error != null && _items.isEmpty
+                  ? DPLoadError(error: _error, onRetry: _load)
+                  : _items.isEmpty
                   ? const Center(
                       child: DPEmptyState(
                         icon: DPIcons.bell,
@@ -117,13 +193,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         message: 'Your notifications will appear here',
                       ),
                     )
-                  : ListView.separated(
+                  : RefreshIndicator(
+                      color: DP.green,
+                      onRefresh: _load,
+                      child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
-                      itemCount: _items.length,
+                      itemCount: _items.length + (_hasMore ? 1 : 0),
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (_, i) => DPAppear(
-                        delay: DPMotion.stagger(i),
-                        child: _buildItem(_items[i]),
+                      itemBuilder: (_, i) => i >= _items.length
+                          ? Center(
+                              child: DPTextLink(
+                                label: 'Load more',
+                                onTap: () => _load(more: true),
+                              ),
+                            )
+                          : DPAppear(
+                              delay: DPMotion.stagger(i),
+                              child: _buildItem(_items[i]),
+                            ),
                       ),
                     ),
             ),
@@ -134,7 +222,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildItem(_Item it) {
-    final s = _style(it.n.kind);
+    final s = _style(it.kind);
     return Dismissible(
       key: ObjectKey(it),
       direction: DismissDirection.endToStart,
@@ -168,7 +256,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          it.n.title,
+                          it.title,
                           style: DP.bodyStrong.copyWith(
                             fontWeight:
                                 it.read ? FontWeight.w600 : FontWeight.w700,
@@ -188,14 +276,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    it.n.body,
+                    it.body,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: DP.caption.copyWith(color: DP.inkSoft),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    mockTimeAgo(DateTime.now().subtract(it.n.ago)),
+                    timeAgo(it.date),
                     style: DP.caption.copyWith(fontSize: 11.5),
                   ),
                 ],

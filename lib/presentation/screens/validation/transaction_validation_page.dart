@@ -1,9 +1,12 @@
 // lib/presentation/screens/validation/transaction_validation_page.dart
-// "Verify Payment" — UI only. Any reference returns a sample result:
-// ending in 0–3 → verified, 4–6 → pending, anything else → not found.
+// "Verify Payment": looks up a wallet top-up by its reference
+// (POST /api/wallet/verify-payment). Recent top-ups and counts come from
+// GET /api/wallet/fundings.
 import 'package:flutter/material.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 
 class TransactionValidationPage extends StatefulWidget {
@@ -17,11 +20,27 @@ class TransactionValidationPage extends StatefulWidget {
 class _TransactionValidationPageState extends State<TransactionValidationPage> {
   final _ref = TextEditingController();
   bool _checking = false;
+  List<Map<String, dynamic>> _recent = [];
+  int _verified = 0;
+  int _pending = 0;
 
   @override
   void initState() {
     super.initState();
     _ref.addListener(() => setState(() {}));
+    _loadFundings();
+  }
+
+  Future<void> _loadFundings() async {
+    try {
+      final r = asMap(await api.get('/api/wallet/fundings'));
+      if (!mounted) return;
+      setState(() {
+        _recent = itemsOf(r);
+        _verified = toInt(r['verified']);
+        _pending = toInt(r['pending']);
+      });
+    } catch (_) {}
   }
 
   @override
@@ -38,35 +57,58 @@ class _TransactionValidationPageState extends State<TransactionValidationPage> {
     }
     FocusScope.of(context).unfocus();
     setState(() => _checking = true);
-    await Future.delayed(const Duration(milliseconds: 900));
+    Map<String, dynamic> res;
+    try {
+      res = asMap(await api.post('/api/wallet/verify-payment', {'reference': r}));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _checking = false);
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
     if (!mounted) return;
     setState(() => _checking = false);
-    final last = int.tryParse(r.substring(r.length - 1)) ?? 9;
-    if (last <= 3) {
+    final status = str(res['status']);
+    final txn = res['transaction'] is Map ? asMap(res['transaction']) : null;
+    if (status == 'success') {
+      Session.instance.refreshQuietly();
+      _loadFundings();
       _result(
         DPStatusKind.success,
         'Transaction Verified ✅',
         'This transaction has been verified and credited to your wallet.',
         'Verify Another',
+        txn,
       );
-    } else if (last <= 6) {
+    } else if (status == 'pending') {
       _result(
         DPStatusKind.pending,
         'Transaction Pending',
         'No funds have been added to your wallet yet. Please wait for the payment to complete.',
         'OK',
+        txn,
       );
-    } else {
+    } else if (status == 'not_found') {
       _result(
         DPStatusKind.failed,
         'Transaction Not Found',
         'We could not find this transaction in our system. Check the reference or contact support.',
         'Contact Support',
+        null,
+      );
+    } else {
+      _result(
+        DPStatusKind.failed,
+        'Transaction ${DPStatus.labelFor(status)}',
+        'This top-up didn\'t go through. Contact support if money left your bank account.',
+        'Contact Support',
+        txn,
       );
     }
   }
 
-  void _result(DPStatusKind kind, String title, String msg, String button) {
+  void _result(DPStatusKind kind, String title, String msg, String button,
+      Map<String, dynamic>? txn) {
     showModalBottomSheet(
       context: context,
       backgroundColor: DP.bg,
@@ -90,14 +132,15 @@ class _TransactionValidationPageState extends State<TransactionValidationPage> {
                 child: Column(
                   children: [
                     DPSummaryRow('Reference', _ref.text.trim()),
-                    if (kind != DPStatusKind.failed) ...[
-                      const DPSummaryRow('Amount', '₦50,000.00'),
+                    if (txn != null) ...[
+                      DPSummaryRow('Amount', DP.naira(toDouble(txn['amount']))),
+                      if (toDouble(txn['fee']) > 0)
+                        DPSummaryRow('Fee', DP.naira(toDouble(txn['fee']))),
+                      DPSummaryRow('Date', dateTimeLabel(parseDate(txn['createdAt']))),
                       DPSummaryRow(
                         'Status',
-                        kind == DPStatusKind.success ? 'Successful' : 'Pending',
-                        valueColor: kind == DPStatusKind.success
-                            ? DP.green
-                            : DP.amber,
+                        DPStatus.labelFor(str(txn['status'])),
+                        valueColor: DPStatus.colorFor(str(txn['status'])),
                       ),
                     ],
                   ],
@@ -130,9 +173,7 @@ class _TransactionValidationPageState extends State<TransactionValidationPage> {
 
   @override
   Widget build(BuildContext context) {
-    final recent = kMockTransactions
-        .where((t) => t['type'] == 'wallet_funding')
-        .toList();
+    final recent = _recent;
     return Scaffold(
       backgroundColor: DP.bg,
       body: SafeArea(
@@ -191,16 +232,16 @@ class _TransactionValidationPageState extends State<TransactionValidationPage> {
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      _stat('Verified', '12', DP.green, DPIcons.checkCircle),
+                      _stat('Verified', '$_verified', DP.green, DPIcons.checkCircle),
                       const SizedBox(width: 10),
-                      _stat('Pending', '1', DP.amber, DPIcons.pending),
+                      _stat('Pending', '$_pending', DP.amber, DPIcons.pending),
                     ],
                   ),
                   const SizedBox(height: 22),
                   const DPLabel('Transaction Reference'),
                   DPField(
                     controller: _ref,
-                    hint: 'e.g. 17764011904836a721485',
+                    hint: 'e.g. WF20260118…',
                     prefix: const Icon(DPIcons.receipt, size: 20),
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _verify(),
@@ -218,21 +259,27 @@ class _TransactionValidationPageState extends State<TransactionValidationPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Column(
                       children: [
+                        if (recent.isEmpty)
+                          const DPEmptyState(
+                            icon: DPIcons.downLeft,
+                            title: 'No top-ups yet',
+                          ),
                         for (final t in recent)
                           DPListRow(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             leading: const DPIconBadge(DPIcons.downLeft,
                                 size: 40, iconSize: 19),
-                            title: t['description'] as String,
-                            subtitle: t['id'] as String,
+                            title: str(t['description'], 'Wallet top-up'),
+                            subtitle:
+                                '${str(t['reference'])} · ${DPStatus.labelFor(str(t['status']))}',
                             trailing: Text(
-                              DP.naira((t['amount'] as num).toDouble()),
-                              style: const TextStyle(
+                              DP.naira(toDouble(t['amount'])),
+                              style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: DP.green,
+                                color: DPStatus.colorFor(str(t['status'])),
                               ),
                             ),
-                            onTap: () => _ref.text = t['id'] as String,
+                            onTap: () => _ref.text = str(t['reference']),
                           ),
                       ],
                     ),
@@ -255,7 +302,7 @@ class _TransactionValidationPageState extends State<TransactionValidationPage> {
                         const SizedBox(height: 10),
                         Text(
                           '• Your reference can be found in your transaction receipt\n'
-                          '• Format: Alphanumeric (e.g., 17764011904836a721485)\n'
+                          '• You can also use the bank\'s transfer reference\n'
                           '• Each transaction can only be verified once\n'
                           '• For pending transactions, wait a few minutes or contact support',
                           style: DP.caption.copyWith(

@@ -1,7 +1,9 @@
 // lib/presentation/screens/auth/forgot_password_screen.dart
-// UI only — "Send code" moves on to the OTP screen.
+// Emails a reset code (POST /api/auth/password/forgot), then the OTP screen.
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/dev_code.dart';
 import '../../../ui/ui.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -31,15 +33,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _sendCode() async {
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushNamed(
-      context,
-      '/otp-verification',
-      arguments: _emailController.text.trim(),
-    );
+    final email = _emailController.text.trim().toLowerCase();
+    try {
+      final r = await api.post('/api/auth/password/forgot', {'email': email});
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showDevCode(context, r);
+      Navigator.pushNamed(context, '/otp-verification', arguments: email);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   @override
@@ -82,7 +89,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     DPButton(
                       label: 'Send code',
                       loading: _isLoading,
-                      onPressed: _isEmailValid ? _sendCode : null,
+                      onPressed: _isEmailValid && !_isLoading ? _sendCode : null,
                     ),
                     const SizedBox(height: 18),
                     Center(

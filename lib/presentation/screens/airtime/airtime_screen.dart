@@ -1,9 +1,12 @@
 // lib/presentation/screens/airtime/airtime_screen.dart
-// UI only — network, phone, amount → review → success.
+// Network, phone, amount → review → POST /api/services/airtime.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/catalog.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/payment_flow.dart';
 
@@ -20,11 +23,46 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
   String? _selectedNetwork = 'MTN';
 
   static const List<int> _quickAmounts = [500, 1000, 2000, 3000, 5000, 10000];
-  static const List<Map<String, String>> _recent = [
-    {'phone': '08034567890', 'network': 'MTN'},
-    {'phone': '08123456789', 'network': 'Airtel'},
-    {'phone': '08051112223', 'network': 'Glo'},
-  ];
+
+  /// name → id ("MTN" → "mtn") from GET /api/services/networks.
+  Map<String, String> _networkIds = const {
+    'MTN': 'mtn',
+    'Airtel': 'airtel',
+    'Glo': 'glo',
+    '9mobile': '9mobile',
+  };
+  List<Map<String, String>> _recent = [];
+  ServiceLimit _limit = const ServiceLimit(minimum: 50, perTxn: 50000);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLookups();
+  }
+
+  Future<void> _loadLookups() async {
+    try {
+      final nets = await Catalog.networks();
+      if (nets.isNotEmpty && mounted) {
+        setState(() => _networkIds = {
+              for (final n in nets) str(n['name']): str(n['id']),
+            });
+      }
+    } catch (_) {}
+    final limit = await Catalog.limitFor('airtime');
+    final recent = await Catalog.recentRecipients('airtime');
+    if (!mounted) return;
+    setState(() {
+      _limit = limit;
+      _recent = [
+        for (final t in recent)
+          {
+            'phone': str(t['recipient']),
+            'network': str(asMap(t['metadata'])['network']),
+          },
+      ];
+    });
+  }
 
   @override
   void dispose() {
@@ -56,11 +94,13 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
       dpSnack(context, 'Enter an 11-digit phone number', error: true);
       return;
     }
-    if (amount < 50 || amount > 50000) {
-      dpSnack(context, 'Enter an amount between ₦50 and ₦50,000', error: true);
+    final limitError = _limit.check(amount, DP.naira);
+    if (limitError != null) {
+      dpSnack(context, limitError, error: true);
       return;
     }
     final network = _selectedNetwork!;
+    final networkId = _networkIds[network] ?? network.toLowerCase();
     showReviewAndPay(
       context,
       icon: DPIcons.phone,
@@ -76,6 +116,15 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
         DPReviewRow('Total to pay', DP.naira(amount), strong: true),
       ],
       footnote: 'Confirm the number. Delivered airtime can\'t be reversed.',
+      onPay: (pin) async {
+        final r = await api.post('/api/services/airtime', {
+          'network': networkId,
+          'phone': phone,
+          'amount': amount,
+          'pin': pin,
+        });
+        return asMap(asMap(r)['transaction']);
+      },
     );
   }
 
@@ -113,7 +162,7 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
                     ),
                     const SectionTitle('Choose network'),
                     DPChipRow(
-                      options: kMockNetworks,
+                      options: _networkIds.keys.toList(),
                       selected: _selectedNetwork,
                       height: 46,
                       logos: true,
@@ -142,17 +191,19 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
                         letterSpacing: 0.4,
                       ),
                       suffix: IconButton(
-                        tooltip: 'Choose from contacts',
+                        tooltip: 'Use my number',
                         icon: Icon(DPIcons.contact, color: DP.muted),
                         onPressed: () => setState(() {
-                          _phoneController.text = MockUser.phone;
-                          _autoDetectNetwork(MockUser.phone);
+                          final mine = Session.instance.user?.phone ?? '';
+                          _phoneController.text = mine;
+                          _autoDetectNetwork(mine);
                         }),
                       ),
                     ),
                     if (_selectedNetwork != null && phone.length >= 4)
                       DPHelper('$_selectedNetwork Nigeria'),
-                    const SizedBox(height: 14),
+                    if (_recent.isNotEmpty) const SizedBox(height: 14),
+                    if (_recent.isNotEmpty)
                     SizedBox(
                       height: 40,
                       child: ListView.separated(
@@ -172,7 +223,9 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
                             ),
                             onTap: () => setState(() {
                               _phoneController.text = c['phone']!;
-                              _selectedNetwork = c['network'];
+                              if (_networkIds.containsKey(c['network'])) {
+                                _selectedNetwork = c['network'];
+                              }
                             }),
                           );
                         },
@@ -203,7 +256,7 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       style: TextStyle(fontSize: 17, color: DP.ink),
                     ),
-                    const DPHelper('Minimum ₦50 · Maximum ₦50,000'),
+                    DPHelper(_limit.describe(DP.naira)),
                     const SizedBox(height: 20),
                     WalletCommissionCard(amount: amount, service: 'airtime'),
                     const SizedBox(height: 14),

@@ -1,26 +1,46 @@
 // lib/presentation/screens/education/education_screen.dart
-// UI only — WAEC / JAMB PINs. Service → plan → (JAMB profile ID) → phone →
-// quantity → review → success with a sample PIN.
+// WAEC / JAMB PINs (GET /api/services/education/products). Service → plan
+// → (JAMB profile ID, POST /api/services/education/verify) → phone →
+// quantity → review → POST /api/services/education. PINs show on the receipt.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/catalog.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/payment_flow.dart';
 
 class _EduService {
+  final String id;
   final String name;
-  final String provider; // for the logo
   final bool needsProfile;
   final bool showQuantity;
-  final List<MockPlan> plans;
+  final List<Plan> plans;
   const _EduService(
-    this.name,
-    this.provider, {
+    this.id,
+    this.name, {
     this.needsProfile = false,
     this.showQuantity = false,
     required this.plans,
   });
+
+  String get provider => id; // for the logo
+
+  factory _EduService.fromJson(Map<String, dynamic> j) => _EduService(
+        str(j['id']),
+        str(j['name']),
+        needsProfile: j['requiresProfile'] == true,
+        showQuantity: j['allowQuantity'] == true,
+        plans: Plan.listFrom(j['variations']),
+      );
+
+  @override
+  bool operator ==(Object other) => other is _EduService && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class EducationScreen extends StatefulWidget {
@@ -31,33 +51,33 @@ class EducationScreen extends StatefulWidget {
 }
 
 class _EducationScreenState extends State<EducationScreen> {
-  static final List<_EduService> _services = [
-    _EduService(
-      'WAEC Result Checker',
-      'waec',
-      showQuantity: true,
-      plans: [kMockEducationProducts[0]],
-    ),
-    _EduService(
-      'WAEC Registration',
-      'waec',
-      plans: [kMockEducationProducts[1]],
-    ),
-    _EduService(
-      'JAMB',
-      'jamb',
-      needsProfile: true,
-      plans: [kMockEducationProducts[2], kMockEducationProducts[3]],
-    ),
-  ];
+  List<_EduService> _services = [];
 
   final _profileController = TextEditingController();
-  final _phoneController = TextEditingController(text: MockUser.phone);
+  final _phoneController =
+      TextEditingController(text: Session.instance.user?.phone ?? '');
   _EduService? _service;
-  MockPlan? _plan;
+  Plan? _plan;
   int _quantity = 1;
   bool _validating = false;
   bool _validated = false;
+  String _candidateName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    try {
+      final list = asList(await api.get('/api/services/education/products'));
+      if (!mounted) return;
+      setState(() => _services = list.map(_EduService.fromJson).toList());
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+  }
 
   @override
   void dispose() {
@@ -77,13 +97,25 @@ class _EducationScreenState extends State<EducationScreen> {
   }
 
   Future<void> _validate() async {
+    FocusScope.of(context).unfocus();
     setState(() => _validating = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() {
-      _validating = false;
-      _validated = true;
-    });
+    try {
+      final r = asMap(await api.post('/api/services/education/verify', {
+        'service': _service!.id,
+        'profileId': _profileController.text.trim(),
+        if (_plan != null) 'variationCode': _plan!.code,
+      }));
+      if (!mounted) return;
+      setState(() {
+        _validating = false;
+        _validated = true;
+        _candidateName = str(r['customerName']);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _validating = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   void _openReview() {
@@ -100,6 +132,11 @@ class _EducationScreenState extends State<EducationScreen> {
       return;
     }
     final total = _plan!.price * _quantity;
+    final service = _service!;
+    final plan = _plan!;
+    final quantity = _quantity;
+    final phone = _phoneController.text.trim();
+    final profileId = _profileController.text.trim();
     showReviewAndPay(
       context,
       icon: DPIcons.school,
@@ -120,11 +157,30 @@ class _EducationScreenState extends State<EducationScreen> {
         DPReviewRow('Total to pay', DP.naira(total), strong: true),
       ],
       successRows: [
-        DPReviewRow('Service', _service!.name),
-        const DPReviewRow('Serial', 'WRN182736455'),
-        const DPReviewRow('PIN', '4829 1736 5520'),
+        DPReviewRow('Service', service.name),
+        if (service.needsProfile && _candidateName.isNotEmpty)
+          DPReviewRow('Candidate', _candidateName),
+      ],
+      resultRows: (txn) => [
+        for (final p in asList(asMap(txn['metadata'])['pins'])) ...[
+          if (p['serial'] != null) DPReviewRow('Serial', str(p['serial'])),
+          DPReviewRow('PIN', str(p['pin'])),
+        ],
+        if (asMap(txn['metadata'])['token'] != null)
+          DPReviewRow('Token', str(asMap(txn['metadata'])['token'])),
       ],
       footnote: 'Your PIN or token appears on the receipt after payment.',
+      onPay: (pin) async {
+        final r = await api.post('/api/services/education', {
+          'service': service.id,
+          'variationCode': plan.code,
+          'quantity': quantity,
+          'phone': phone,
+          if (service.needsProfile) 'profileId': profileId,
+          'pin': pin,
+        });
+        return asMap(asMap(r)['transaction']);
+      },
     );
   }
 
@@ -214,8 +270,8 @@ class _EducationScreenState extends State<EducationScreen> {
                       ),
                       if (_validated) ...[
                         const SizedBox(height: 12),
-                        const DPBanner(
-                          'ADAEZE CHIOMA OKAFOR',
+                        DPBanner(
+                          _candidateName,
                           title: 'Profile Validated',
                           icon: DPIcons.checkCircle,
                         ),
@@ -290,7 +346,7 @@ class _EducationScreenState extends State<EducationScreen> {
     );
   }
 
-  Widget _planTile(MockPlan p) {
+  Widget _planTile(Plan p) {
     final selected = _plan == p;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),

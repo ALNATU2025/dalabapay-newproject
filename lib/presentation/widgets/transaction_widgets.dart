@@ -1,9 +1,16 @@
 // lib/presentation/widgets/transaction_widgets.dart
-// Transaction list helpers and the receipt sheet (UI only).
+// Transaction list helpers and the receipt sheet. Rows take the
+// transaction JSON returned by the API.
 import 'package:flutter/material.dart';
 
-import '../../mock/mock_data.dart';
+import '../../core/format.dart';
 import '../../ui/ui.dart';
+import 'payment_flow.dart';
+
+bool txIsCredit(Map<String, dynamic> t) =>
+    t['isCredit'] == true || t['direction'] == 'credit';
+
+bool txIsCommissionWallet(Map<String, dynamic> t) => t['wallet'] == 'commission';
 
 IconData transactionIcon(String type) {
   final t = type.toLowerCase();
@@ -13,8 +20,14 @@ IconData transactionIcon(String type) {
   if (t.contains('cable') || t.contains('tv')) return DPIcons.tv;
   if (t.contains('education')) return DPIcons.school;
   if (t.contains('insurance')) return DPIcons.shield;
-  if (t.contains('commission')) return DPIcons.sparkle;
-  if (t.contains('transfer')) return DPIcons.upRight;
+  if (t.contains('commission') || t.contains('referral')) {
+    return DPIcons.sparkle;
+  }
+  if (t == 'transfer_in' || t == 'refund' || t == 'admin_credit') {
+    return DPIcons.downLeft;
+  }
+  if (t.contains('transfer') || t == 'admin_debit') return DPIcons.upRight;
+  if (t.contains('international')) return DPIcons.smartphone;
   if (t.contains('fund') || t.contains('wallet')) return DPIcons.downLeft;
   return DPIcons.receipt;
 }
@@ -33,12 +46,27 @@ String transactionTypeLabel(String type) {
       return 'Education Purchase';
     case 'insurance':
       return 'Insurance Purchase';
+    case 'international':
+      return 'International Airtime';
     case 'transfer':
-      return 'Transfer';
+    case 'transfer_out':
+      return 'Money Sent';
+    case 'transfer_in':
+      return 'Money Received';
     case 'wallet_funding':
       return 'Fund Wallet';
     case 'commission':
       return 'Commission Credit';
+    case 'commission_withdrawal':
+      return 'Commission to Wallet';
+    case 'referral_bonus':
+      return 'Referral Bonus';
+    case 'refund':
+      return 'Refund';
+    case 'admin_credit':
+      return 'Wallet Credit';
+    case 'admin_debit':
+      return 'Wallet Debit';
   }
   return 'Transaction';
 }
@@ -51,14 +79,14 @@ class TransactionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCredit = mockIsCredit(tx);
-    final amount = (tx['amount'] as num).toDouble();
-    final type = tx['type'] as String;
-    final date = DateTime.parse(tx['createdAt'] as String);
+    final isCredit = txIsCredit(tx);
+    final amount = toDouble(tx['amount']);
+    final type = str(tx['type']);
+    final date = parseDate(tx['createdAt']);
     final status = DPStatus.labelFor(tx['status'] as String?);
     final failed = status == 'Failed';
     final amountColor = failed ? DP.muted : (isCredit ? DP.green : DP.red);
-    final label = tx['isCommission'] == true ? 'Commission' : status;
+    final label = txIsCommissionWallet(tx) ? 'Earnings' : status;
 
     return DPListRow(
       onTap: () => showTransactionReceipt(context, tx),
@@ -71,10 +99,10 @@ class TransactionRow extends StatelessWidget {
         color: failed ? DP.muted : (isCredit ? DP.green : DP.red),
         background: failed ? DP.borderSoft : (isCredit ? DP.mint : DP.redBg),
       ),
-      title: tx['description'] as String,
+      title: str(tx['description'], transactionTypeLabel(type)),
       subtitle: detailed
-          ? '${transactionTypeLabel(type)}${status != 'Successful' ? ' · $status' : ''}\n${mockDateTime(date)}'
-          : '${mockTimeAgo(date)}  •  $label',
+          ? '${transactionTypeLabel(type)}${status != 'Successful' ? ' · $status' : ''}\n${dateTimeLabel(date)}'
+          : '${timeAgo(date)}  •  $label',
       trailing: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
@@ -108,12 +136,17 @@ Future<void> showTransactionReceipt(
   BuildContext context,
   Map<String, dynamic> tx,
 ) {
-  final amount = (tx['amount'] as num).toDouble();
+  final amount = toDouble(tx['amount']);
+  final fee = toDouble(tx['fee']);
+  final commission = toDouble(tx['commission']);
   final status = DPStatus.labelFor(tx['status'] as String?);
   final kind = DPStatusHero.kindFor(status);
-  final date = DateTime.parse(tx['createdAt'] as String);
-  final target = (tx['phone'] ?? tx['meterNumber'] ?? tx['smartcardNumber'])
-      ?.toString();
+  final date = parseDate(tx['createdAt']);
+  final meta = asMap(tx['metadata']);
+  final target = tx['recipient']?.toString();
+  final token = meta['token']?.toString();
+  final pins = asList(meta['pins']);
+  final description = str(tx['description'], transactionTypeLabel(str(tx['type'])));
 
   return showModalBottomSheet(
     context: context,
@@ -138,7 +171,7 @@ Future<void> showTransactionReceipt(
             Center(child: DPStatusHero(kind: kind, size: 76)),
             const SizedBox(height: 12),
             Text(
-              tx['description'] as String,
+              description,
               textAlign: TextAlign.center,
               style: DP.body.copyWith(color: DP.muted),
             ),
@@ -179,13 +212,30 @@ Future<void> showTransactionReceipt(
                 children: [
                   DPSummaryRow(
                     'Type',
-                    transactionTypeLabel(tx['type'] as String),
+                    transactionTypeLabel(str(tx['type'])),
                   ),
-                  if (target != null) DPSummaryRow('Recipient', target),
-                  DPSummaryRow('Date & time', mockDateTime(date)),
-                  DPSummaryRow('Reference', tx['id'] as String),
-                  const DPSummaryRow('Fee', '₦0.00'),
-                  DPSummaryRow('Total', DP.naira(amount), strong: true),
+                  if (target != null && target.isNotEmpty)
+                    DPSummaryRow('Recipient', target),
+                  if (meta['customerName'] != null)
+                    DPSummaryRow('Customer', str(meta['customerName'])),
+                  if (meta['plan'] != null) DPSummaryRow('Plan', str(meta['plan'])),
+                  if (token != null) DPSummaryRow('Token', token),
+                  if (meta['units'] != null) DPSummaryRow('Units', str(meta['units'])),
+                  for (final p in pins)
+                    DPSummaryRow('PIN', '${p['pin']}${p['serial'] != null ? ' (S/N ${p['serial']})' : ''}'),
+                  if (meta['certificateNumber'] != null)
+                    DPSummaryRow('Certificate', str(meta['certificateNumber'])),
+                  if (meta['note'] != null && str(meta['note']).isNotEmpty)
+                    DPSummaryRow('Note', str(meta['note'])),
+                  DPSummaryRow('Date & time', dateTimeLabel(date)),
+                  DPSummaryRow('Reference', str(tx['reference'])),
+                  DPSummaryRow('Fee', DP.naira(fee)),
+                  if (commission > 0)
+                    DPSummaryRow('Commission earned', DP.naira(commission),
+                        valueColor: DP.green),
+                  if (tx['refunded'] == true)
+                    const DPSummaryRow('Refund', 'Returned to wallet'),
+                  DPSummaryRow('Total', DP.naira(txIsCredit(tx) ? amount : amount + fee), strong: true),
                 ],
               ),
             ),
@@ -193,10 +243,7 @@ Future<void> showTransactionReceipt(
             DPButton(
               label: 'Share Receipt',
               icon: DPIcons.share,
-              onPressed: () => dpSnack(
-                ctx,
-                'Sharing isn\'t set up in this UI build',
-              ),
+              onPressed: () => shareReceipt(tx),
             ),
             const SizedBox(height: 10),
             DPOutlineButton(
@@ -204,7 +251,8 @@ Future<void> showTransactionReceipt(
               icon: DPIcons.flag,
               onPressed: () {
                 Navigator.pop(ctx);
-                Navigator.pushNamed(context, '/user-disputes');
+                Navigator.pushNamed(context, '/user-disputes',
+                    arguments: tx['id']);
               },
             ),
           ],

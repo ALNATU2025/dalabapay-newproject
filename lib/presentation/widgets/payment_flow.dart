@@ -1,73 +1,117 @@
 // lib/presentation/widgets/payment_flow.dart
-// Shared "Review payment → PIN → Payment successful" flow used by every
-// bill screen. UI only: "Pay" waits a moment and shows the success screen.
-// Nothing is charged and no request is made.
-import 'dart:math' as math;
-
+// Shared "Review payment → PIN → result" flow used by every bill screen.
+// The screen passes [onPay], which calls the backend with the PIN and
+// returns the transaction; this page shows success, pending or failed.
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
-import '../../mock/mock_data.dart';
+import '../../core/api/api.dart';
+import '../../core/api/session.dart';
+import '../../core/format.dart';
 import '../../ui/ui.dart';
 
-/// Sample commission rates (percent) so the "Estimated commission" row has
-/// something to show. Replace with the backend's rates.
-const Map<String, double> kMockCommissionRates = {
-  'airtime': 2.0,
-  'data': 2.5,
-  'electricity': 0.5,
-  'cable': 1.0,
-  'education': 1.5,
-  'insurance': 2.0,
-  'international': 1.0,
-};
+/// Commission rates (percent per service) from GET /api/services/rates.
+class CommissionRates {
+  CommissionRates._();
+  static Map<String, double> _rates = {};
+  static DateTime? _loadedAt;
+
+  static Future<void> load({bool force = false}) async {
+    if (!force &&
+        _loadedAt != null &&
+        DateTime.now().difference(_loadedAt!) < const Duration(minutes: 5)) {
+      return;
+    }
+    try {
+      final data = asMap(await api.get('/api/services/rates'));
+      _rates = data.map((k, v) => MapEntry(k, toDouble(v)));
+      _loadedAt = DateTime.now();
+    } catch (_) {}
+  }
+
+  static double? rateFor(String service) => _rates[service];
+}
 
 double? estimateCommission(String service, double amount) {
-  final rate = kMockCommissionRates[service];
-  if (rate == null || amount <= 0) return null;
+  final rate = CommissionRates.rateFor(service);
+  if (rate == null || rate <= 0 || amount <= 0) return null;
   return amount * rate / 100;
 }
 
 /// Wallet balance + estimated commission summary card.
-class WalletCommissionCard extends StatelessWidget {
-  final double walletBalance;
+class WalletCommissionCard extends StatefulWidget {
   final double amount;
   final String service;
   final bool balanceVisible;
 
   const WalletCommissionCard({
     super.key,
-    this.walletBalance = MockUser.walletBalance,
     required this.amount,
     required this.service,
     this.balanceVisible = true,
   });
 
   @override
+  State<WalletCommissionCard> createState() => _WalletCommissionCardState();
+}
+
+class _WalletCommissionCardState extends State<WalletCommissionCard> {
+  @override
+  void initState() {
+    super.initState();
+    CommissionRates.load().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final est = estimateCommission(service, amount);
-    return DPCard(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
-      child: Column(
-        children: [
-          DPSummaryRow(
-            'Wallet balance',
-            balanceVisible ? DP.naira(walletBalance) : '₦ ••••',
-          ),
-          if (est != null)
+    final est = estimateCommission(widget.service, widget.amount);
+    return ValueListenableBuilder<AppUser?>(
+      valueListenable: Session.instance,
+      builder: (context, user, _) => DPCard(
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+        child: Column(
+          children: [
             DPSummaryRow(
-              'Estimated commission',
-              DP.naira(est),
-              valueColor: DP.green,
+              'Wallet balance',
+              widget.balanceVisible ? DP.naira(user?.balance ?? 0) : '₦ ••••',
             ),
-        ],
+            if (est != null)
+              DPSummaryRow(
+                'Estimated commission',
+                DP.naira(est),
+                valueColor: DP.green,
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Opens the review screen. When the user pays, the success screen replaces
-/// it. [service] picks the sample commission rate.
-Future<void> showReviewAndPay(
+/// Builds plain-text receipt lines for sharing.
+String receiptText(Map<String, dynamic> txn, {String? title}) {
+  final b = StringBuffer('DalabaPay receipt\n');
+  if (title != null) b.writeln(title);
+  b.writeln('Amount: ${DP.naira(toDouble(txn['amount']))}');
+  b.writeln('Status: ${DPStatus.labelFor(str(txn['status']))}');
+  if (txn['recipient'] != null) b.writeln('Recipient: ${txn['recipient']}');
+  final m = asMap(txn['metadata']);
+  if (m['token'] != null) b.writeln('Token: ${m['token']}');
+  b.writeln('Reference: ${txn['reference']}');
+  b.writeln('Date: ${dateTimeLabel(parseDate(txn['createdAt']))}');
+  return b.toString();
+}
+
+void shareReceipt(Map<String, dynamic> txn, {String? title}) {
+  Share.share(receiptText(txn, title: title ?? str(txn['description'])));
+}
+
+/// Opens the review screen. When the user pays, [onPay] is called with the
+/// PIN and must return the transaction JSON. Returns that transaction, or
+/// null if the user closed the screen without paying.
+Future<Map<String, dynamic>?> showReviewAndPay(
   BuildContext context, {
   required IconData icon,
   required String title,
@@ -75,15 +119,17 @@ Future<void> showReviewAndPay(
   required double amount,
   required List<DPReviewRow> rows,
   required String service,
+  required Future<Map<String, dynamic>> Function(String pin) onPay,
   double fee = 0,
   String? footnote,
   String successTitle = 'Payment Successful!',
   String successSubtitle = 'Your transaction has been completed successfully.',
   List<DPReviewRow>? successRows,
+  List<DPReviewRow> Function(Map<String, dynamic> txn)? resultRows,
   bool pinRequired = true,
   String payLabel = '',
 }) {
-  return Navigator.of(context).push(
+  return Navigator.of(context).push<Map<String, dynamic>>(
     MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => _ReviewPage(
@@ -94,10 +140,12 @@ Future<void> showReviewAndPay(
         fee: fee,
         rows: rows,
         service: service,
+        onPay: onPay,
         footnote: footnote,
         successTitle: successTitle,
         successSubtitle: successSubtitle,
         successRows: successRows,
+        resultRows: resultRows,
         pinRequired: pinRequired,
         payLabel: payLabel,
       ),
@@ -113,10 +161,12 @@ class _ReviewPage extends StatefulWidget {
   final double fee;
   final List<DPReviewRow> rows;
   final String service;
+  final Future<Map<String, dynamic>> Function(String pin) onPay;
   final String? footnote;
   final String successTitle;
   final String successSubtitle;
   final List<DPReviewRow>? successRows;
+  final List<DPReviewRow> Function(Map<String, dynamic> txn)? resultRows;
   final bool pinRequired;
   final String payLabel;
 
@@ -128,10 +178,12 @@ class _ReviewPage extends StatefulWidget {
     required this.fee,
     required this.rows,
     required this.service,
+    required this.onPay,
     required this.footnote,
     required this.successTitle,
     required this.successSubtitle,
     required this.successRows,
+    required this.resultRows,
     required this.pinRequired,
     required this.payLabel,
   });
@@ -143,9 +195,17 @@ class _ReviewPage extends StatefulWidget {
 class _ReviewPageState extends State<_ReviewPage> {
   final _pin = TextEditingController();
   bool _processing = false;
-  bool _done = false;
-  late final String _reference =
-      'DP${DateTime.now().millisecondsSinceEpoch}${math.Random().nextInt(90) + 10}';
+  String? _error;
+  Map<String, dynamic>? _txn;
+
+  @override
+  void initState() {
+    super.initState();
+    CommissionRates.load().then((_) {
+      if (mounted) setState(() {});
+    });
+    Session.instance.refreshQuietly();
+  }
 
   @override
   void dispose() {
@@ -155,60 +215,189 @@ class _ReviewPageState extends State<_ReviewPage> {
 
   Future<void> _pay() async {
     FocusScope.of(context).unfocus();
-    setState(() => _processing = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
     setState(() {
-      _processing = false;
-      _done = true;
+      _processing = true;
+      _error = null;
     });
+    try {
+      final txn = await widget.onPay(_pin.text.trim());
+      await Session.instance.refreshQuietly();
+      if (!mounted) return;
+      setState(() {
+        _processing = false;
+        _txn = txn;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'PIN_NOT_SET') {
+        setState(() => _processing = false);
+        final go = await dpDialog(
+          context,
+          title: 'Create your payment PIN',
+          message: 'You need a 6-digit payment PIN before you can pay.',
+          confirmLabel: 'Create PIN',
+          cancelLabel: 'Not now',
+          tone: DPTone.info,
+        );
+        if (go == true && mounted) Navigator.pushNamed(context, '/pin-setup');
+        return;
+      }
+      _pin.clear();
+      setState(() {
+        _processing = false;
+        _error = e.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _processing = false;
+        _error = errorMessage(e);
+      });
+    }
   }
+
+  void _close() => Navigator.of(context).pop(_txn);
 
   @override
   Widget build(BuildContext context) {
     final total = widget.amount + widget.fee;
-    final commission = estimateCommission(widget.service, widget.amount);
+    final txn = _txn;
 
-    if (_done) {
+    if (txn != null) {
+      final status = str(txn['status']);
+      final extraRows = widget.resultRows?.call(txn) ?? const <DPReviewRow>[];
+      final rows = [
+        ...(widget.successRows ?? widget.rows.where((r) => !r.strong)),
+        ...extraRows,
+        DPReviewRow('Date & time', dateTimeLabel(parseDate(txn['createdAt']))),
+        DPReviewRow('Reference', str(txn['reference'])),
+      ];
+      if (status == 'failed' || status == 'refunded') {
+        return Scaffold(
+          backgroundColor: DP.bg,
+          body: _FailedPanel(
+            title: 'Payment failed',
+            message: txn['refunded'] == true
+                ? 'The provider couldn\'t complete this payment. ${DP.naira(toDouble(txn['amount']))} has been returned to your wallet.'
+                : 'The provider couldn\'t complete this payment.',
+            reason: str(asMap(txn['metadata'])['failureReason']),
+            reference: str(txn['reference']),
+            onDone: _close,
+          ),
+        );
+      }
+      final pending = status == 'pending';
+      final commission = toDouble(txn['commission']);
       return Scaffold(
         backgroundColor: DP.bg,
         body: DPSuccessPanel(
-          title: widget.successTitle,
-          subtitle: widget.successSubtitle,
+          title: pending ? 'Payment Pending' : widget.successTitle,
+          subtitle: pending
+              ? 'We\'re confirming this with the provider. You\'ll get a notification when it\'s done.'
+              : widget.successSubtitle,
           serviceLabel: widget.serviceLabel,
-          amount: total,
-          commission: commission,
-          rows: [
-            ...(widget.successRows ?? widget.rows.where((r) => !r.strong)),
-            DPReviewRow('Date & time', mockDateTime(DateTime.now())),
-            DPReviewRow('Reference', _reference),
-          ],
-          onDone: () => Navigator.of(context).pop(),
-          onShare: () => dpSnack(context, 'Sharing isn\'t set up in this UI build'),
+          amount: toDouble(txn['amount']) + toDouble(txn['fee']),
+          commission: commission > 0 ? commission : null,
+          pending: pending,
+          rows: rows,
+          onDone: _close,
+          onShare: () => shareReceipt(txn, title: widget.title),
         ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: DP.bg,
-      body: DPReviewPanel(
-        icon: widget.icon,
-        title: widget.title,
-        amount: widget.amount,
-        rows: widget.rows,
-        walletBalance: MockUser.walletBalance,
-        totalDebit: total,
-        commission: commission,
-        pinController: _pin,
-        pinRequired: widget.pinRequired,
-        processing: _processing,
-        onPay: _pay,
-        onClose: () => Navigator.of(context).pop(),
-        biometricAvailable: true,
-        biometricLabel: 'fingerprint',
-        onBiometric: _pay,
-        footnote: widget.footnote,
-        payLabel: widget.payLabel,
+    return PopScope(
+      canPop: !_processing,
+      child: Scaffold(
+        backgroundColor: DP.bg,
+        body: ValueListenableBuilder<AppUser?>(
+          valueListenable: Session.instance,
+          builder: (context, user, _) => DPReviewPanel(
+            icon: widget.icon,
+            title: widget.title,
+            amount: widget.amount,
+            rows: widget.rows,
+            walletBalance: user?.balance,
+            totalDebit: total,
+            commission: estimateCommission(widget.service, widget.amount),
+            pinController: _pin,
+            pinRequired: widget.pinRequired,
+            pinError: _error,
+            processing: _processing,
+            onPay: _pay,
+            onClose: () => Navigator.of(context).pop(),
+            footnote: widget.footnote,
+            payLabel: widget.payLabel,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FailedPanel extends StatelessWidget {
+  final String title;
+  final String message;
+  final String reason;
+  final String reference;
+  final VoidCallback onDone;
+  const _FailedPanel({
+    required this.title,
+    required this.message,
+    required this.reason,
+    required this.reference,
+    required this.onDone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          DPLogoBar(
+            onLeading: onDone,
+            actionLabel: 'Help',
+            onAction: () => Navigator.pushNamed(context, '/help'),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+              children: [
+                const Center(
+                    child: DPStatusHero(kind: DPStatusKind.failed, size: 92)),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 23,
+                    fontWeight: FontWeight.w800,
+                    color: DP.ink,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: DP.body.copyWith(color: DP.muted),
+                ),
+                const SizedBox(height: 20),
+                DPCard(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Column(
+                    children: [
+                      if (reason.isNotEmpty) DPSummaryRow('Reason', reason),
+                      DPSummaryRow('Reference', reference),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          DPBottomAction(
+            child: DPButton(label: 'Done', onPressed: onDone),
+          ),
+        ],
       ),
     );
   }

@@ -1,10 +1,11 @@
 // lib/main.dart
-// Dalabapay — UI/UX-only build. Every screen runs on sample data from
-// lib/mock/mock_data.dart. There is no backend, no API calls, no storage,
-// no Firebase and no real payments.
+// Dalabapay app. Talks to the DalabaPay backend (newproject-backend); set
+// the server with --dart-define=API_URL=https://api.example.com
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'core/api/api.dart';
+import 'core/api/session.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'presentation/screens/admin/admin_all_transactions_page.dart';
@@ -57,11 +58,28 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   ThemeController.instance.apply();
+  // Saved login rejected by the server (expired, password changed,
+  // account deactivated): back to the login screen.
+  Api.instance.onUnauthorized = () {
+    Session.instance.logout();
+    final nav = DalabapayApp.navigatorKey.currentState;
+    if (nav == null) return;
+    nav.pushNamedAndRemoveUntil('/login', (_) => false);
+    final ctx = DalabapayApp.navigatorKey.currentContext;
+    if (ctx != null) {
+      ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(
+        const SnackBar(content: Text('Your session has ended. Please log in again.')),
+      );
+    }
+  };
   runApp(const DalabapayApp());
 }
 
 class DalabapayApp extends StatelessWidget {
   const DalabapayApp({super.key});
+
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   /// Every screen, by route name.
   static final Map<String, WidgetBuilder> routes = {
@@ -97,7 +115,7 @@ class DalabapayApp extends StatelessWidget {
     '/referral': (_) => const ReferralScreen(),
     '/wallet': (_) => const WalletTopUpScreen(),
     '/send-money': (_) => const SendMoneyScreen(),
-    // Admin console (UI only)
+    // Admin console (staff roles only; the server checks permissions)
     '/admin': (_) => const AdminDashboardScreen(),
     '/admin/users': (_) => const AdminUsersPage(),
     '/admin/transactions': (_) => const AdminAllTransactionsPage(),
@@ -121,6 +139,7 @@ class DalabapayApp extends StatelessWidget {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: ThemeController.instance,
       builder: (context, mode, _) => MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Dalabapay',
       debugShowCheckedModeBanner: false,
       // AppTheme.current already reflects light/dark, so one theme is used.
@@ -133,7 +152,7 @@ class DalabapayApp extends StatelessWidget {
         if (settings.name == '/otp-verification') {
           final email = settings.arguments is String
               ? settings.arguments as String
-              : 'you@example.com';
+              : '';
           return MaterialPageRoute(
             settings: settings,
             builder: (_) => OtpVerificationScreen(email: email),

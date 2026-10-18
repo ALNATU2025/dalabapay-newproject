@@ -1,9 +1,13 @@
 // lib/presentation/screens/auth/otp_verification_screen.dart
-// UI only — any 6 digits continue to "Create new password".
+// Checks the password-reset code (POST /api/auth/password/verify-code) and
+// passes the reset token on to "Create new password".
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
+import '../../../core/dev_code.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -19,6 +23,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   int _resendCountdown = 59;
   Timer? _timer;
   bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
@@ -48,11 +53,43 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   Future<void> _verify() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/reset-password');
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final r = await api.post('/api/auth/password/verify-code', {
+        'email': widget.email,
+        'code': _otpController.text.trim(),
+      });
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      Navigator.pushReplacementNamed(
+        context,
+        '/reset-password',
+        arguments: str(asMap(r)['resetToken']),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _otpController.clear();
+      setState(() {
+        _isLoading = false;
+        _error = errorMessage(e);
+      });
+    }
+  }
+
+  Future<void> _resend() async {
+    try {
+      final r = await api.post('/api/auth/password/forgot', {'email': widget.email});
+      _startTimer();
+      if (!mounted) return;
+      dpSnack(context, 'A new code is on its way.', success: true);
+      showDevCode(context, r);
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   @override
@@ -85,6 +122,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         if (!_isLoading) _verify();
                       },
                     ),
+                    if (_error != null)
+                      DPHelper(_error!, color: DP.red, icon: DPIcons.alert),
                     const SizedBox(height: 18),
                     Center(
                       child: Row(
@@ -101,7 +140,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                               : DPTextLink(
                                   label: 'Resend Code',
                                   fontSize: 13,
-                                  onTap: _startTimer,
+                                  onTap: _resend,
                                 ),
                         ],
                       ),
@@ -111,7 +150,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       label: 'Verify OTP',
                       loading: _isLoading,
                       onPressed:
-                          _otpController.text.length == 6 ? _verify : null,
+                          _otpController.text.length == 6 && !_isLoading
+                              ? _verify
+                              : null,
                     ),
                     const SizedBox(height: 18),
                     const DPBanner(

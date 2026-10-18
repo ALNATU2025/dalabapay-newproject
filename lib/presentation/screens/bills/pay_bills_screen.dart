@@ -1,6 +1,6 @@
 // lib/presentation/screens/bills/pay_bills_screen.dart
 // "All Services" (design screen 8) and "Pay Bills" (design screen 11).
-// UI only: the chosen route is handed back via [onSelect]; the dashboard
+// The chosen route is handed back via [onSelect]; the dashboard
 // opens it with the same logic as before.
 import 'package:flutter/material.dart';
 

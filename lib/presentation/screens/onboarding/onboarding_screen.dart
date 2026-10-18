@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/api/api.dart';
 import '../../../ui/ui.dart';
 import '../auth/login_screen.dart';
 
@@ -64,6 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _finishOnboarding() {
+    api.setFlag('onboarded');
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(

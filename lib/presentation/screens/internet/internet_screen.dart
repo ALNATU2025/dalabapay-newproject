@@ -1,10 +1,15 @@
 // lib/presentation/screens/internet/internet_screen.dart
-// UI only — network, phone, plan (sample plans) → review → success.
+// Network, phone, plan (GET /api/services/data/plans) → review →
+// POST /api/services/data.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../mock/mock_data.dart';
+import '../../../core/api/api.dart';
+import '../../../core/api/catalog.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 import '../../widgets/payment_flow.dart';
 
 class InternetScreen extends StatefulWidget {
@@ -17,13 +22,79 @@ class InternetScreen extends StatefulWidget {
 class _InternetScreenState extends State<InternetScreen> {
   final _phoneController = TextEditingController();
   String? _selectedNetwork;
-  MockPlan? _selectedPlan;
+  Plan? _selectedPlan;
   String _planFilter = 'All plans';
 
-  static const List<Map<String, String>> _recent = [
-    {'phone': '08034567890', 'network': 'MTN'},
-    {'phone': '08123456789', 'network': 'Airtel'},
-  ];
+  Map<String, String> _networkIds = const {
+    'MTN': 'mtn',
+    'Airtel': 'airtel',
+    'Glo': 'glo',
+    '9mobile': '9mobile',
+  };
+  List<Map<String, String>> _recent = [];
+  List<Plan> _plans = [];
+  bool _plansLoading = false;
+  Object? _plansError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLookups();
+  }
+
+  Future<void> _loadLookups() async {
+    try {
+      final nets = await Catalog.networks();
+      if (nets.isNotEmpty && mounted) {
+        setState(() => _networkIds = {
+              for (final n in nets) str(n['name']): str(n['id']),
+            });
+      }
+    } catch (_) {}
+    final recent = await Catalog.recentRecipients('data');
+    if (!mounted) return;
+    setState(() => _recent = [
+          for (final t in recent)
+            {
+              'phone': str(t['recipient']),
+              'network': str(asMap(t['metadata'])['network']),
+            },
+        ]);
+  }
+
+  Future<void> _loadPlans() async {
+    final network = _selectedNetwork;
+    if (network == null) return;
+    setState(() {
+      _plansLoading = true;
+      _plansError = null;
+      _plans = [];
+    });
+    try {
+      final r = await api.get('/api/services/data/plans',
+          query: {'network': _networkIds[network] ?? network.toLowerCase()});
+      if (!mounted || network != _selectedNetwork) return;
+      setState(() {
+        _plans = Plan.listFrom(r);
+        _plansLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _plansLoading = false;
+        _plansError = e;
+      });
+    }
+  }
+
+  void _selectNetwork(String? name) {
+    if (name == null || name == _selectedNetwork) return;
+    setState(() {
+      _selectedNetwork = name;
+      _selectedPlan = null;
+    });
+    _loadPlans();
+  }
 
   @override
   void dispose() {
@@ -31,7 +102,7 @@ class _InternetScreenState extends State<InternetScreen> {
     super.dispose();
   }
 
-  int _days(MockPlan p) {
+  int _days(Plan p) {
     final v = (p.validity ?? '').toLowerCase();
     final n = int.tryParse(v.split(' ').first) ?? 30;
     if (v.contains('week')) return n * 7;
@@ -39,7 +110,7 @@ class _InternetScreenState extends State<InternetScreen> {
     return n;
   }
 
-  bool _matches(MockPlan p) {
+  bool _matches(Plan p) {
     final d = _days(p);
     switch (_planFilter) {
       case 'Daily':
@@ -74,11 +145,20 @@ class _InternetScreenState extends State<InternetScreen> {
       rows: [
         DPReviewRow('Phone number', phone),
         DPReviewRow('Network', '$network Nigeria'),
-        DPReviewRow('Plan', '${plan.name} · ${plan.validity}'),
+        DPReviewRow('Plan', '${plan.name}${plan.validity != null ? ' · ${plan.validity}' : ''}'),
         const DPReviewRow('Service fee', '₦0.00'),
         DPReviewRow('Total to pay', DP.naira(plan.price), strong: true),
       ],
       footnote: 'Data activates on the number above and can\'t be moved.',
+      onPay: (pin) async {
+        final r = await api.post('/api/services/data', {
+          'network': _networkIds[network] ?? network.toLowerCase(),
+          'phone': phone,
+          'planCode': plan.code,
+          'pin': pin,
+        });
+        return asMap(asMap(r)['transaction']);
+      },
     );
   }
 
@@ -108,16 +188,13 @@ class _InternetScreenState extends State<InternetScreen> {
                     ),
                     const SizedBox(height: 18),
                     DPChipRow(
-                      options: kMockNetworks,
+                      options: _networkIds.keys.toList(),
                       selected: _selectedNetwork,
                       height: 46,
                       logos: true,
                       onSelect: (name) {
                         HapticFeedback.selectionClick();
-                        setState(() {
-                          _selectedNetwork = name;
-                          _selectedPlan = null;
-                        });
+                        _selectNetwork(name);
                       },
                     ),
                     const SizedBox(height: 20),
@@ -137,14 +214,16 @@ class _InternetScreenState extends State<InternetScreen> {
                         letterSpacing: 0.4,
                       ),
                       suffix: IconButton(
-                        tooltip: 'Choose from contacts',
+                        tooltip: 'Use my number',
                         icon: Icon(DPIcons.contact, color: DP.muted),
                         onPressed: () => setState(
-                          () => _phoneController.text = MockUser.phone,
+                          () => _phoneController.text =
+                              Session.instance.user?.phone ?? '',
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    if (_recent.isNotEmpty) const SizedBox(height: 12),
+                    if (_recent.isNotEmpty)
                     SizedBox(
                       height: 40,
                       child: ListView.separated(
@@ -162,10 +241,12 @@ class _InternetScreenState extends State<InternetScreen> {
                               size: 16,
                               color: DP.muted,
                             ),
-                            onTap: () => setState(() {
-                              _phoneController.text = c['phone']!;
-                              _selectedNetwork = c['network'];
-                            }),
+                            onTap: () {
+                              setState(() => _phoneController.text = c['phone']!);
+                              if (_networkIds.containsKey(c['network'])) {
+                                _selectNetwork(c['network']);
+                              }
+                            },
                           );
                         },
                       ),
@@ -218,7 +299,7 @@ class _InternetScreenState extends State<InternetScreen> {
 
   Widget _buildPlanSection() {
     const filters = ['All plans', 'Daily', 'Weekly', 'Monthly'];
-    final plans = kMockDataPlans.where(_matches).toList();
+    final plans = _plans.where(_matches).toList();
     final rows = <Widget>[];
     for (var i = 0; i < plans.length; i += 2) {
       rows.add(
@@ -253,7 +334,11 @@ class _InternetScreenState extends State<InternetScreen> {
           onSelect: (f) => setState(() => _planFilter = f),
         ),
         const SizedBox(height: 14),
-        if (plans.isEmpty)
+        if (_plansLoading)
+          const DPLoading(padding: 24)
+        else if (_plansError != null)
+          DPLoadError(error: _plansError, onRetry: _loadPlans)
+        else if (plans.isEmpty)
           DPEmptyState(
             icon: DPIcons.wifi,
             title: 'No ${_planFilter.toLowerCase()} plans',
@@ -265,7 +350,7 @@ class _InternetScreenState extends State<InternetScreen> {
     );
   }
 
-  Widget _planCard(MockPlan plan) {
+  Widget _planCard(Plan plan) {
     final isSelected = _selectedPlan == plan;
     return Material(
       color: isSelected ? DP.mint : DP.surface,

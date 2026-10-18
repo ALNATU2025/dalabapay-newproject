@@ -1,9 +1,16 @@
 // lib/presentation/screens/transactions/transactions_screen.dart
-// "My Wallet" / Transactions tab — UI only, filters the sample list.
-import 'package:flutter/material.dart';
+// "My Wallet" / Transactions tab: GET /api/transactions with status, type,
+// date and search filters, loaded a page at a time.
+import 'dart:async';
 
-import '../../../mock/mock_data.dart';
+import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../../../core/api/api.dart';
+import '../../../core/api/session.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/async_view.dart';
 import '../../widgets/transaction_widgets.dart';
 
 class TransactionsScreen extends StatefulWidget {
@@ -32,38 +39,143 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     'Commission Credit',
   ];
 
+  /// Filter chip → API query.
+  static const _statusQuery = {
+    'Successful': 'success',
+    'Pending': 'pending',
+    'Failed': 'failed',
+  };
+  static const _typeQuery = {
+    'Airtime Purchase': 'airtime,international',
+    'Data Purchase': 'data',
+    'Cable TV Purchase': 'cable',
+    'Electricity Purchase': 'electricity',
+    'Education Purchase': 'education',
+    'Insurance Purchase': 'insurance',
+    'Transfer': 'transfer_out,transfer_in',
+    'Fund Wallet': 'wallet_funding',
+    'Commission Credit': 'commission,commission_withdrawal,referral_bonus',
+  };
+
+  final List<Map<String, dynamic>> _items = [];
+  int _page = 1;
+  bool _hasMore = false;
+  bool _loading = true;
+  bool _loadingMore = false;
+  Object? _error;
+  Timer? _debounce;
+  int _requestId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+    Session.instance.refreshQuietly();
+  }
+
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  List<Map<String, dynamic>> get _filtered {
-    final q = _searchController.text.trim().toLowerCase();
-    return kMockTransactions.where((tx) {
-      final status = DPStatus.labelFor(tx['status'] as String?);
-      final type = transactionTypeLabel(tx['type'] as String);
-      final date = DateTime.parse(tx['createdAt'] as String);
-      if (_statusChips.contains(_selectedFilter) &&
-          _selectedFilter != 'All' &&
-          status != _selectedFilter) {
-        return false;
+  Map<String, dynamic> _query(int page, {int limit = 20}) {
+    final type = _typeQuery[_selectedFilter];
+    return {
+      'page': page,
+      'limit': limit,
+      'status': _statusQuery[_selectedFilter],
+      'type': type,
+      if (_selectedFilter == 'Commission Credit') 'wallet': 'all',
+      'q': _searchController.text.trim(),
+      if (_range != null) 'from': isoDay(_range!.start),
+      if (_range != null) 'to': isoDay(_range!.end),
+    };
+  }
+
+  Future<void> _reload() async {
+    final id = ++_requestId;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final r = asMap(await api.get('/api/transactions', query: _query(1)));
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(itemsOf(r));
+        _page = 1;
+        _hasMore = r['hasMore'] == true;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    final id = _requestId;
+    setState(() => _loadingMore = true);
+    try {
+      final r = asMap(await api.get('/api/transactions', query: _query(_page + 1)));
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _items.addAll(itemsOf(r));
+        _page += 1;
+        _hasMore = r['hasMore'] == true;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  void _setFilter(String f) {
+    setState(() => _selectedFilter = f);
+    _reload();
+  }
+
+  void _onSearchChanged() {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), _reload);
+  }
+
+  Future<void> _export() async {
+    try {
+      final r = await api.get('/api/transactions', query: _query(1, limit: 100));
+      final rows = itemsOf(r);
+      if (rows.isEmpty) {
+        if (mounted) dpSnack(context, 'Nothing to export');
+        return;
       }
-      if (_typeChips.contains(_selectedFilter) && type != _selectedFilter) {
-        return false;
+      String esc(Object? v) => '"${'${v ?? ''}'.replaceAll('"', '""')}"';
+      final b = StringBuffer('Date,Reference,Description,Type,Status,Amount,Direction\n');
+      for (final t in rows) {
+        b.writeln([
+          dateTimeLabel(parseDate(t['createdAt'])),
+          t['reference'],
+          t['description'],
+          transactionTypeLabel(str(t['type'])),
+          DPStatus.labelFor(str(t['status'])),
+          toDouble(t['amount']).toStringAsFixed(2),
+          t['direction'],
+        ].map(esc).join(','));
       }
-      if (_range != null &&
-          (date.isBefore(_range!.start) ||
-              date.isAfter(_range!.end.add(const Duration(days: 1))))) {
-        return false;
-      }
-      if (q.isNotEmpty &&
-          !(tx['description'] as String).toLowerCase().contains(q) &&
-          !(tx['id'] as String).toLowerCase().contains(q)) {
-        return false;
-      }
-      return true;
-    }).toList();
+      await Share.share(b.toString(), subject: 'Dalabapay transactions');
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
   }
 
   Future<void> _selectDateRange() async {
@@ -74,7 +186,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       lastDate: now,
       initialDateRange: _range,
     );
-    if (r != null) setState(() => _range = r);
+    if (r != null) {
+      setState(() => _range = r);
+      _reload();
+    }
   }
 
   void _onNavTap(int i) {
@@ -86,7 +201,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final items = _filtered;
+    final items = _items;
     return Scaffold(
       backgroundColor: DP.bg,
       body: SafeArea(
@@ -96,11 +211,23 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             DPTopBar(
               title: 'My Wallet',
               actionLabel: 'Export',
-              onAction: () =>
-                  dpSnack(context, 'CSV export isn\'t set up in this UI build'),
+              onAction: _export,
             ),
             Expanded(
-              child: CustomScrollView(
+              child: RefreshIndicator(
+                color: DP.green,
+                onRefresh: () async {
+                  await Session.instance.refreshQuietly();
+                  await _reload();
+                },
+                child: NotificationListener<ScrollNotification>(
+                onNotification: (n) {
+                  if (n.metrics.pixels > n.metrics.maxScrollExtent - 300) {
+                    _loadMore();
+                  }
+                  return false;
+                },
+                child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverPadding(
@@ -117,7 +244,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       ),
                     ),
                   ),
-                  if (items.isEmpty)
+                  if (_loading && items.isEmpty)
+                    const SliverToBoxAdapter(child: DPLoading())
+                  else if (_error != null && items.isEmpty)
+                    SliverToBoxAdapter(
+                      child: DPLoadError(error: _error, onRetry: _reload),
+                    )
+                  else if (items.isEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -126,11 +259,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                           title: 'No matching transactions',
                           message: 'Try a different search or filter.',
                           actionLabel: 'Clear filters',
-                          onAction: () => setState(() {
-                            _selectedFilter = 'All';
-                            _searchController.clear();
-                            _range = null;
-                          }),
+                          onAction: () {
+                            setState(() {
+                              _selectedFilter = 'All';
+                              _searchController.clear();
+                              _range = null;
+                            });
+                            _reload();
+                          },
                         ),
                       ),
                     )
@@ -151,6 +287,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         ),
                       ),
                     ),
+                  if (_loadingMore)
+                    const SliverToBoxAdapter(child: DPLoading(padding: 16)),
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(24, 8, 24, 28),
                     sliver: SliverToBoxAdapter(
@@ -163,6 +301,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   ),
                 ],
               ),
+              ),
+              ),
             ),
           ],
         ),
@@ -170,7 +310,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       bottomNavigationBar: DPBottomNav(
         index: 1,
         items: kDPTabs,
-        onCenter: () => Navigator.pushNamed(context, '/send-money'),
+        onCenter: () => Navigator.pushNamed(context, '/send-money').then((_) {
+          if (mounted) _reload();
+        }),
         onTap: _onNavTap,
       ),
     );
@@ -235,10 +377,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 fit: BoxFit.scaleDown,
                 child: _balanceHidden
                     ? const Text('₦ ••••••', style: balanceStyle)
-                    : DPCountUp(
-                        value: MockUser.walletBalance,
-                        format: (v) => DP.naira(v),
-                        style: balanceStyle,
+                    : ValueListenableBuilder(
+                        valueListenable: Session.instance,
+                        builder: (context, user, _) => DPCountUp(
+                          value: user?.balance ?? 0,
+                          format: (v) => DP.naira(v),
+                          style: balanceStyle,
+                        ),
                       ),
               ),
             ),
@@ -253,7 +398,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   height: 46,
                   background: Colors.white,
                   foreground: DP.green,
-                  onPressed: () => Navigator.pushNamed(context, '/wallet'),
+                  onPressed: () => Navigator.pushNamed(context, '/wallet').then((_) {
+          if (mounted) _reload();
+        }),
                 ),
               ),
               const SizedBox(width: 12),
@@ -263,7 +410,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   leadingIcon: DPIcons.upRight,
                   height: 46,
                   background: DP.blue,
-                  onPressed: () => Navigator.pushNamed(context, '/send-money'),
+                  onPressed: () => Navigator.pushNamed(context, '/send-money').then((_) {
+          if (mounted) _reload();
+        }),
                 ),
               ),
             ],
@@ -284,7 +433,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       children: [
         TextField(
           controller: _searchController,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => _onSearchChanged(),
           textInputAction: TextInputAction.search,
           decoration: DPField.decoration(
             hint: 'Search name or reference',
@@ -293,7 +442,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 ? null
                 : IconButton(
                     icon: const Icon(DPIcons.close),
-                    onPressed: () => setState(_searchController.clear),
+                    onPressed: () {
+                      setState(_searchController.clear);
+                      _reload();
+                    },
                   ),
           ),
         ),
@@ -304,7 +456,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               _statusChips.contains(_selectedFilter) ? _selectedFilter : null,
           spacing: 8,
           height: 40,
-          onSelect: (f) => setState(() => _selectedFilter = f),
+          onSelect: _setFilter,
         ),
         const SizedBox(height: 10),
         Row(
@@ -324,10 +476,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                               .replaceAll(' Credit', ''),
                           selected: _selectedFilter == f,
                           height: 36,
-                          onTap: () => setState(() {
-                            _selectedFilter =
-                                _selectedFilter == f ? 'All' : f;
-                          }),
+                          onTap: () =>
+                              _setFilter(_selectedFilter == f ? 'All' : f),
                         ),
                       ),
                   ],
@@ -356,7 +506,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               ),
               DPTextLink(
                 label: 'Clear dates',
-                onTap: () => setState(() => _range = null),
+                onTap: () {
+                  setState(() => _range = null);
+                  _reload();
+                },
               ),
             ],
           ),
