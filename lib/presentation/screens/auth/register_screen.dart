@@ -244,7 +244,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
+                      Text(
                         'Already have an account? ',
                         style: DP.caption,
                       ),
@@ -284,7 +284,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 const DPIconBadge(DPIcons.mail, size: 64, iconSize: 30),
                 const SizedBox(height: 28),
-                const Text('One quick check.', style: DP.display),
+                Text('One quick check.', style: DP.display),
                 const SizedBox(height: 10),
                 Text(
                   'Enter the 6-digit code we sent to $email.',
@@ -335,7 +335,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Center(
                   child: Column(
                     children: [
-                      const Text('Still having trouble?', style: DP.caption),
+                      Text('Still having trouble?', style: DP.caption),
                       const SizedBox(height: 4),
                       DPTextLink(
                         label: 'Get help from our team',
@@ -419,7 +419,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               'By creating an account, you agree to our Terms of use and Privacy policy.',
               style: DP.caption,

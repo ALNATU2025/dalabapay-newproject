@@ -2,6 +2,7 @@
 // Profile + Security — UI only. Toggles change on screen only.
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/theme_controller.dart';
 import '../../../mock/mock_data.dart';
 import '../../../ui/ui.dart';
 
@@ -18,7 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   final bool _kycVerified = true;
 
-  Widget _divider() => const Divider(height: 1, color: DP.borderSoft);
+  Widget _divider() => Divider(height: 1, color: DP.borderSoft);
 
   Widget _statusChip(String text, Color color) {
     return Container(
@@ -55,7 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (status != null) _statusChip(status, statusColor ?? DP.green),
-          const Icon(DPIcons.chevronRight, color: DP.muted, size: 22),
+          Icon(DPIcons.chevronRight, color: DP.muted, size: 22),
         ],
       ),
     );
@@ -110,9 +111,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 12),
               const DPLogoMark(size: 48),
               const SizedBox(height: 8),
-              const Text('Dalabapay', style: DP.title),
+              Text('Dalabapay', style: DP.title),
               const SizedBox(height: 4),
-              const Text('Smart Life Fast Pay', style: DP.caption),
+              Text('Smart Life Fast Pay', style: DP.caption),
               const SizedBox(height: 16),
               DPMenuRow(
                 icon: Icons.privacy_tip_outlined,
@@ -159,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const DPSheetHandle(),
               const SizedBox(height: 8),
-              const Text('Personal information', style: DP.title),
+              Text('Personal information', style: DP.title),
               const SizedBox(height: 16),
               const DPCard(
                 padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -178,7 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: () => Navigator.pop(ctx),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'To change your name, email or phone number, contact support from Help.',
                 style: DP.caption,
               ),
@@ -228,7 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : DPIconSquare(
                         icon: DPIcons.settings,
                         size: 40,
-                        color: DP.navy,
+                        color: DP.navyInk,
                         background: Colors.transparent,
                         semanticLabel: 'Security settings',
                         onTap: () => setState(() => _securityView = true),
@@ -352,6 +353,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         DPAppear(child: _buildProfileHeader()),
         const SizedBox(height: 20),
+        _buildAppearance(),
+        const SizedBox(height: 16),
         DPCard(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Column(
@@ -398,7 +401,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.admin_panel_settings_outlined,
                 title: 'Admin Console',
                 status: 'ADMIN',
-                statusColor: DP.navy,
+                statusColor: DP.navyInk,
                 onTap: () => Navigator.pushNamed(context, '/admin'),
               ),
               _divider(),
@@ -427,6 +430,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Theme picker: Normal (light), Dark, or follow the phone (System).
+  Widget _buildAppearance() {
+    const modes = [ThemeMode.light, ThemeMode.dark, ThemeMode.system];
+    final current = ThemeController.instance.value;
+    return DPCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              DPIconBadge.blue(
+                DP.isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                size: 36,
+                iconSize: 19,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Appearance', style: DP.bodyStrong),
+                    Text(
+                      current == ThemeMode.system
+                          ? 'Following your phone (${DP.isDark ? 'dark' : 'normal'})'
+                          : '${ThemeController.label(current)} theme',
+                      style: DP.caption,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          DPSegmented(
+            options: [for (final m in modes) ThemeController.label(m)],
+            index: modes.indexOf(current),
+            onChanged: (i) {
+              ThemeController.instance.setMode(modes[i]);
+              setState(() {});
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProfileHeader() {
     return Row(
       children: [
@@ -435,7 +485,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: DP.blueTint,
                 shape: BoxShape.circle,
               ),
@@ -472,7 +522,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 MockUser.fullName,
                 style: TextStyle(
                   fontSize: 18,
@@ -483,9 +533,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 3),
-              const Text(MockUser.phone, style: DP.caption),
+              Text(MockUser.phone, style: DP.caption),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 MockUser.email,
                 style: DP.caption,
                 maxLines: 1,

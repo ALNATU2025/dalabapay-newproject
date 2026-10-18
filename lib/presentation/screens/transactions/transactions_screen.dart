@@ -142,7 +142,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                           (context, i) => Column(
                             children: [
                               if (i > 0)
-                                const Divider(
+                                Divider(
                                     height: 1, color: DP.borderSoft),
                               TransactionRow(tx: items[i], detailed: true),
                             ],
@@ -151,7 +151,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         ),
                       ),
                     ),
-                  const SliverPadding(
+                  SliverPadding(
                     padding: EdgeInsets.fromLTRB(24, 8, 24, 28),
                     sliver: SliverToBoxAdapter(
                       child: Text(

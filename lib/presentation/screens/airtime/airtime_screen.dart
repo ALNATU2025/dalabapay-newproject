@@ -136,14 +136,14 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         color: DP.ink,
                         letterSpacing: 0.4,
                       ),
                       suffix: IconButton(
                         tooltip: 'Choose from contacts',
-                        icon: const Icon(DPIcons.contact, color: DP.muted),
+                        icon: Icon(DPIcons.contact, color: DP.muted),
                         onPressed: () => setState(() {
                           _phoneController.text = MockUser.phone;
                           _autoDetectNetwork(MockUser.phone);
@@ -165,7 +165,7 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
                             label: c['phone']!,
                             selected: phone == c['phone'],
                             height: 40,
-                            leading: const Icon(
+                            leading: Icon(
                               DPIcons.history,
                               size: 16,
                               color: DP.muted,
@@ -201,7 +201,7 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
                       keyboardType: TextInputType.number,
                       onChanged: (_) => setState(() {}),
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: const TextStyle(fontSize: 17, color: DP.ink),
+                      style: TextStyle(fontSize: 17, color: DP.ink),
                     ),
                     const DPHelper('Minimum ₦50 · Maximum ₦50,000'),
                     const SizedBox(height: 20),

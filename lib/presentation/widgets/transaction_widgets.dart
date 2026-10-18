@@ -146,7 +146,7 @@ Future<void> showTransactionReceipt(
             Text(
               DP.naira(amount),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w700,
                 color: DP.ink,

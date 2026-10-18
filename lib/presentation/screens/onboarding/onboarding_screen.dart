@@ -208,7 +208,7 @@ class OnboardingContent extends StatelessWidget {
               delay: const Duration(milliseconds: 120),
               child: Text(
                 data.title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 26,
                   height: 1.2,
                   fontWeight: FontWeight.w800,
@@ -243,7 +243,7 @@ class _IllustrationPlaceholder extends StatelessWidget {
     final circle = Container(
         width: 220,
         height: 220,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: DP.mint,
           shape: BoxShape.circle,
         ),
@@ -251,7 +251,7 @@ class _IllustrationPlaceholder extends StatelessWidget {
         child: Container(
           width: 130,
           height: 130,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: DP.surface,
             shape: BoxShape.circle,
           ),

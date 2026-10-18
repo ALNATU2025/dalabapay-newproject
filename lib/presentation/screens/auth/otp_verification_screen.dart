@@ -90,7 +90,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Didn\'t get it? ', style: DP.caption),
+                          Text('Didn\'t get it? ', style: DP.caption),
                           _resendCountdown > 0
                               ? Text(
                                   'Resend in ${_resendCountdown}s',

@@ -154,7 +154,7 @@ class _AdminTransactionStatusPageState
             onSelect: (f) => setState(() => _filter = f),
           ),
           const SizedBox(height: 8),
-          const Text('Tap on a transaction to change its status',
+          Text('Tap on a transaction to change its status',
               style: DP.caption),
           const SizedBox(height: 10),
           if (items.isEmpty)
@@ -186,7 +186,7 @@ class _AdminTransactionStatusPageState
                       children: [
                         Text(
                           DP.naira(t.amount),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: DP.ink,
                           ),

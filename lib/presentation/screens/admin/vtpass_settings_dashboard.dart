@@ -201,7 +201,7 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
           ),
           const SizedBox(height: 20),
           const DPSectionHeader('Service Controls'),
-          const Text('Enable or disable individual services',
+          Text('Enable or disable individual services',
               style: DP.caption),
           const SizedBox(height: 10),
           DPCard(
@@ -210,7 +210,7 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
               children: [
                 for (final e in _services.entries) ...[
                   if (e.key != _services.keys.first)
-                    const Divider(height: 1, color: DP.borderSoft),
+                    Divider(height: 1, color: DP.borderSoft),
                   DPMenuRow(
                     icon: _iconFor(e.key),
                     title: e.key,
@@ -284,7 +284,7 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
               subtitle: 'Access VTpass API documentation',
               onTap: () =>
                   dpSnack(context, 'Links aren\'t set up in this UI build'),
-              trailing: const Icon(DPIcons.chevronRight, color: DP.muted),
+              trailing: Icon(DPIcons.chevronRight, color: DP.muted),
             ),
           ),
         ],

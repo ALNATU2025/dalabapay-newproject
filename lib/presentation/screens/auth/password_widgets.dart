@@ -67,7 +67,7 @@ class PasswordRules extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Password requirements:',
             style: TextStyle(
               fontSize: 13,

@@ -101,7 +101,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                 children: [
                   const DPSheetHandle(),
                   const SizedBox(height: 8),
-                  const Text('File a Dispute', style: DP.title),
+                  Text('File a Dispute', style: DP.title),
                   const SizedBox(height: 14),
                   DPCard(
                     color: DP.blueTint,
@@ -110,7 +110,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Transaction Details',
+                        Text('Transaction Details',
                             style: DP.bodyStrong),
                         const SizedBox(height: 4),
                         Text('Ref: ${tx['id']}', style: DP.caption),
@@ -162,7 +162,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                       ctx,
                       'Image picking isn\'t set up in this UI build',
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Column(
                         children: [
                           Icon(Icons.cloud_upload_outlined,
@@ -231,7 +231,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
             children: [
               const DPSheetHandle(),
               const SizedBox(height: 8),
-              const Text('Dispute Details', style: DP.title),
+              Text('Dispute Details', style: DP.title),
               const SizedBox(height: 14),
               DPCard(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -369,7 +369,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
                 children: [
                   Text(
                     DP.naira(d.amount),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: DP.ink,
                     ),
@@ -393,7 +393,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
-        const Text(
+        Text(
           'Choose the payment you want to report.',
           style: DP.caption,
         ),

@@ -143,7 +143,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
                         title: 'Transfer hasn\'t arrived?',
                         subtitle: 'Find a transfer with its bank reference',
                         trailing:
-                            const Icon(DPIcons.chevronRight, color: DP.muted),
+                            Icon(DPIcons.chevronRight, color: DP.muted),
                         onTap: () => Navigator.pushNamed(
                           context,
                           '/transaction-validation',
@@ -269,7 +269,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           onChanged: (_) => setState(() {}),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             color: DP.ink,
             fontWeight: FontWeight.w600,
@@ -308,7 +308,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
             children: [
               const Icon(DPIcons.fingerprint, color: DP.green),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text('Confirm with biometrics', style: DP.body),
               ),
               Switch(
@@ -322,7 +322,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
           ),
         ),
         if (!_useBiometric) ...[
-          const Text('Enter your payment PIN', style: DP.section),
+          Text('Enter your payment PIN', style: DP.section),
           const SizedBox(height: 12),
           DPCodeInput(controller: _pinController, length: 6),
         ],
@@ -442,7 +442,7 @@ class _OneTimeAccountDialogState extends State<_OneTimeAccountDialog> {
             children: [
               Row(
                 children: [
-                  const Text('One-time account', style: DP.title),
+                  Text('One-time account', style: DP.title),
                   const SizedBox(width: 8),
                   Container(
                     padding:
@@ -462,7 +462,7 @@ class _OneTimeAccountDialogState extends State<_OneTimeAccountDialog> {
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(DPIcons.close, color: DP.muted),
+                    icon: Icon(DPIcons.close, color: DP.muted),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -482,7 +482,7 @@ class _OneTimeAccountDialogState extends State<_OneTimeAccountDialog> {
                   highlight: true, copy: true),
               _row(DPIcons.user, 'Account Name', 'DALABAPAY / ADAEZE OKAFOR',
                   copy: true),
-              const Divider(height: 24, color: DP.border),
+              Divider(height: 24, color: DP.border),
               _row(Icons.payments_outlined, 'Amount to transfer',
                   DP.naira(widget.amount + fee),
                   highlight: true),

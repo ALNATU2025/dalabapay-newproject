@@ -23,7 +23,7 @@ class ReferralScreen extends StatelessWidget {
                 children: [
                   const DPAppear(scaleFrom: 0.97, child: _EarningsCard()),
                   const SizedBox(height: 24),
-                  const Text('Bonus Breakdown', style: DP.section),
+                  Text('Bonus Breakdown', style: DP.section),
                   const SizedBox(height: 12),
                   const Row(
                     children: [
@@ -83,7 +83,7 @@ class ReferralScreen extends StatelessWidget {
                       children: [
                         for (var i = 0; i < kMockReferrals.length; i++) ...[
                           if (i > 0)
-                            const Divider(height: 1, color: DP.borderSoft),
+                            Divider(height: 1, color: DP.borderSoft),
                           _referralRow(kMockReferrals[i]),
                         ],
                       ],
@@ -106,7 +106,7 @@ class ReferralScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Your Referral Code', style: DP.section),
+          Text('Your Referral Code', style: DP.section),
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
@@ -154,7 +154,7 @@ class ReferralScreen extends StatelessWidget {
                 dpSnack(context, 'Sharing isn\'t set up in this UI build'),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Share this code with friends. When they join and make their first deposit (₦5000+), you both earn ₦200!',
             style: DP.caption,
           ),
@@ -194,7 +194,7 @@ class ReferralScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(Icons.lightbulb_outline_rounded, color: DP.navyIcon),
               SizedBox(width: 8),
@@ -231,7 +231,7 @@ class ReferralScreen extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'All bonuses are credited to your commission balance and can be used for payments or withdrawn.',
             style: DP.caption,
           ),

@@ -175,7 +175,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
                         LengthLimitingTextInputFormatter(11),
                       ],
                       onChanged: (_) => setState(() => _isValidated = false),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         color: DP.ink,
                         letterSpacing: 0.6,
@@ -278,7 +278,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
-                      suffix: const Icon(DPIcons.phone, color: DP.muted),
+                      suffix: Icon(DPIcons.phone, color: DP.muted),
                     ),
                     const SizedBox(height: 20),
                     WalletCommissionCard(
@@ -398,7 +398,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
       children: [
         Row(
           children: [
-            const Expanded(child: Text('Months', style: DP.section)),
+            Expanded(child: Text('Months', style: DP.section)),
             Text(
               'Total: ${DP.naira(_amount * _quantity)}',
               style: const TextStyle(
@@ -419,7 +419,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
               child: Text(
                 '$_quantity',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: DP.ink,
@@ -429,7 +429,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
             step(DPIcons.plus, _quantity < 12,
                 () => setState(() => _quantity++)),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Max 12 months',
                 textAlign: TextAlign.right,

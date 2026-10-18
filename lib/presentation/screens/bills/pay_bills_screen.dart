@@ -138,7 +138,7 @@ class _ServicesViewState extends State<ServicesView> {
               TextField(
                 onChanged: (v) => setState(() => _query = v),
                 textInputAction: TextInputAction.search,
-                style: const TextStyle(fontSize: 15, color: DP.ink),
+                style: TextStyle(fontSize: 15, color: DP.ink),
                 decoration: DPField.decoration(
                   hint: 'Search for a service...',
                   prefix: const Icon(DPIcons.search, size: 20),
@@ -174,7 +174,7 @@ class _ServicesViewState extends State<ServicesView> {
                     children: [
                       for (var i = 0; i < again.length; i++) ...[
                         if (i > 0)
-                          const Divider(height: 1, color: DP.borderSoft),
+                          Divider(height: 1, color: DP.borderSoft),
                         DPListRow(
                           onTap: () =>
                               widget.onSelect(again[i]['route'] as String),
@@ -185,7 +185,7 @@ class _ServicesViewState extends State<ServicesView> {
                           ),
                           title: again[i]['title'] as String,
                           subtitle: _mask(again[i]['subtitle'] as String),
-                          trailing: const Icon(
+                          trailing: Icon(
                             DPIcons.chevronRight,
                             color: DP.muted,
                           ),

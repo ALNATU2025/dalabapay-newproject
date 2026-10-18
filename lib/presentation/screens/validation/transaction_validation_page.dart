@@ -245,7 +245,7 @@ class _TransactionValidationPageState extends State<TransactionValidationPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
                             Icon(DPIcons.help, color: DP.navyIcon),
                             SizedBox(width: 8),

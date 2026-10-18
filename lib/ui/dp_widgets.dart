@@ -78,8 +78,8 @@ class DPIconSquare extends StatelessWidget {
     required this.icon,
     this.onTap,
     this.size = 44,
-    this.color = DP.ink,
-    this.background = DP.surface,
+    this.color = DPAuto.ink,
+    this.background = DPAuto.surface,
     this.semanticLabel,
     this.badge,
   });
@@ -90,7 +90,7 @@ class DPIconSquare extends StatelessWidget {
       button: true,
       label: semanticLabel,
       child: Material(
-        color: background,
+        color: DP.resolve(background),
         borderRadius: BorderRadius.circular(DP.rMd),
         child: InkWell(
           borderRadius: BorderRadius.circular(DP.rMd),
@@ -102,7 +102,7 @@ class DPIconSquare extends StatelessWidget {
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, size: 22, color: color),
+                Icon(icon, size: 22, color: DP.resolve(color)),
                 if (badge != null) Positioned(top: 6, right: 6, child: badge!),
               ],
             ),
@@ -287,12 +287,13 @@ class DPButton extends StatelessWidget {
     this.icon,
     this.leadingIcon,
     this.height = 52,
-  })  : background = DP.mint,
-        foreground = DP.navy;
+  })  : background = DPAuto.mint,
+        foreground = DPAuto.navyInk;
 
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null && !loading;
+    final foreground = DP.resolve(this.foreground);
     return DPPressable(
       enabled: enabled,
       child: SizedBox(
@@ -305,7 +306,9 @@ class DPButton extends StatelessWidget {
           boxShadow: const [],
         ),
         child: Material(
-        color: enabled ? background : background.withValues(alpha: 0.45),
+        color: enabled
+            ? DP.resolve(background)
+            : DP.resolve(background).withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(DP.rLg),
         child: InkWell(
           borderRadius: BorderRadius.circular(DP.rLg),
@@ -516,7 +519,7 @@ class DPField extends StatelessWidget {
         );
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: DP.faint, fontSize: 14.5),
+      hintStyle: TextStyle(color: DP.faint, fontSize: 14.5),
       filled: true,
       fillColor: DP.surface,
       isDense: false,
@@ -525,7 +528,7 @@ class DPField extends StatelessWidget {
       errorMaxLines: 3,
       errorStyle: const TextStyle(color: DP.red, fontSize: 12.5),
       prefixText: prefixText,
-      prefixStyle: const TextStyle(
+      prefixStyle: TextStyle(
         color: DP.ink,
         fontSize: 15,
         fontWeight: FontWeight.w600,
@@ -572,7 +575,7 @@ class DPField extends StatelessWidget {
       textCapitalization: textCapitalization,
       maxLines: obscureText ? 1 : maxLines,
       cursorColor: DP.green,
-      style: style ?? const TextStyle(fontSize: 15, color: DP.ink),
+      style: style ?? TextStyle(fontSize: 15, color: DP.ink),
       decoration: decoration(
         hint: hint,
         suffix: suffix,
@@ -610,7 +613,7 @@ class DPSelectField extends StatelessWidget {
       color: enabled ? DP.surface : DP.bg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DP.rMd),
-        side: const BorderSide(color: DP.border),
+        side: BorderSide(color: DP.border),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(DP.rMd),
@@ -732,7 +735,7 @@ class _DPPickerSheetState<T> extends State<_DPPickerSheet<T>> {
               ),
             Flexible(
               child: list.isEmpty
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(32),
                       child: Text(
                         'Nothing matches your search.',
@@ -1068,8 +1071,8 @@ class DPCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(18),
-    this.color = DP.surface,
-    this.borderColor = DP.border,
+    this.color = DPAuto.surface,
+    this.borderColor = DPAuto.border,
     this.radius = DP.rLg,
     this.onTap,
     this.margin,
@@ -1078,12 +1081,12 @@ class DPCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final body = Material(
-      color: color,
+      color: DP.resolve(color),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radius),
         side: borderColor == null
             ? BorderSide.none
-            : BorderSide(color: borderColor!),
+            : BorderSide(color: DP.resolve(borderColor!)),
       ),
       clipBehavior: Clip.antiAlias,
       child: onTap == null
@@ -1265,7 +1268,7 @@ class DPIconBadge extends StatelessWidget {
     this.icon, {
     super.key,
     this.color = DP.green,
-    this.background = DP.mint,
+    this.background = DPAuto.mint,
     this.size = 44,
     this.iconSize = 22,
   });
@@ -1277,14 +1280,17 @@ class DPIconBadge extends StatelessWidget {
     this.size = 44,
     this.iconSize = 22,
   })  : color = DP.navyIcon,
-        background = DP.blueTint;
+        background = DPAuto.blueTint;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: DP.resolve(background),
+        shape: BoxShape.circle,
+      ),
       child: Icon(icon, color: color, size: iconSize),
     );
   }
@@ -1386,13 +1392,13 @@ class DPMenuRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 13),
       leading: SizedBox(
         width: 28,
-        child: Icon(icon, color: color ?? DP.navy, size: 22),
+        child: Icon(icon, color: color ?? DP.navyInk, size: 22),
       ),
       title: title,
       titleColor: color,
       subtitle: subtitle,
       trailing: trailing ??
-          const Icon(DPIcons.chevronRight, color: DP.muted, size: 22),
+          Icon(DPIcons.chevronRight, color: DP.muted, size: 22),
     );
   }
 }
@@ -1437,7 +1443,7 @@ class DPServiceTile extends StatelessWidget {
           color: DP.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(DP.rLg),
-            side: const BorderSide(color: DP.border),
+            side: BorderSide(color: DP.border),
           ),
           child: InkWell(
             onTap: onTap,
@@ -1757,14 +1763,14 @@ class DPPinDots extends StatelessWidget {
                     ? Container(
                         width: 10,
                         height: 10,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: DP.ink,
                           shape: BoxShape.circle,
                         ),
                       )
                     : Text(
                         value![i],
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w500,
                           color: DP.ink,
@@ -1912,7 +1918,7 @@ class DPKeypad extends StatelessWidget {
                   child: Center(
                     child: Text(
                       d,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w400,
                         color: DP.ink,
@@ -1946,7 +1952,7 @@ class DPKeypad extends StatelessWidget {
                 child: Center(
                   child: IconButton(
                     onPressed: onBackspace,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.backspace_outlined,
                       color: DP.ink,
                       size: 24,
@@ -2077,7 +2083,7 @@ class DPBottomNav extends StatelessWidget {
       row.add(_item(context, i));
     }
     final bar = Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: DP.surface,
         border: Border(top: BorderSide(color: DP.border)),
       ),
@@ -2232,7 +2238,7 @@ class DPSegmented extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F4F8),
+        color: DP.isDark ? const Color(0xFF1C263A) : const Color(0xFFF0F4F8),
         borderRadius: BorderRadius.circular(DP.rMd),
       ),
       child: Row(
@@ -2288,7 +2294,7 @@ class DPWaves extends StatelessWidget {
       child: SizedBox(
         height: height,
         width: double.infinity,
-        child: CustomPaint(painter: _WavesPainter(top: top)),
+        child: CustomPaint(painter: _WavesPainter(top: top, dark: DP.isDark)),
       ),
     );
   }
@@ -2296,7 +2302,8 @@ class DPWaves extends StatelessWidget {
 
 class _WavesPainter extends CustomPainter {
   final bool top;
-  _WavesPainter({required this.top});
+  final bool dark;
+  _WavesPainter({required this.top, this.dark = false});
 
   @override
   void paint(Canvas canvas, Size s) {
@@ -2307,7 +2314,11 @@ class _WavesPainter extends CustomPainter {
         ..quadraticBezierTo(w * 0.70, h * 0.75, w, h * 0.95)
         ..lineTo(w, 0)
         ..close();
-      canvas.drawPath(light, Paint()..color = const Color(0xFFDDF5EA));
+      canvas.drawPath(
+        light,
+        Paint()
+          ..color = dark ? const Color(0xFF123A2E) : const Color(0xFFDDF5EA),
+      );
       final green = Path()
         ..moveTo(w * 0.58, 0)
         ..quadraticBezierTo(w * 0.80, h * 0.62, w, h * 0.8)
@@ -2328,7 +2339,10 @@ class _WavesPainter extends CustomPainter {
       ..lineTo(w, h)
       ..lineTo(0, h)
       ..close();
-    canvas.drawPath(mintPath, Paint()..color = const Color(0xFFD4F3E5));
+    canvas.drawPath(
+      mintPath,
+      Paint()..color = dark ? const Color(0xFF103528) : const Color(0xFFD4F3E5),
+    );
     final greenPath = Path()
       ..moveTo(0, h * 0.2)
       ..cubicTo(w * 0.30, h * 0.12, w * 0.50, h * 0.62, w * 0.85, h * 0.80)
@@ -2362,7 +2376,8 @@ class _WavesPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _WavesPainter old) => old.top != top;
+  bool shouldRepaint(covariant _WavesPainter old) =>
+      old.top != top || old.dark != dark;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2378,7 +2393,11 @@ void dpSnack(
 }) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
-  final Color bg = error ? DP.red : (success ? DP.green : DP.ink);
+  final Color bg = error
+      ? DP.red
+      : (success
+          ? DP.green
+          : (DP.isDark ? const Color(0xFF2A3753) : DP.ink));
   final IconData ic =
       error ? DPIcons.alert : (success ? DPIcons.checkCircle : DPIcons.info);
   messenger
@@ -2479,7 +2498,7 @@ Future<bool?> dpDialog(
                 onPressed: () => Navigator.of(ctx).pop(false),
                 child: Text(
                   cancelLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: DP.muted,
                     fontWeight: FontWeight.w600,
                   ),

@@ -131,14 +131,14 @@ class _InternetScreenState extends State<InternetScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(11),
                       ],
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         color: DP.ink,
                         letterSpacing: 0.4,
                       ),
                       suffix: IconButton(
                         tooltip: 'Choose from contacts',
-                        icon: const Icon(DPIcons.contact, color: DP.muted),
+                        icon: Icon(DPIcons.contact, color: DP.muted),
                         onPressed: () => setState(
                           () => _phoneController.text = MockUser.phone,
                         ),
@@ -157,7 +157,7 @@ class _InternetScreenState extends State<InternetScreen> {
                             label: c['phone']!,
                             selected: phone == c['phone'],
                             height: 40,
-                            leading: const Icon(
+                            leading: Icon(
                               DPIcons.history,
                               size: 16,
                               color: DP.muted,
@@ -292,7 +292,7 @@ class _InternetScreenState extends State<InternetScreen> {
                       plan.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w400,
                         color: DP.ink,

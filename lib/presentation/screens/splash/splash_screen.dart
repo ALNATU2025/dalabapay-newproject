@@ -147,11 +147,11 @@ class _SplashScreenState extends State<SplashScreen>
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text.rich(
-                                  const TextSpan(
+                                  TextSpan(
                                     children: [
                                       TextSpan(
                                         text: 'Dalaba',
-                                        style: TextStyle(color: DP.navy),
+                                        style: TextStyle(color: DP.navyInk),
                                       ),
                                       TextSpan(
                                         text: 'pay',
@@ -175,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen>
                                   'Smart Life Fast Pay',
                                   maxLines: 1,
                                   style: DP.body.copyWith(
-                                    color: DP.navy,
+                                    color: DP.navyInk,
                                     fontSize: tagline,
                                     fontWeight: FontWeight.w500,
                                   ),

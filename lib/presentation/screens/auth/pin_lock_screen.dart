@@ -50,7 +50,7 @@ class _PinLockScreenState extends State<PinLockScreen> {
             children: [
               const DPAvatar(name: MockUser.fullName, size: 56),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                 'Welcome back, ${MockUser.firstName}.',
                 style: DP.display,
               ),

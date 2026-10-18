@@ -303,7 +303,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 label: 'Admins',
                 value: '${kAdminUsers.where((u) => u.isAdmin).length}',
                 icon: Icons.admin_panel_settings_outlined,
-                color: DP.navy,
+                color: DP.navyInk,
               ),
               AdminStat(
                 label: 'Awaiting Approval',
@@ -345,7 +345,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                       children: [
                         Text(
                           DP.naira(u.balance, decimals: false),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: DP.ink,
                           ),

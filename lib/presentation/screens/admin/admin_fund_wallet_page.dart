@@ -57,7 +57,7 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
               onChanged: (_) => setSheet(() {}),
             ),
             const SizedBox(height: 10),
-            const Text('Quick Amounts', style: DP.caption),
+            Text('Quick Amounts', style: DP.caption),
             const SizedBox(height: 6),
             QuickAmounts(controller: amount, onChanged: () => setSheet(() {})),
             const SizedBox(height: 14),

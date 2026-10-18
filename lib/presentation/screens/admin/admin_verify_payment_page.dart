@@ -207,9 +207,9 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Manual Verification', style: DP.section),
+                  Text('Manual Verification', style: DP.section),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Credit a user directly when a transfer arrived but wasn\'t matched.',
                     style: DP.caption,
                   ),
@@ -247,7 +247,7 @@ class _AdminVerifyPaymentPageState extends State<AdminVerifyPaymentPage> {
             onAction: () => setState(_log.clear),
           ),
           if (_log.isEmpty)
-            const DPCard(
+            DPCard(
               child: Text(
                 'Verification steps will appear here.',
                 style: DP.caption,

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'presentation/screens/admin/admin_all_transactions_page.dart';
 import 'presentation/screens/admin/admin_control_page.dart';
 import 'presentation/screens/admin/admin_dashboard_screen.dart';
@@ -55,12 +56,7 @@ import 'presentation/screens/wallet/wallet_screen.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ),
-  );
+  ThemeController.instance.apply();
   runApp(const DalabapayApp());
 }
 
@@ -120,11 +116,18 @@ class DalabapayApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    // Rebuilds with the new colours whenever the theme is switched in
+    // Profile → Appearance.
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.instance,
+      builder: (context, mode, _) => MaterialApp(
       title: 'Dalabapay',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      // AppTheme.current already reflects light/dark, so one theme is used.
+      theme: AppTheme.current,
       themeMode: ThemeMode.light,
+      builder: (context, child) =>
+          ThemeRefresher(child: child ?? const SizedBox.shrink()),
       initialRoute: '/',
       onGenerateRoute: (settings) {
         if (settings.name == '/otp-verification') {
@@ -139,6 +142,7 @@ class DalabapayApp extends StatelessWidget {
         final builder = routes[settings.name] ?? routes['/dashboard']!;
         return MaterialPageRoute(settings: settings, builder: builder);
       },
+      ),
     );
   }
 }

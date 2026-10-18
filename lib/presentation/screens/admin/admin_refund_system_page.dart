@@ -211,7 +211,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(DP.naira(t.amount),
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontWeight: FontWeight.w700, color: DP.ink)),
                           const SizedBox(height: 3),
                           DPTextLink(
@@ -285,7 +285,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
               children: [
                 Text(
                   DP.naira(d.amount),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.w700, color: DP.ink),
                 ),
                 const Spacer(),

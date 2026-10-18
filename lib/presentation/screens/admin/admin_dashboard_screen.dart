@@ -63,7 +63,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         DPIconSquare(
           icon: DPIcons.bell,
           size: 40,
-          color: DP.navy,
+          color: DP.navyInk,
           background: Colors.transparent,
           semanticLabel: 'Admin alerts',
           onTap: () => Navigator.pushNamed(context, '/admin/alerts'),
@@ -110,7 +110,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   label: 'Transactions',
                   value: '$txns',
                   icon: Icons.receipt_long_outlined,
-                  color: DP.navy,
+                  color: DP.navyInk,
                   sub: '+5.1%',
                 ),
                 AdminStat(
@@ -168,7 +168,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       children: [
                         Text(
                           DP.naira(t.amount),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: DP.ink,
                           ),

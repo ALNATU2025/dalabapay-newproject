@@ -174,7 +174,7 @@ class _AdminTransactionLimitsPageState
                   title: s,
                   subtitle:
                       '${_fmt(limits[s]!.perTxn)} per txn · ${_fmt(limits[s]!.daily)} daily',
-                  trailing: const Icon(DPIcons.edit, size: 18, color: DP.muted),
+                  trailing: Icon(DPIcons.edit, size: 18, color: DP.muted),
                 ),
             ],
           ),
@@ -193,7 +193,7 @@ class _AdminTransactionLimitsPageState
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
-          const Text('Manage user limits & service availability',
+          Text('Manage user limits & service availability',
               style: DP.caption),
           const SizedBox(height: 12),
           DPSegmented(
@@ -215,7 +215,7 @@ class _AdminTransactionLimitsPageState
                         '${_fmt(_defaults[s]!.perTxn)} per transaction\n${_fmt(_defaults[s]!.daily)} daily cap',
                     subtitleMaxLines: 2,
                     trailing:
-                        const Icon(DPIcons.edit, size: 18, color: DP.muted),
+                        Icon(DPIcons.edit, size: 18, color: DP.muted),
                   ),
               ],
             ),
@@ -235,7 +235,7 @@ class _AdminTransactionLimitsPageState
             DPSelectField(
               value: null,
               hint: 'Search by name, email, phone or ID...',
-              leading: const Icon(DPIcons.search, size: 20, color: DP.muted),
+              leading: Icon(DPIcons.search, size: 20, color: DP.muted),
               onTap: _pickUser,
             ),
             const SizedBox(height: 16),
@@ -256,7 +256,7 @@ class _AdminTransactionLimitsPageState
                         name: u.name,
                         subtitle: u.email,
                         onTap: () => _openUserLimits(u),
-                        trailing: const Icon(DPIcons.chevronRight,
+                        trailing: Icon(DPIcons.chevronRight,
                             color: DP.muted),
                       );
                     }(),
@@ -301,7 +301,7 @@ class _AdminTransactionLimitsPageState
             ),
             const SizedBox(height: 20),
             const DPSectionHeader('Service Controls'),
-            const Text('Enable or disable individual services',
+            Text('Enable or disable individual services',
                 style: DP.caption),
             const SizedBox(height: 10),
             DPCard(
@@ -310,7 +310,7 @@ class _AdminTransactionLimitsPageState
                 children: [
                   for (final s in _serviceNames) ...[
                     if (s != _serviceNames.first)
-                      const Divider(height: 1, color: DP.borderSoft),
+                      Divider(height: 1, color: DP.borderSoft),
                     DPMenuRow(
                       icon: Icons.toggle_on_outlined,
                       title: s,
