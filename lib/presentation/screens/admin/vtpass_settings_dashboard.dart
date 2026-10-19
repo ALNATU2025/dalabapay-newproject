@@ -154,7 +154,7 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
     final providerName = str(bill['name'], 'none');
     final env = str(bill['environment'], providerName);
     final configured = bill['configured'] == true;
-    final live = env == 'live';
+    final live = env.contains('live');
     final balance = _provider['balance'] == null ? null : toDouble(_provider['balance']);
     final low = _provider['lowBalance'] == true;
     final threshold = toDouble(_provider['lowBalanceThreshold']);
@@ -186,14 +186,16 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
                   Row(
                     children: [
                       Text(
-                        '${providerName == 'none' ? 'Bill provider' : providerName.toUpperCase()} Balance',
+                        '${providerName.contains('vtpass') ? 'VTpass' : (providerName == 'none' ? 'Bill provider' : providerName.toUpperCase())} Balance',
                         style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
                       ),
                       const Spacer(),
                       StatusPill(
                         !configured
                             ? 'Not connected'
-                            : (live ? 'Live Mode' : '${_cap(env)} Mode'),
+                            : (live
+                                ? 'Live Mode'
+                                : (env.contains('sandbox') ? 'Sandbox Mode' : '${_cap(env)} Mode')),
                         color: live ? const Color(0xFF7FE3BC) : DP.amberBg,
                       ),
                     ],
@@ -242,9 +244,16 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Column(
                 children: [
-                  DPSummaryRow('Bill provider', providerName),
-                  DPSummaryRow('Mode', env),
+                  DPSummaryRow('Bill providers', providerName),
                   DPSummaryRow('Payment provider', str(asMap(_provider['payment'])['name'], 'none')),
+                  for (final e in asMap(bill['services']).entries)
+                    DPSummaryRow(
+                      str(labels[e.key], e.key),
+                      asMap(e.value)['configured'] == true
+                          ? '${str(asMap(e.value)['provider'])} · ${str(asMap(e.value)['environment'])}'
+                          : '${str(asMap(e.value)['provider'])} · not connected',
+                      valueColor: asMap(e.value)['configured'] == true ? null : DP.red,
+                    ),
                 ],
               ),
             ),

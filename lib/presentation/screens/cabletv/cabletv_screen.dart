@@ -88,8 +88,23 @@ class _CableTvScreenState extends State<CableTvScreen> {
     'change': 'Change package',
   };
 
+  /// Whether this decoder can be renewed at the provider's renewal price
+  /// (StarTimes can't; it is always "choose a package").
+  bool get _canRenew =>
+      _customer['canRenew'] != false && toDouble(_customer['renewalAmount']) > 0;
+
+  /// Most months that can be paid at once (StarTimes: 1).
+  int get _maxMonths {
+    final m = toInt(_customer['maxMonths']);
+    return m <= 0 ? 12 : m;
+  }
+
+  Map<String, String> get _availableActions => _canRenew
+      ? _actions
+      : {'change': _actions['change']!};
+
   /// The customer's current package, from the smartcard check.
-  Plan? get _currentPlan => _customer['currentPlanCode'] == null
+  Plan? get _currentPlan => !_canRenew || _customer['currentPlanCode'] == null
       ? null
       : Plan(
           str(_customer['currentPlanCode']),
@@ -134,6 +149,8 @@ class _CableTvScreenState extends State<CableTvScreen> {
         _isValidating = false;
         _isValidated = true;
         _customer = r;
+        if (!_canRenew) _selectedAction = 'change';
+        if (_quantity > _maxMonths) _quantity = _maxMonths;
       });
     } catch (e) {
       if (!mounted) return;
@@ -314,9 +331,17 @@ class _CableTvScreenState extends State<CableTvScreen> {
                                       fontSize: 14,
                                     ),
                                   ),
-                                  if (_currentPlan != null)
+                                  if (_customer['currentPlan'] != null)
                                     Text(
-                                      'Current: ${_currentPlan!.name}',
+                                      'Current: ${str(_customer['currentPlan'])}',
+                                      style: const TextStyle(
+                                        color: DP.green,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  if (_customer['balance'] != null)
+                                    Text(
+                                      'Decoder balance: ${DP.naira(toDouble(_customer['balance']))}',
                                       style: const TextStyle(
                                         color: DP.green,
                                         fontSize: 12.5,
@@ -339,13 +364,13 @@ class _CableTvScreenState extends State<CableTvScreen> {
                       const SizedBox(height: 20),
                       const SectionTitle('What do you want to do?'),
                       DPChipRow(
-                        options: _actions.values.toList(),
+                        options: _availableActions.values.toList(),
                         selected: _selectedAction == null
                             ? null
                             : _actions[_selectedAction],
                         height: 46,
                         onSelect: (label) => setState(() {
-                          _selectedAction = _actions.entries
+                          _selectedAction = _availableActions.entries
                               .firstWhere((e) => e.value == label)
                               .key;
                           _selectedPlan = null;
@@ -527,12 +552,12 @@ class _CableTvScreenState extends State<CableTvScreen> {
                 ),
               ),
             ),
-            step(DPIcons.plus, _quantity < 12,
+            step(DPIcons.plus, _quantity < _maxMonths,
                 () => setState(() => _quantity++)),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
-                'Max 12 months',
+                _maxMonths == 1 ? 'One period at a time' : 'Max $_maxMonths months',
                 textAlign: TextAlign.right,
                 style: DP.caption,
               ),
