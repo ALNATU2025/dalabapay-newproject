@@ -67,7 +67,7 @@ jobs:
           code=$?
           python3 - <<'PY'
           import json
-          names, n = {}, 0
+          names, n, printed = {}, 0, {}
           for line in open('ui.jsonl'):
               try:
                   e = json.loads(line)
@@ -75,9 +75,11 @@ jobs:
                   continue
               if e.get('type') == 'testStart':
                   names[e['test']['id']] = e['test']['name']
+              if e.get('type') == 'print':
+                  printed[e['testID']] = printed.get(e['testID'], '') + e.get('message', '') + '\n'
               if e.get('type') == 'error' and n < 30:
                   n += 1
-                  msg = (e.get('error', '') + '\n' + e.get('stackTrace', ''))[:1500]
+                  msg = (printed.get(e['testID'], '')[:1200] + '\n' + e.get('error', '') + '\n' + e.get('stackTrace', ''))[:2000]
                   msg = msg.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
                   print(f"::error title={names.get(e['testID'], 'test')[:100]}::{msg}")
           PY

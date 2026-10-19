@@ -66,17 +66,21 @@ Future<void> snap(
   tester.view.physicalSize = size * 2;
   tester.view.devicePixelRatio = 2;
   addTearDown(tester.view.reset);
-  // Draw real blurred shadows (tests flatten them by default).
+  // Draw real blurred shadows (tests flatten them by default). The flag
+  // must be back to its default before the test ends.
   debugDisableShadows = false;
-  addTearDown(() => debugDisableShadows = true);
-  DP.isDark = dark;
-  await tester.pumpWidget(shell(Builder(builder: (_) => build()), dark: dark));
-  // Let entrance animations finish (repeating ones never settle).
-  for (var i = 0; i < 12; i++) {
-    await tester.pump(const Duration(milliseconds: 250));
+  try {
+    DP.isDark = dark;
+    await tester.pumpWidget(shell(Builder(builder: (_) => build()), dark: dark));
+    // Let entrance animations finish (repeating ones never settle).
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('screenshots/$name${dark ? '_dark' : ''}.png'),
+    );
+  } finally {
+    debugDisableShadows = true;
   }
-  await expectLater(
-    find.byType(MaterialApp),
-    matchesGoldenFile('screenshots/$name${dark ? '_dark' : ''}.png'),
-  );
 }
