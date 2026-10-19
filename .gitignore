@@ -31,3 +31,4 @@ ios/Flutter/flutter_export_environment.sh
 
 # Build-time keys (passed with --dart-define-from-file)
 secrets.json
+test/ui/screenshots/

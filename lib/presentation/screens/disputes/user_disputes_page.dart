@@ -293,7 +293,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
       backgroundColor: DP.bg,
       body: SafeArea(
         child: _loading
-            ? const Column(children: [DPTopBar(title: 'My Disputes'), Expanded(child: DPLoading())])
+            ? const Column(children: [DPTopBar(title: 'My Disputes'), Expanded(child: SingleChildScrollView(child: DPLoading.list(rows: 4)))])
             : _error != null && _disputes.isEmpty
             ? Column(children: [
                 const DPTopBar(title: 'My Disputes'),

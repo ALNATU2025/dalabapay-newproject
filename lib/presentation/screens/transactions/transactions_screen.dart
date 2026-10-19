@@ -245,7 +245,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     ),
                   ),
                   if (_loading && items.isEmpty)
-                    const SliverToBoxAdapter(child: DPLoading())
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+                        child: DPSkeletonList(rows: 6, card: false),
+                      ),
+                    )
                   else if (_error != null && items.isEmpty)
                     SliverToBoxAdapter(
                       child: DPLoadError(error: _error, onRetry: _reload),

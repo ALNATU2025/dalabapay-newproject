@@ -288,7 +288,7 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
           ),
           const SizedBox(height: 14),
           if (_loading)
-            const DPLoading()
+            const DPLoading.list(rows: 6, padding: 0)
           else if (_error != null && items.isEmpty)
             DPLoadError(error: _error, onRetry: _load)
           else if (items.isEmpty)

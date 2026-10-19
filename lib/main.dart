@@ -8,6 +8,7 @@ import 'core/api/api.dart';
 import 'core/api/session.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'ui/ui.dart';
 import 'presentation/screens/admin/admin_all_transactions_page.dart';
 import 'presentation/screens/admin/admin_control_page.dart';
 import 'presentation/screens/admin/admin_dashboard_screen.dart';
@@ -56,7 +57,15 @@ import 'presentation/screens/wallet/wallet_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  // Phones stay upright; tablets and desktops may rotate (the layout is
+  // centred there, see DPResponsiveFrame).
+  final views = WidgetsBinding.instance.platformDispatcher.views;
+  final phone = views.isEmpty ||
+      views.first.physicalSize.shortestSide / views.first.devicePixelRatio <
+          DPBreakpoints.medium;
+  if (phone) {
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  }
   ThemeController.instance.apply();
   // Saved login rejected by the server (expired, password changed,
   // account deactivated): back to the login screen.
@@ -145,8 +154,10 @@ class DalabapayApp extends StatelessWidget {
       // AppTheme.current already reflects light/dark, so one theme is used.
       theme: AppTheme.current,
       themeMode: ThemeMode.light,
-      builder: (context, child) =>
-          ThemeRefresher(child: child ?? const SizedBox.shrink()),
+      navigatorObservers: [DPRouteWatcher.instance],
+      builder: (context, child) => ThemeRefresher(
+        child: DPResponsiveFrame(child: child ?? const SizedBox.shrink()),
+      ),
       initialRoute: '/',
       onGenerateRoute: (settings) {
         if (settings.name == '/otp-verification') {

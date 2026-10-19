@@ -1642,8 +1642,9 @@ class DPEmptyState extends StatelessWidget {
   }
 }
 
-/// Grey placeholder block for loading states.
-class DPSkeleton extends StatelessWidget {
+/// Placeholder block for loading states, with a soft light sweep moving
+/// across it (still when the system asks for reduced motion).
+class DPSkeleton extends StatefulWidget {
   final double width;
   final double height;
   final double radius;
@@ -1655,14 +1656,116 @@ class DPSkeleton extends StatelessWidget {
   });
 
   @override
+  State<DPSkeleton> createState() => _DPSkeletonState();
+}
+
+class _DPSkeletonState extends State<DPSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (DPMotion.reduced(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      // Every skeleton on screen shares the same phase, so the sweep moves
+      // across the page as one.
+      _c.value = (DateTime.now().millisecondsSinceEpoch % 1400) / 1400;
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: DP.borderSoft,
-        borderRadius: BorderRadius.circular(radius),
+    final base = DP.borderSoft;
+    final shine = DP.isDark ? const Color(0xFF253049) : const Color(0xFFFFFFFF);
+    return ExcludeSemantics(
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) {
+          // Centre of the light band travels from off the left edge to off
+          // the right edge.
+          final x = -2.0 + 4.0 * _c.value;
+          return Container(
+            width: widget.width,
+            height: widget.height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(widget.radius),
+              gradient: LinearGradient(
+                begin: Alignment(x - 1, -0.3),
+                end: Alignment(x + 1, 0.3),
+                colors: [base, shine, base],
+                stops: const [0.25, 0.5, 0.75],
+              ),
+            ),
+          );
+        },
       ),
+    );
+  }
+}
+
+/// Skeleton for a list of rows (icon, two lines, amount) — the shape of
+/// transactions, notifications and most admin lists.
+class DPSkeletonList extends StatelessWidget {
+  final int rows;
+  final bool card;
+  const DPSkeletonList({super.key, this.rows = 5, this.card = true});
+
+  @override
+  Widget build(BuildContext context) {
+    final list = Column(
+      children: [
+        for (var i = 0; i < rows; i++) ...[
+          if (i > 0) Divider(height: 1, color: DP.borderSoft),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                const DPSkeleton(width: 42, height: 42, radius: DP.rMd),
+                DPSpace.w12,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FractionallySizedBox(
+                        widthFactor: i.isEven ? 0.7 : 0.55,
+                        child: const DPSkeleton(height: 13),
+                      ),
+                      DPSpace.h8,
+                      const FractionallySizedBox(
+                        widthFactor: 0.4,
+                        child: DPSkeleton(height: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                DPSpace.w12,
+                const DPSkeleton(width: 64, height: 13),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+    return Semantics(
+      label: 'Loading',
+      child: card
+          ? DPCard(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: list,
+            )
+          : list,
     );
   }
 }

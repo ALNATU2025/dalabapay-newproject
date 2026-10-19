@@ -61,10 +61,13 @@ class DP {
   static Color get redLine => isDark ? const Color(0xFF5C2B2E) : const Color(0xFFF8CFD0);
 
   // ── Radii ─────────────────────────────────────────────────
+  static const double rXs = 6;
   static const double rSm = 10;
   static const double rMd = 12;
   static const double rLg = 14;
   static const double rXl = 18;
+  static const double rXxl = 24;
+  static const double rPill = 999;
 
   // ── Spacing ───────────────────────────────────────────────
   static const double gutter = 24;
@@ -140,6 +143,40 @@ class DP {
     BoxShadow(color: Color(0x0D10255A), blurRadius: 16, offset: Offset(0, 6)),
   ];
 
+  // ── Elevation ─────────────────────────────────────────────
+  // Shadows are tinted navy in light mode and almost black in dark mode so
+  // raised surfaces read the same way in both themes.
+  static List<BoxShadow> get shadowSm => [
+        BoxShadow(
+          color: isDark ? const Color(0x33000000) : const Color(0x0A10255A),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ];
+  static List<BoxShadow> get shadowMd => [
+        BoxShadow(
+          color: isDark ? const Color(0x4D000000) : const Color(0x1210255A),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+        ),
+      ];
+  static List<BoxShadow> get shadowLg => [
+        BoxShadow(
+          color: isDark ? const Color(0x66000000) : const Color(0x1A10255A),
+          blurRadius: 36,
+          offset: const Offset(0, 16),
+        ),
+      ];
+
+  /// Coloured glow under a brand surface (balance card, primary button).
+  static List<BoxShadow> glow(Color c, {double strength = 1}) => [
+        BoxShadow(
+          color: c.withValues(alpha: (isDark ? 0.35 : 0.28) * strength),
+          blurRadius: 24,
+          offset: const Offset(0, 10),
+        ),
+      ];
+
   /// Navy balance card (Home).
   static const LinearGradient navyGradient = LinearGradient(
     begin: Alignment.topLeft,
@@ -167,6 +204,32 @@ class DP {
     final s = parts.length > 1 ? '$whole.${parts[1]}' : whole;
     return '${neg ? '-' : ''}₦$s';
   }
+}
+
+/// Spacing scale (4-point grid). Use these instead of loose numbers so
+/// screens line up with each other.
+class DPSpace {
+  DPSpace._();
+  static const double xxs = 4;
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 20;
+  static const double xl = 24;
+  static const double xxl = 32;
+  static const double xxxl = 48;
+
+  static const SizedBox h4 = SizedBox(height: xxs);
+  static const SizedBox h8 = SizedBox(height: xs);
+  static const SizedBox h12 = SizedBox(height: sm);
+  static const SizedBox h16 = SizedBox(height: md);
+  static const SizedBox h20 = SizedBox(height: lg);
+  static const SizedBox h24 = SizedBox(height: xl);
+  static const SizedBox h32 = SizedBox(height: xxl);
+  static const SizedBox w4 = SizedBox(width: xxs);
+  static const SizedBox w8 = SizedBox(width: xs);
+  static const SizedBox w12 = SizedBox(width: sm);
+  static const SizedBox w16 = SizedBox(width: md);
 }
 
 /// Icon set for the redesign. Material outlined/rounded glyphs chosen to match

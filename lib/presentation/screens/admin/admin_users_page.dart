@@ -411,7 +411,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           ),
           const SizedBox(height: 14),
           if (_loading)
-            const DPLoading()
+            const DPLoading.list(rows: 6, padding: 0)
           else if (_error != null && users.isEmpty)
             DPLoadError(error: _error, onRetry: _load)
           else if (users.isEmpty)

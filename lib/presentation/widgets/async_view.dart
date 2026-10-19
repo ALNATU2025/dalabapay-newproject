@@ -61,7 +61,7 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
   Widget build(BuildContext context) {
     final data = _data;
     if (data != null) return widget.builder(context, data, _reload);
-    if (_loading) return widget.loading ?? const DPLoading();
+    if (_loading) return widget.loading ?? const DPLoading.list();
     return Padding(
       padding: widget.padding,
       child: DPLoadError(error: _error, onRetry: _reload),
@@ -71,10 +71,22 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
 
 class DPLoading extends StatelessWidget {
   final double padding;
-  const DPLoading({super.key, this.padding = 40});
+  final int? _rows;
+  const DPLoading({super.key, this.padding = 40}) : _rows = null;
+
+  /// Shimmering list skeleton instead of a spinner — for screens whose
+  /// content is a list.
+  const DPLoading.list({super.key, int rows = 5, this.padding = 20})
+      : _rows = rows;
 
   @override
   Widget build(BuildContext context) {
+    if (_rows != null) {
+      return Padding(
+        padding: EdgeInsets.all(padding),
+        child: DPSkeletonList(rows: _rows),
+      );
+    }
     return Padding(
       padding: EdgeInsets.all(padding),
       child: Center(

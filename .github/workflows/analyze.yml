@@ -48,6 +48,46 @@ jobs:
       - name: Fail on errors
         run: test "$(cat errors.count)" = "0"
 
+  # Widget tests for the design system + screenshots for review.
+  widgets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Widget tests and screenshots
+        run: |
+          set +e
+          flutter test test/ui test/widget_test.dart --update-goldens -r json > ui.jsonl
+          code=$?
+          python3 - <<'PY'
+          import json
+          names, n = {}, 0
+          for line in open('ui.jsonl'):
+              try:
+                  e = json.loads(line)
+              except Exception:
+                  continue
+              if e.get('type') == 'testStart':
+                  names[e['test']['id']] = e['test']['name']
+              if e.get('type') == 'error' and n < 30:
+                  n += 1
+                  msg = (e.get('error', '') + '\n' + e.get('stackTrace', ''))[:1500]
+                  msg = msg.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+                  print(f"::error title={names.get(e['testID'], 'test')[:100]}::{msg}")
+          PY
+          exit $code
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: test/ui/screenshots/
+          if-no-files-found: ignore
+
   # Runs the app's API client against the real backend + MongoDB.
   contract:
     runs-on: ubuntu-latest

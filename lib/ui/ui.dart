@@ -11,3 +11,4 @@ export 'dp_review.dart';
 export 'dp_motion.dart';
 export 'dp_catalog.dart';
 export 'dp_wave_background.dart';
+export 'dp_responsive.dart';

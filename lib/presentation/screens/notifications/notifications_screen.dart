@@ -182,7 +182,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             Expanded(
               child: _loading
-                  ? const DPLoading()
+                  ? const SingleChildScrollView(child: DPLoading.list(rows: 6))
                   : _error != null && _items.isEmpty
                   ? DPLoadError(error: _error, onRetry: _load)
                   : _items.isEmpty
