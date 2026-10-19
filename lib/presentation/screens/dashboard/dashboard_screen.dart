@@ -530,6 +530,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: 'No transactions yet',
         message: 'Add money to your wallet to start paying bills.',
         actionLabel: 'Add Money',
+        animated: true,
         onAction: () => _go('/wallet'),
       );
     } else {

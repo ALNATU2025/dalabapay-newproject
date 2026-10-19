@@ -360,6 +360,7 @@ class _UserDisputesPageState extends State<UserDisputesPage> {
           icon: Icons.gavel_rounded,
           title: 'No disputes',
           message: 'If something went wrong with a payment, report it here.',
+          animated: true,
         ),
       );
     }

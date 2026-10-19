@@ -191,6 +191,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         icon: DPIcons.bell,
                         title: 'No notifications yet',
                         message: 'Your notifications will appear here',
+                        animated: true,
                       ),
                     )
                   : RefreshIndicator(

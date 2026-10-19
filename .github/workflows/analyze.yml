@@ -51,6 +51,8 @@ jobs:
   # Widget tests for the design system + screenshots for review.
   widgets:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -80,6 +82,26 @@ jobs:
                   print(f"::error title={names.get(e['testID'], 'test')[:100]}::{msg}")
           PY
           exit $code
+      # Also published to the ui-screenshots branch (one folder per branch)
+      # so they can be viewed from anywhere with git.
+      - name: Publish screenshots
+        if: always() && github.event_name == 'push'
+        run: |
+          [ -d test/ui/screenshots ] || exit 0
+          dest="$RUNNER_TEMP/shots"
+          git clone --quiet --depth 1 --branch ui-screenshots \
+            "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" "$dest" \
+            || (mkdir -p "$dest" && cd "$dest" && git init -q -b ui-screenshots \
+                && git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}")
+          rm -rf "$dest/${{ github.ref_name }}"
+          mkdir -p "$dest/${{ github.ref_name }}"
+          cp test/ui/screenshots/*.png "$dest/${{ github.ref_name }}/"
+          cd "$dest"
+          git config user.name "ci-screenshots"
+          git config user.email "ci@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Screenshots for ${{ github.ref_name }} @ ${GITHUB_SHA::7}" || exit 0
+          git push -q origin HEAD:ui-screenshots
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4

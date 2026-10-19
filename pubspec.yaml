@@ -19,6 +19,8 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   share_plus: ^10.1.4
   url_launcher: ^6.3.1
+  # Animations for success, loading and empty states (assets/animations/)
+  lottie: ^3.1.2
 
 dev_dependencies:
   flutter_test:
@@ -37,6 +39,7 @@ flutter:
     - assets/images/onboarding_2.png
     - assets/images/onboarding_3.png
     - assets/images/app_barlogo.png
+    - assets/animations/
 flutter_launcher_icons:
   android: true
   ios: true

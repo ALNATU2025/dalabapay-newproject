@@ -90,10 +90,16 @@ class DPLoading extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.all(padding),
       child: Center(
-        child: SizedBox(
-          width: 28,
-          height: 28,
-          child: CircularProgressIndicator(strokeWidth: 2.6, color: DP.green),
+        child: DPLottie(
+          DPLottie.loading,
+          width: 72,
+          height: 36,
+          semanticLabel: 'Loading',
+          fallback: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.6, color: DP.green),
+          ),
         ),
       ),
     );

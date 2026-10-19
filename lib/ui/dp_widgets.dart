@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'dp_logo.dart';
+import 'dp_lottie.dart';
 import 'dp_motion.dart';
 import 'dp_tokens.dart';
 
@@ -1607,6 +1608,10 @@ class DPEmptyState extends StatelessWidget {
   final String? message;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  /// Shows the floating-card animation instead of the icon (lists that are
+  /// empty because nothing has happened yet, not because of an error).
+  final bool animated;
   const DPEmptyState({
     super.key,
     required this.icon,
@@ -1614,6 +1619,7 @@ class DPEmptyState extends StatelessWidget {
     this.message,
     this.actionLabel,
     this.onAction,
+    this.animated = false,
   });
 
   @override
@@ -1624,7 +1630,15 @@ class DPEmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
       child: Column(
         children: [
-          DPIconBadge(icon, size: 56, iconSize: 26),
+          if (animated)
+            DPLottie(
+              DPLottie.empty,
+              width: 150,
+              height: 120,
+              fallback: DPIconBadge(icon, size: 56, iconSize: 26),
+            )
+          else
+            DPIconBadge(icon, size: 56, iconSize: 26),
           const SizedBox(height: 14),
           Text(title, style: DP.bodyStrong, textAlign: TextAlign.center),
           if (message != null) ...[

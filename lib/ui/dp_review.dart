@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import 'dp_logo.dart';
+import 'dp_lottie.dart';
 import 'dp_motion.dart';
 import 'dp_tokens.dart';
 import 'dp_widgets.dart';
@@ -275,7 +276,7 @@ class DPSuccessPanel extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
                 children: [
-                  Center(child: DPStatusHero(kind: kind, size: 92)),
+                  _SuccessHero(kind: kind),
                   DPAppear(
                     delay: d(380),
                     child: Text(
@@ -341,6 +342,43 @@ class DPSuccessPanel extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The status mark at the top of the success screen. A completed payment
+/// gets the Lottie tick with a confetti burst; pending keeps the clock.
+class _SuccessHero extends StatelessWidget {
+  final DPStatusKind kind;
+  const _SuccessHero({required this.kind});
+
+  @override
+  Widget build(BuildContext context) {
+    final hero = DPStatusHero(kind: kind, size: 92);
+    if (kind != DPStatusKind.success) return Center(child: hero);
+    return SizedBox(
+      height: 132,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          DPLottie(
+            DPLottie.success,
+            width: 132,
+            height: 132,
+            repeat: false,
+            semanticLabel: 'Payment successful',
+            fallback: hero,
+          ),
+          const IgnorePointer(
+            child: OverflowBox(
+              maxWidth: 360,
+              maxHeight: 360,
+              child: DPLottie(DPLottie.celebrate, width: 360, height: 360, repeat: false),
+            ),
+          ),
+        ],
       ),
     );
   }
