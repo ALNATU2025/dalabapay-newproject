@@ -51,7 +51,13 @@ lib/
     api/session.dart           the logged-in user (balance, role, KYC, PIN…)
     api/catalog.dart           cached networks, limits, recent recipients
     format.dart                dates and safe JSON readers
-  ui/                          design system (colours, type, widgets, motion)
+  ui/                          design system
+    dp_tokens.dart             colours, type, radii, spacing (DPSpace), shadows
+    dp_widgets.dart            buttons, fields, chips, cards, lists, nav, skeletons
+    dp_cards.dart              balance card + quick actions
+    dp_motion.dart             page transitions, appear/float/press animations
+    dp_lottie.dart             Lottie animations with static fallbacks
+    dp_responsive.dart         centred layout on tablets/desktop/web, text-scale cap
   presentation/
     widgets/payment_flow.dart  Review → PIN → success / pending / failed
     widgets/async_view.dart    loading, error and retry states
@@ -81,6 +87,8 @@ Service Commission · Transaction Limits.
 ## Checks
 GitHub Actions runs on every push:
 - `flutter analyze`
+- widget tests for the design system (`test/ui/`), which also produce the
+  screenshots
 - a **contract test** (`test/api_contract_test.dart`) that starts the real
   backend with MongoDB and runs every request the screens make — sign-up,
   payments for each service, history, earnings, disputes, KYC and all admin
@@ -92,6 +100,32 @@ To run the contract test yourself, start the backend first, then:
 BACKEND_DIR=../newproject-backend flutter test test/api_contract_test.dart \
   --dart-define=API_URL=http://localhost:4000
 ```
+
+## Design system
+- **Tokens** live in `lib/ui/dp_tokens.dart`: brand colours (light and dark),
+  type styles, radii (`DP.rSm` … `DP.rXxl`), spacing (`DPSpace.md`, `DPSpace.h16`…)
+  and elevation (`DP.shadowSm/Md/Lg`, `DP.glow(colour)`). Use them instead of
+  loose numbers.
+- **Responsive**: phones use the full width. On tablets, desktop and the web
+  the app is centred (560 px; the admin console gets 1200 px). System text
+  size is honoured up to 130 %.
+- **Loading** uses shimmer skeletons (`DPSkeleton`, `DPSkeletonList`,
+  `DPLoading.list()`); empty lists can use the animated empty state
+  (`DPEmptyState(animated: true)`).
+- **Motion** respects the phone's “reduce motion” setting everywhere.
+
+### Animations (Lottie)
+`assets/animations/` holds four small brand-coloured Lottie files:
+`success`, `celebrate` (payment success), `loading` and `empty`. To use an
+animation from LottieFiles instead, replace the file with the same name.
+If a file is missing or broken the app shows the built-in version, so it
+never breaks a screen. (Rive files can be added the same way later with the
+`rive` package; none are used yet.)
+
+### Screenshots
+CI renders the design system (light, dark, tablet and animation frames) on
+every push and publishes the images to the `ui-screenshots` branch, one
+folder per branch — handy for reviewing UI changes without a device.
 
 ## Theme
 Profile → **Appearance**: Normal, Dark or System.
