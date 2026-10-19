@@ -129,7 +129,31 @@ class _InternationalAirtimeScreenState
   double get _foreign => _fixed
       ? toDouble(_variation?['amount'])
       : (double.tryParse(_amount.text.trim()) ?? 0);
-  double get _naira => _foreign * _rate;
+  /// Rate for the chosen plan (VTpass gives one per plan), else the operator's.
+  double get _planRate {
+    final r = toDouble(_variation?['rate']);
+    return r > 0 ? r : _rate;
+  }
+
+  /// Fixed plans may come with the naira price already worked out.
+  double? get _fixedNaira {
+    final n = toDouble(_variation?['nairaAmount']);
+    return _fixed && n > 0 ? n : null;
+  }
+
+  double get _naira => _fixedNaira ?? _foreign * _planRate;
+
+  /// What the recipient gets: the local amount, or the plan name when the
+  /// plan is a bundle without a local-currency value.
+  String _receives(String currency) =>
+      _foreign > 0 ? _money(currency, _foreign) : str(_variation?['name']);
+
+  String _planPrice(Map<String, dynamic> v, String currency) {
+    final n = toDouble(v['nairaAmount']);
+    if (n > 0) return DP.naira(n);
+    final a = toDouble(v['amount']);
+    return a > 0 ? _money(currency, a) : '';
+  }
 
   String _money(String cur, double v) => '$cur ${v.toStringAsFixed(2)}';
 
@@ -142,7 +166,7 @@ class _InternationalAirtimeScreenState
       dpSnack(context, 'Choose a plan', error: true);
       return;
     }
-    if (_phone.text.trim().length < 5 || _foreign <= 0) {
+    if (_phone.text.trim().length < 5 || _naira <= 0) {
       dpSnack(context, 'Enter the phone number and amount', error: true);
       return;
     }
@@ -170,9 +194,10 @@ class _InternationalAirtimeScreenState
       rows: [
         DPReviewRow('Phone number', '${c.dialCode} ${_phone.text.trim()}'),
         DPReviewRow('Network', _operator!),
-        DPReviewRow('Recipient receives', _money(c.currency, _foreign)),
+        DPReviewRow('Recipient receives', _receives(c.currency)),
         if (_fixed) DPReviewRow('Plan', str(_variation!['name'])),
-        DPReviewRow('Exchange rate', '1 ${c.currency} ≈ ${DP.naira(_rate)}'),
+        if (_fixedNaira == null && _planRate > 0)
+          DPReviewRow('Exchange rate', '1 ${c.currency} ≈ ${DP.naira(_planRate)}'),
         const DPReviewRow('Service fee', '₦0.00'),
         DPReviewRow('You pay', DP.naira(_naira), strong: true),
       ],
@@ -313,7 +338,7 @@ class _InternationalAirtimeScreenState
                                   Expanded(child: Text(str(v['name']), style: DP.bodyStrong)),
                                   if (v['fixed'] == true)
                                     Text(
-                                      _money(c.currency, toDouble(v['amount'])),
+                                      _planPrice(v, c.currency),
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: DP.green,
@@ -359,12 +384,13 @@ class _InternationalAirtimeScreenState
                           children: [
                             DPSummaryRow(
                               'Recipient receives',
-                              _money(c.currency, _foreign),
+                              _receives(c.currency),
                             ),
-                            DPSummaryRow(
-                              'Estimated exchange rate',
-                              '1 ${c.currency} ≈ ${DP.naira(_rate)}',
-                            ),
+                            if (_fixedNaira == null && _planRate > 0)
+                              DPSummaryRow(
+                                'Estimated exchange rate',
+                                '1 ${c.currency} ≈ ${DP.naira(_planRate)}',
+                              ),
                             DPSummaryRow('Airtime value', DP.naira(_naira)),
                             const DPSummaryRow('Service fee', '₦0.00'),
                             DPSummaryRow(
