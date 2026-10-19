@@ -229,6 +229,26 @@ class _ReviewPageState extends State<_ReviewPage> {
       });
     } on ApiException catch (e) {
       if (!mounted) return;
+      if (e.isNetwork) {
+        // The request may have reached the server: never invite a retry
+        // that could pay twice. Send the customer to History instead.
+        setState(() => _processing = false);
+        await Session.instance.refreshQuietly();
+        if (!mounted) return;
+        await dpDialog(
+          context,
+          title: 'We couldn\'t confirm this payment',
+          message:
+              'Your connection dropped while paying. Please check Transaction History before trying again — if it went through, it\'s there.',
+          confirmLabel: 'Open History',
+          tone: DPTone.warning,
+        );
+        if (!mounted) return;
+        final nav = Navigator.of(context);
+        nav.pop();
+        nav.pushNamed('/transactions');
+        return;
+      }
       if (e.code == 'PIN_NOT_SET') {
         setState(() => _processing = false);
         final go = await dpDialog(

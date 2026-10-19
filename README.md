@@ -15,12 +15,14 @@ the server.
 
 ```bash
 flutter pub get
-# Android emulator → your computer's localhost (the default)
+# Live server on Render (the default)
 flutter run
+# Android emulator → backend on your own computer
+flutter run --dart-define=API_URL=http://10.0.2.2:4000
 # A phone on the same Wi-Fi as your computer
 flutter run --dart-define=API_URL=http://192.168.1.20:4000
-# Production
-flutter build apk --dart-define=API_URL=https://api.yourdomain.com
+# Live server (the default — no flag needed)
+flutter build apk --release
 ```
 
 Plain `http://` is allowed only for local addresses (10.0.2.2, localhost,

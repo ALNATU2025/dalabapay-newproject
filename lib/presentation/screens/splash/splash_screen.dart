@@ -54,6 +54,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   /// Saved login → unlock with PIN; first launch → onboarding; else login.
   Future<void> _checkRouteAfterSplash() async {
+    api.warmUp();
     final results = await Future.wait([
       Session.instance.restore(),
       api.readFlag('onboarded'),

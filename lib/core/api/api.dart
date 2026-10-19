@@ -1,9 +1,9 @@
 // lib/core/api/api.dart
 // HTTP client for the DalabaPay backend (newproject-backend).
 //
-// The server address comes from --dart-define=API_URL=https://your-server
-// (default: http://10.0.2.2:4000, which is "localhost" from the Android
-// emulator). Every response is { success, data } or
+// The server address comes from --dart-define=API_URL=… and defaults to
+// the live server on Render. For a backend on your own computer use
+// --dart-define=API_URL=http://10.0.2.2:4000 (Android emulator). Every response is { success, data } or
 // { success:false, code, message }; errors become [ApiException].
 import 'dart:async';
 import 'dart:convert';
@@ -16,9 +16,10 @@ class ApiConfig {
   ApiConfig._();
   static const String baseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://10.0.2.2:4000',
+    defaultValue: 'https://newproject-backend-bod8.onrender.com',
   );
-  static const Duration timeout = Duration(seconds: 40);
+  // Render's free plan can take ~50 s to wake up.
+  static const Duration timeout = Duration(seconds: 70);
 }
 
 class ApiException implements Exception {
@@ -139,6 +140,13 @@ class Api {
 
   Future<dynamic> delete(String path) =>
       _send(() => _client.delete(_uri(path), headers: _headers));
+
+  /// Wakes the server (Render sleeps when idle). Never throws.
+  Future<void> warmUp() async {
+    try {
+      await _client.get(_uri('/health')).timeout(ApiConfig.timeout);
+    } catch (_) {}
+  }
 
   /// Raw text download (CSV export).
   Future<String> getText(String path, {Map<String, dynamic>? query}) async {

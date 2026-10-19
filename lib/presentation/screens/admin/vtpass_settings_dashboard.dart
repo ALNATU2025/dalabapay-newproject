@@ -23,6 +23,7 @@ class VtpassSettingsDashboard extends StatefulWidget {
 class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
   Map<String, dynamic> _settings = {};
   Map<String, dynamic> _provider = {};
+  Map<String, dynamic> _readiness = {};
   bool _loading = true;
   Object? _error;
   bool _checking = false;
@@ -53,7 +54,13 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
         api.get('/api/admin/provider'),
       ]);
       if (!mounted) return;
+      Map<String, dynamic> ready = {};
+      try {
+        ready = asMap(await api.get('/api/admin/readiness'));
+      } catch (_) {}
+      if (!mounted) return;
       setState(() {
+        _readiness = ready;
         _settings = asMap(results[0]);
         _provider = asMap(results[1]);
         _message.text = str(_settings['maintenanceMessage']);
@@ -126,6 +133,63 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
       message: str(r['message'], ok ? 'Credentials are valid.' : 'The provider rejected the credentials.'),
       confirmLabel: 'Close',
       tone: ok ? DPTone.success : DPTone.error,
+    );
+  }
+
+  Widget _readinessCard() {
+    final ready = _readiness['ready'] == true;
+    final checks = asList(_readiness['checks']);
+    (IconData, Color) look(String status) => switch (status) {
+          'ok' => (DPIcons.checkCircle, DP.green),
+          'warn' => (DPIcons.info, DP.amber),
+          _ => (DPIcons.alert, DP.red),
+        };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DPSectionHeader(
+          'Go-live checklist',
+          actionLabel: 'Re-check',
+          onAction: _load,
+        ),
+        DPBanner(
+          ready
+              ? 'Ready for real transactions. Make one small payment first.'
+              : 'Not ready for real money yet — fix the red items below.',
+          tone: ready ? DPTone.success : DPTone.error,
+          icon: ready ? DPIcons.checkCircle : DPIcons.alert,
+        ),
+        const SizedBox(height: 10),
+        DPCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: Column(
+            children: [
+              for (final c in checks)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(look(str(c['status'])).$1,
+                          size: 20, color: look(str(c['status'])).$2),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(str(c['label']), style: DP.bodyStrong),
+                            const SizedBox(height: 2),
+                            Text(str(c['detail']), style: DP.caption),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -237,6 +301,10 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
                 tone: DPTone.warning,
                 icon: DPIcons.alert,
               ),
+            ],
+            if (_readiness.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              _readinessCard(),
             ],
             const SizedBox(height: 20),
             const DPSectionHeader('Environment'),
