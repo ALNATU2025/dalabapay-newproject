@@ -9,6 +9,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -47,6 +48,9 @@ class ApiException implements Exception {
 /// A readable message for any error thrown while calling the API.
 String errorMessage(Object e) {
   if (e is ApiException) return e.message;
+  // Not from the server: print it so it shows in the debug console.
+  debugPrint('Unexpected error: $e');
+  if (kDebugMode) return 'Something went wrong: $e';
   return 'Something went wrong. Please try again.';
 }
 
@@ -164,7 +168,18 @@ class Api {
     } on SocketException {
       throw const ApiException(0, 'NETWORK',
           'Can\'t reach DalabaPay. Check your internet connection.');
-    } on http.ClientException {
+    } on http.ClientException catch (e) {
+      debugPrint('Network error: $e');
+      throw const ApiException(0, 'NETWORK',
+          'Can\'t reach DalabaPay. Check your internet connection.');
+    } on HandshakeException catch (e) {
+      // Usually a wrong date/time on the phone, or a network that
+      // intercepts HTTPS.
+      debugPrint('Secure connection failed: $e');
+      throw const ApiException(0, 'NETWORK',
+          'Secure connection failed. Check the date and time on your phone, or try another network.');
+    } on IOException catch (e) {
+      debugPrint('Network error: $e');
       throw const ApiException(0, 'NETWORK',
           'Can\'t reach DalabaPay. Check your internet connection.');
     }
@@ -198,6 +213,7 @@ class Api {
     final errors = body is Map && body['errors'] is List
         ? body['errors'] as List
         : const [];
+    debugPrint('API ${res.request?.method} ${res.request?.url.path} → ${res.statusCode} $code: $message');
     if (res.statusCode == 401 && hasToken && code != 'INVALID_CREDENTIALS') {
       clearToken();
       onUnauthorized?.call();
