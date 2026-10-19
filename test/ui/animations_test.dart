@@ -42,7 +42,7 @@ void main() {
       await snap(
         tester,
         'anim_$name',
-        Center(
+        () => Center(
           child: Wrap(
             spacing: 8,
             runSpacing: 8,

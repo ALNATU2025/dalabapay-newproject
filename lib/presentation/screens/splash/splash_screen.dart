@@ -160,7 +160,19 @@ class _SplashScreenState extends State<SplashScreen>
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              DPLogoMark(size: logo),
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: DP.green.withValues(alpha: 0.18),
+                                      blurRadius: logo * 0.6,
+                                      spreadRadius: logo * 0.05,
+                                    ),
+                                  ],
+                                ),
+                                child: DPLogoMark(size: logo),
+                              ),
                               SizedBox(height: logo * 0.18),
                               FittedBox(
                                 fit: BoxFit.scaleDown,

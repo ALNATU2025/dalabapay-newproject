@@ -184,16 +184,16 @@ void main() {
 
   for (final dark in [false, true]) {
     testWidgets('components${dark ? ' (dark)' : ''}', (tester) async {
-      await snap(tester, 'components', _components(), dark: dark);
+      await snap(tester, 'components', _components, dark: dark);
     });
     testWidgets('lists${dark ? ' (dark)' : ''}', (tester) async {
-      await snap(tester, 'lists', _lists(), dark: dark);
+      await snap(tester, 'lists', _lists, dark: dark);
     });
     testWidgets('home${dark ? ' (dark)' : ''}', (tester) async {
-      await snap(tester, 'home', _home(), dark: dark);
+      await snap(tester, 'home', _home, dark: dark);
     });
     testWidgets('history${dark ? ' (dark)' : ''}', (tester) async {
-      await snap(tester, 'history', _history(), dark: dark);
+      await snap(tester, 'history', _history, dark: dark);
     });
   }
 

@@ -125,6 +125,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: DPButton(
                 label: isLast ? 'Get Started' : 'Next',
+                icon: DPIcons.forward,
                 onPressed: _goToNextPage,
               ),
             ),
@@ -188,7 +189,26 @@ class OnboardingContent extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 height: c.maxHeight * 0.58,
-                child: Image.asset(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Soft brand glow behind the illustration.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            radius: 0.62,
+                            colors: [
+                              DP.green.withValues(alpha: DP.isDark ? 0.18 : 0.12),
+                              DP.green.withValues(alpha: 0),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: DPFloat(
+                        child: Image.asset(
                   data.image,
                   fit: BoxFit.contain,
                   gaplessPlayback: true,
@@ -202,6 +222,10 @@ class OnboardingContent extends StatelessWidget {
                           : null,
                     );
                   },
+                ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -290,11 +314,12 @@ class AnimatedDot extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
       height: 8,
-      width: 8,
+      width: isActive ? 24 : 8,
       decoration: BoxDecoration(
         color: isActive ? DP.green : DP.border,
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(DP.rPill),
       ),
     );
   }

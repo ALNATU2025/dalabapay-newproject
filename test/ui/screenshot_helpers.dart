@@ -59,14 +59,18 @@ Widget shell(Widget child, {bool dark = false}) {
 Future<void> snap(
   WidgetTester tester,
   String name,
-  Widget widget, {
+  Widget Function() build, {
   Size size = const Size(390, 844),
   bool dark = false,
 }) async {
   tester.view.physicalSize = size * 2;
   tester.view.devicePixelRatio = 2;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(shell(widget, dark: dark));
+  // Draw real blurred shadows (tests flatten them by default).
+  debugDisableShadows = false;
+  addTearDown(() => debugDisableShadows = true);
+  DP.isDark = dark;
+  await tester.pumpWidget(shell(Builder(builder: (_) => build()), dark: dark));
   // Let entrance animations finish (repeating ones never settle).
   for (var i = 0; i < 12; i++) {
     await tester.pump(const Duration(milliseconds: 250));

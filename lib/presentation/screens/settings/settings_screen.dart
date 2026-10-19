@@ -510,74 +510,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildProfileHeader() {
-    return Row(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: DP.blueTint,
-                shape: BoxShape.circle,
-              ),
-              child: ClipOval(
-                child: SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: DPAvatar(name: _user?.fullName ?? '', size: 72),
-                ),
+    const onNavy = Color(0xB3FFFFFF);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: DP.navyGradient,
+        borderRadius: BorderRadius.circular(DP.rXxl),
+        boxShadow: DP.glow(DP.navy, strength: 0.8),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
+            ),
+            child: ClipOval(
+              child: SizedBox(
+                width: 64,
+                height: 64,
+                child: DPAvatar(name: _user?.fullName ?? '', size: 64),
               ),
             ),
-          ],
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _user?.fullName ?? '',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: DP.ink,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-              Text(_user?.phone ?? '', style: DP.caption),
-              const SizedBox(height: 2),
-              Text(
-                _user?.email ?? '',
-                style: DP.caption,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 6),
-              if (_kycVerified)
-                const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.verified_rounded, size: 16, color: DP.green),
-                    SizedBox(width: 4),
-                    Text(
-                      'Verified',
-                      style: TextStyle(
-                        color: DP.green,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                _statusChip(_kycLabel == 'Not started' ? 'Not verified' : _kycLabel, _kycColor),
-            ],
           ),
-        ),
-      ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _user?.fullName ?? '',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(_user?.phone ?? '', style: const TextStyle(color: onNavy, fontSize: 13)),
+                const SizedBox(height: 1),
+                Text(
+                  _user?.email ?? '',
+                  style: const TextStyle(color: onNavy, fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(DP.rPill),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _kycVerified ? Icons.verified_rounded : DPIcons.badge,
+                        size: 14,
+                        color: _kycVerified ? const Color(0xFF7FE3BC) : const Color(0xFFFFD58A),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _kycVerified
+                            ? 'Verified'
+                            : (_kycLabel == 'Not started' ? 'Not verified' : _kycLabel),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

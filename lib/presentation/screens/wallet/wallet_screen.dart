@@ -267,14 +267,8 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: DP.greenGradient,
-            borderRadius: BorderRadius.circular(DP.rXl),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x33079A68),
-                blurRadius: 18,
-                offset: Offset(0, 8),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(DP.rXxl),
+            boxShadow: DP.glow(DP.green),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

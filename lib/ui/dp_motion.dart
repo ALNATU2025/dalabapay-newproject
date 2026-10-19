@@ -156,6 +156,59 @@ class _DPAppearState extends State<DPAppear>
   }
 }
 
+/// Bobs its child gently up and down (illustrations, hero art). Still
+/// when the system asks for reduced motion.
+class DPFloat extends StatefulWidget {
+  final Widget child;
+  final double distance;
+  final Duration period;
+  const DPFloat({
+    super.key,
+    required this.child,
+    this.distance = 8,
+    this.period = const Duration(milliseconds: 3200),
+  });
+
+  @override
+  State<DPFloat> createState() => _DPFloatState();
+}
+
+class _DPFloatState extends State<DPFloat> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: widget.period);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (DPMotion.reduced(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_c.value);
+        return Transform.translate(
+          offset: Offset(0, widget.distance * (0.5 - t)),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
 /// Shrinks slightly while pressed — tactile feedback for buttons and tiles.
 /// It only listens to the pointer, so taps still reach the child.
 class DPPressable extends StatefulWidget {
