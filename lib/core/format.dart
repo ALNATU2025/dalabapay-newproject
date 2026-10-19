@@ -30,6 +30,24 @@ String dateTimeLabel(DateTime d) {
   return '${d.day} ${_months[d.month - 1]} ${d.year}, $hh:$mm';
 }
 
+/// Group heading for lists: "Today", "Yesterday", "Mon, 12 Oct" (with the
+/// year when it isn't this year).
+String dayLabel(DateTime d) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(d.year, d.month, d.day);
+  final diff = today.difference(day).inDays;
+  if (diff == 0) return 'Today';
+  if (diff == 1) return 'Yesterday';
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final base = '${days[d.weekday - 1]}, ${d.day} ${_months[d.month - 1]}';
+  return d.year == now.year ? base : '$base ${d.year}';
+}
+
+/// True when [a] and [b] fall on the same calendar day.
+bool sameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
 /// "18 Jan 2026"
 String dateLabel(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
 

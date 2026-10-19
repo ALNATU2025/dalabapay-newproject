@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dalabapay/core/format.dart';
 import 'package:dalabapay/presentation/widgets/transaction_widgets.dart';
 import 'package:dalabapay/ui/ui.dart';
 
@@ -111,6 +112,72 @@ Widget _lists() {
   );
 }
 
+Widget _home() {
+  return Column(
+    children: [
+      Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Hello, Amaka!', style: DP.title),
+              Text('Good morning', style: DP.caption),
+              DPSpace.h16,
+              DPBalanceCard(
+                balance: 124850.5,
+                earnings: 2310,
+                visible: true,
+                onToggleVisible: () {},
+                onEarnings: () {},
+                actions: [
+                  DPQuickAction(DPIcons.plus, 'Add Money', () {}),
+                  DPQuickAction(DPIcons.upRight, 'Send', () {}),
+                  DPQuickAction(DPIcons.receipt, 'Pay Bills', () {}),
+                  DPQuickAction(DPIcons.history, 'History', () {}),
+                ],
+              ),
+              DPSpace.h20,
+              DPSectionHeader('Essential Services', actionLabel: 'More', onAction: () {}),
+              DPServiceGrid(columns: 3, tiles: [
+                DPServiceTile(icon: DPIcons.receipt, label: 'Pay Bill', color: DP.green, onTap: () {}),
+                DPServiceTile(icon: DPIcons.tv, label: 'Pay TV', color: DP.navyIcon, onTap: () {}),
+                DPServiceTile(icon: DPIcons.globe, label: 'International Airtime', color: DP.navyIcon, onTap: () {}),
+              ]),
+              DPSpace.h20,
+              DPSectionHeader('Transaction History', actionLabel: 'See All', onAction: () {}),
+              DPCard(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Column(children: [
+                  TransactionRow(tx: _rows[0]),
+                  Divider(height: 1, color: DP.borderSoft),
+                  TransactionRow(tx: _rows[1]),
+                ]),
+              ),
+            ],
+          ),
+        ),
+      ),
+      DPBottomNav(index: 0, items: kDPTabs, onTap: (_) {}, onCenter: () {}),
+    ],
+  );
+}
+
+Widget _history() {
+  return ListView(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    children: [
+      for (var i = 0; i < _rows.length; i++) ...[
+        if (i == 0 || !sameDay(parseDate(_rows[i]['createdAt']), parseDate(_rows[i - 1]['createdAt'])))
+          TransactionDayHeader(parseDate(_rows[i]['createdAt']))
+        else
+          Divider(height: 1, color: DP.borderSoft),
+        TransactionRow(tx: _rows[i], detailed: true),
+      ],
+    ],
+  );
+}
+
 void main() {
   setUpAll(loadTestFonts);
   tearDown(() => DP.isDark = false);
@@ -122,7 +189,30 @@ void main() {
     testWidgets('lists${dark ? ' (dark)' : ''}', (tester) async {
       await snap(tester, 'lists', _lists(), dark: dark);
     });
+    testWidgets('home${dark ? ' (dark)' : ''}', (tester) async {
+      await snap(tester, 'home', _home(), dark: dark);
+    });
+    testWidgets('history${dark ? ' (dark)' : ''}', (tester) async {
+      await snap(tester, 'history', _history(), dark: dark);
+    });
   }
+
+  testWidgets('tablet frame', (tester) async {
+    tester.view.physicalSize = const Size(1024, 768) * 1.5;
+    tester.view.devicePixelRatio = 1.5;
+    addTearDown(tester.view.reset);
+    DP.isDark = false;
+    await tester.pumpWidget(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(fontFamily: 'Roboto', scaffoldBackgroundColor: DP.bg),
+      builder: (context, child) => DPResponsiveFrame(child: child!),
+      home: Scaffold(backgroundColor: DP.bg, body: SafeArea(child: _home())),
+    ));
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('screenshots/tablet.png'));
+  });
 
   testWidgets('wide screens centre the app', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);

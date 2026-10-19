@@ -304,7 +304,9 @@ class DPButton extends StatelessWidget {
         duration: DPMotion.fast,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(DP.rLg),
-          boxShadow: const [],
+          boxShadow: enabled && DP.resolve(background).a > 0.9
+              ? DP.glow(DP.resolve(background), strength: 0.55)
+              : const [],
         ),
         child: Material(
         color: enabled
@@ -527,7 +529,12 @@ class DPField extends StatelessWidget {
       counterText: '',
       errorText: errorText,
       errorMaxLines: 3,
-      errorStyle: const TextStyle(color: DP.red, fontSize: 12.5),
+      errorStyle: const TextStyle(
+        color: DP.red,
+        fontSize: 12.5,
+        height: 1.3,
+        fontWeight: FontWeight.w500,
+      ),
       prefixText: prefixText,
       prefixStyle: TextStyle(
         color: DP.ink,
@@ -549,9 +556,9 @@ class DPField extends StatelessWidget {
       border: b(DP.border),
       enabledBorder: b(DP.border),
       disabledBorder: b(DP.borderSoft),
-      focusedBorder: b(DP.green, 1.4),
-      errorBorder: b(DP.red),
-      focusedErrorBorder: b(DP.red, 1.4),
+      focusedBorder: b(DP.green, 1.8),
+      errorBorder: b(DP.red, 1.2),
+      focusedErrorBorder: b(DP.red, 1.8),
     );
   }
 
@@ -1440,17 +1447,22 @@ class DPServiceTile extends StatelessWidget {
       child: DPPressable(
         enabled: onTap != null && !disabled,
         pressedScale: 0.94,
-        child: Material(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(DP.rXl),
+            boxShadow: disabled ? const [] : DP.shadowSm,
+          ),
+          child: Material(
           color: DP.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DP.rLg),
-            side: BorderSide(color: DP.border),
+            borderRadius: BorderRadius.circular(DP.rXl),
+            side: BorderSide(color: DP.borderSoft),
           ),
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(DP.rLg),
+            borderRadius: BorderRadius.circular(DP.rXl),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 12, 4, 10),
+              padding: const EdgeInsets.fromLTRB(4, 14, 4, 12),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1458,12 +1470,12 @@ class DPServiceTile extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       Container(
-                        width: 42,
-                        height: 42,
+                        width: 46,
+                        height: 46,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: tint ?? c.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(DP.rLg),
                         ),
                         child: image == null
                             ? iconWidget
@@ -1508,7 +1520,7 @@ class DPServiceTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.2,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: disabled ? DP.faint : DP.ink,
                     ),
                   ),
@@ -1516,6 +1528,7 @@ class DPServiceTile extends StatelessWidget {
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -2143,15 +2156,30 @@ class DPBottomNav extends StatelessWidget {
       size: 24,
     );
     return Expanded(
-      child: InkWell(
+      child: Semantics(
+        selected: active,
+        button: true,
+        label: it.label,
+        excludeSemantics: true,
+        child: InkWell(
         onTap: () => onTap(i),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedScale(
-                scale: active ? 1.12 : 1,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                width: active ? 56 : 40,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: active ? DP.mint : Colors.transparent,
+                  borderRadius: BorderRadius.circular(DP.rPill),
+                ),
+                child: AnimatedScale(
+                scale: active ? 1.06 : 1,
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutBack,
                 child: SizedBox(
@@ -2170,8 +2198,9 @@ class DPBottomNav extends StatelessWidget {
                           ),
                         ),
                 ),
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 it.label,
                 maxLines: 1,
@@ -2184,6 +2213,7 @@ class DPBottomNav extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -2202,9 +2232,16 @@ class DPBottomNav extends StatelessWidget {
     final bar = Container(
       decoration: BoxDecoration(
         color: DP.surface,
-        border: Border(top: BorderSide(color: DP.border)),
+        border: Border(top: BorderSide(color: DP.borderSoft)),
+        boxShadow: [
+          BoxShadow(
+            color: DP.isDark ? const Color(0x40000000) : const Color(0x0F10255A),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
-      padding: EdgeInsets.only(top: 8, bottom: 6 + bottom),
+      padding: EdgeInsets.only(top: 6, bottom: 6 + bottom),
       child: Row(children: row),
     );
     if (onCenter == null) return bar;
@@ -2510,35 +2547,52 @@ void dpSnack(
 }) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
-  final Color bg = error
-      ? DP.red
-      : (success
-          ? DP.green
-          : (DP.isDark ? const Color(0xFF2A3753) : DP.ink));
+  final Color bg = DP.isDark ? const Color(0xFF22304D) : const Color(0xFF0F1D3D);
+  final Color accent = error
+      ? const Color(0xFFFF7A7E)
+      : (success ? const Color(0xFF5BD6A6) : const Color(0xFF8CB4FF));
   final IconData ic =
-      error ? DPIcons.alert : (success ? DPIcons.checkCircle : DPIcons.info);
+      error ? DPIcons.alert : (success ? DPIcons.check : DPIcons.info);
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: bg,
-        elevation: 0,
+        elevation: 6,
+        duration: Duration(milliseconds: error ? 5000 : 3500),
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.fromLTRB(12, 12, 16, 12),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(DP.rMd),
+          borderRadius: BorderRadius.circular(DP.rLg),
         ),
-        content: Row(
-          children: [
-            Icon(ic, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+        content: Semantics(
+          liveRegion: true,
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(ic, color: accent, size: 18),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2588,7 +2642,11 @@ Future<bool?> dpDialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DP.rXl),
       ),
-      child: Padding(
+      child: DPAppear(
+        scaleFrom: 0.92,
+        offsetY: 10,
+        duration: const Duration(milliseconds: 260),
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -2623,6 +2681,7 @@ Future<bool?> dpDialog(
               ),
             ],
           ],
+        ),
         ),
       ),
     ),

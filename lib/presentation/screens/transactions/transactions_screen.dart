@@ -280,14 +280,21 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
-                          (context, i) => Column(
-                            children: [
-                              if (i > 0)
-                                Divider(
-                                    height: 1, color: DP.borderSoft),
-                              TransactionRow(tx: items[i], detailed: true),
-                            ],
-                          ),
+                          (context, i) {
+                            final day = parseDate(items[i]['createdAt']);
+                            final newDay = i == 0 ||
+                                !sameDay(day, parseDate(items[i - 1]['createdAt']));
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (newDay)
+                                  TransactionDayHeader(day)
+                                else
+                                  Divider(height: 1, color: DP.borderSoft),
+                                TransactionRow(tx: items[i], detailed: true),
+                              ],
+                            );
+                          },
                           childCount: items.length,
                         ),
                       ),

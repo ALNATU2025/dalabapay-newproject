@@ -64,14 +64,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return r;
   }
 
-  static const TextStyle _balanceStyle = TextStyle(
-    color: Colors.white,
-    fontSize: 30,
-    fontWeight: FontWeight.w800,
-    letterSpacing: -0.5,
-    fontFeatures: [FontFeature.tabularFigures()],
-  );
-
   static const List<DPService> _payBillGroup = [
     DPService('Electricity', DPIcons.bolt, '/electricity', DPAssets.svcElectricity, DP.green),
     DPService('Airtime', DPIcons.smartphone, '/airtime', DPAssets.svcAirtime, DP.navyIcon),
@@ -302,119 +294,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 
   Widget _buildBalanceCard() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        gradient: DP.navyGradient,
-        borderRadius: BorderRadius.circular(DP.rXl),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x3315368A),
-            blurRadius: 20,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Wallet Balance',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              InkResponse(
-                radius: 20,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  setState(() => _isBalanceVisible = !_isBalanceVisible);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(
-                    _isBalanceVisible ? DPIcons.eye : DPIcons.eyeOff,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 40,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: Align(
-                key: ValueKey('bal_$_isBalanceVisible'),
-                alignment: Alignment.centerLeft,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: _isBalanceVisible
-                      ? DPCountUp(
-                          value: Session.instance.user?.balance ?? 0,
-                          format: (v) => DP.naira(v),
-                          style: _balanceStyle,
-                        )
-                      : const Text('₦ ••••••', style: _balanceStyle),
-                ),
-              ),
+    final user = Session.instance.user;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: DPLayout.gutter(context)),
+      child: DPBalanceCard(
+        balance: user?.balance ?? 0,
+        earnings: user?.commissionBalance ?? 0,
+        visible: _isBalanceVisible,
+        onToggleVisible: () =>
+            setState(() => _isBalanceVisible = !_isBalanceVisible),
+        onEarnings: () => _go('/commission'),
+        actions: [
+          DPQuickAction(DPIcons.plus, 'Add Money', () => _go('/wallet')),
+          DPQuickAction(DPIcons.upRight, 'Send', () => _go('/send-money')),
+          DPQuickAction(
+            DPIcons.receipt,
+            'Pay Bills',
+            () => _showServiceGroup(
+              'Pay Bill',
+              'Electricity, airtime and data',
+              _payBillGroup,
             ),
           ),
-          const SizedBox(height: 4),
-          GestureDetector(
-            onTap: () => _go('/commission'),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(DPIcons.sparkle, size: 14, color: Color(0xFF7FE3BC)),
-                const SizedBox(width: 5),
-                Text(
-                  'Earnings ${_isBalanceVisible ? DP.naira(Session.instance.user?.commissionBalance ?? 0) : '₦ ••••'}',
-                  style: const TextStyle(
-                    color: Color(0xFF7FE3BC),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Icon(
-                  DPIcons.chevronRight,
-                  size: 16,
-                  color: Color(0xFF7FE3BC),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: DPButton(
-                  label: 'Add Money',
-                  leadingIcon: DPIcons.plus,
-                  height: 46,
-                  background: DP.greenBright,
-                  onPressed: () => _go('/wallet'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DPButton(
-                  label: 'Send Money',
-                  height: 46,
-                  background: DP.blue,
-                  onPressed: () => _go('/send-money'),
-                ),
-              ),
-            ],
-          ),
+          DPQuickAction(DPIcons.history, 'History', () => _onNavTap(1)),
         ],
       ),
     );

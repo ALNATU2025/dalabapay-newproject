@@ -71,7 +71,9 @@ String transactionTypeLabel(String type) {
   return 'Transaction';
 }
 
-/// One row in a transaction list.
+/// One row in a transaction list. Credits are green, debits stay in the
+/// ink colour (calmer than red for everyday spending), failed payments are
+/// struck through, and anything not yet successful gets a status pill.
 class TransactionRow extends StatelessWidget {
   final Map<String, dynamic> tx;
   final bool detailed;
@@ -85,47 +87,95 @@ class TransactionRow extends StatelessWidget {
     final date = parseDate(tx['createdAt']);
     final status = DPStatus.labelFor(tx['status'] as String?);
     final failed = status == 'Failed';
-    final amountColor = failed ? DP.muted : (isCredit ? DP.green : DP.red);
-    final label = txIsCommissionWallet(tx) ? 'Earnings' : status;
+    final settled = status == 'Successful';
+    final amountColor = failed ? DP.muted : (isCredit ? DP.green : DP.ink);
+    final earnings = txIsCommissionWallet(tx);
 
-    return DPListRow(
-      onTap: () => showTransactionReceipt(context, tx),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      subtitleMaxLines: detailed ? 2 : 1,
-      leading: DPIconBadge(
-        transactionIcon(type),
-        size: detailed ? 46 : 44,
-        iconSize: 21,
-        color: failed ? DP.muted : (isCredit ? DP.green : DP.red),
-        background: failed ? DP.borderSoft : (isCredit ? DP.mint : DP.redBg),
-      ),
-      title: str(tx['description'], transactionTypeLabel(type)),
-      subtitle: detailed
-          ? '${transactionTypeLabel(type)}${status != 'Successful' ? ' · $status' : ''}\n${dateTimeLabel(date)}'
-          : '${timeAgo(date)}  •  $label',
-      trailing: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${failed ? '' : (isCredit ? '+ ' : '- ')}${DP.naira(amount)}',
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-              color: amountColor,
-              decoration: failed ? TextDecoration.lineThrough : null,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-          if (detailed && status != 'Successful')
+    return Semantics(
+      button: true,
+      label:
+          '${str(tx['description'], transactionTypeLabel(type))}, ${isCredit ? 'received' : 'paid'} ${DP.naira(amount)}, $status, ${dateTimeLabel(date)}',
+      excludeSemantics: true,
+      child: DPListRow(
+        onTap: () => showTransactionReceipt(context, tx),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        subtitleMaxLines: 1,
+        leading: DPIconBadge(
+          transactionIcon(type),
+          size: detailed ? 46 : 44,
+          iconSize: 21,
+          color: failed ? DP.muted : (isCredit ? DP.green : DP.navyInk),
+          background: failed ? DP.borderSoft : (isCredit ? DP.mint : DP.blueTint),
+        ),
+        title: str(tx['description'], transactionTypeLabel(type)),
+        subtitle: detailed
+            ? '${transactionTypeLabel(type)} · ${_time(date)}'
+            : '${timeAgo(date)}${earnings ? '  •  Earnings' : ''}',
+        trailing: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Text(
-              failed ? 'No debit' : status,
+              '${failed ? '' : (isCredit ? '+ ' : '- ')}${DP.naira(amount)}',
               style: TextStyle(
-                fontSize: 11.5,
-                color: DPStatus.colorFor(status),
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: amountColor,
+                decoration: failed ? TextDecoration.lineThrough : null,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-        ],
+            if (!settled) ...[
+              const SizedBox(height: 4),
+              DPStatusPill(failed ? 'Failed · no debit' : status),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _time(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+}
+
+/// Small coloured pill for a status word ("Pending", "Failed").
+class DPStatusPill extends StatelessWidget {
+  final String label;
+  const DPStatusPill(this.label, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = DPStatus.colorFor(label.split(' ').first);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: DP.isDark ? 0.2 : 0.1),
+        borderRadius: BorderRadius.circular(DP.rPill),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c),
+      ),
+    );
+  }
+}
+
+/// Day heading inside a transaction list ("Today", "Yesterday"…).
+class TransactionDayHeader extends StatelessWidget {
+  final DateTime day;
+  const TransactionDayHeader(this.day, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(2, 18, 2, 6),
+        child: Text(
+          dayLabel(day).toUpperCase(),
+          style: DP.tiny.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.8),
+        ),
       ),
     );
   }

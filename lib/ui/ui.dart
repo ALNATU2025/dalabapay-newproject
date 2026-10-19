@@ -13,3 +13,4 @@ export 'dp_catalog.dart';
 export 'dp_wave_background.dart';
 export 'dp_responsive.dart';
 export 'dp_lottie.dart';
+export 'dp_cards.dart';
