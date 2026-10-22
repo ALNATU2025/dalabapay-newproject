@@ -128,13 +128,17 @@ class DPCountryPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (final c in DPCountry.all) ...[
-          if (c != DPCountry.all.first) const SizedBox(width: 12),
-          Expanded(child: _card(c)),
+    // Both cards share the taller one's height.
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final c in DPCountry.all) ...[
+            if (c != DPCountry.all.first) const SizedBox(width: 12),
+            Expanded(child: _card(c)),
+          ],
         ],
-      ],
+      ),
     );
   }
 
