@@ -21,6 +21,9 @@ dependencies:
   url_launcher: ^6.3.1
   # Animations for success, loading and empty states (assets/animations/)
   lottie: ^3.1.2
+  # Sign-up SMS codes (Firebase Phone Auth) — see lib/core/firebase_setup.dart
+  firebase_core: ^4.14.0
+  firebase_auth: ^6.7.0
 
 dev_dependencies:
   flutter_test:

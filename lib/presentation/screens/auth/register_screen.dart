@@ -9,6 +9,8 @@ import 'package:flutter/services.dart';
 import '../../../core/api/api.dart';
 import '../../../core/api/session.dart';
 import '../../../core/dev_code.dart';
+import '../../../core/firebase_setup.dart';
+import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -28,6 +30,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _otpController = TextEditingController();
 
   /// NG or SL — decides the account's services, dashboard and currency.
+  /// Set when the server verifies sign-ups by SMS (Firebase) instead of
+  /// an email code.
+  bool _sms = false;
+  String _phoneE164 = '';
+  bool _sendingSms = false;
+  final _smsVerifier = SmsVerification();
+
   /// Null until the person picks one (they must choose).
   String? _country;
   DPCountry get _countryInfo => DPCountry.of(_country);
@@ -117,12 +126,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'referralCode': _referralCodeController.text.trim(),
       });
       if (!mounted) return;
+      final data = asMap(r);
       setState(() {
         _isLoading = false;
         _showVerifyStep = true;
+        _sms = data['verification'] == 'sms';
+        _phoneE164 = str(data['phoneE164']);
       });
-      _startResendTimer();
-      showDevCode(context, r);
+      if (_sms) {
+        await _sendSms();
+      } else {
+        _startResendTimer();
+        showDevCode(context, r);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -140,7 +156,69 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
+  /// Asks Firebase to text the code (also used for "Resend code").
+  Future<void> _sendSms() async {
+    setState(() {
+      _sendingSms = true;
+      _error = null;
+    });
+    try {
+      await _smsVerifier.send(
+        _phoneE164,
+        onCodeSent: () {
+          if (!mounted) return;
+          setState(() => _sendingSms = false);
+          _startResendTimer();
+          dpSnack(context, 'Code sent to $_phoneE164', success: true);
+        },
+        // Android can read the SMS itself: finish without typing.
+        onAutoVerified: (idToken) {
+          if (mounted && !_isLoading) _finishWithFirebase(idToken);
+        },
+        onError: (message) {
+          if (!mounted) return;
+          setState(() {
+            _sendingSms = false;
+            _error = message;
+          });
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sendingSms = false;
+        _error = errorMessage(e);
+      });
+    }
+  }
+
+  /// Firebase confirmed the phone: the server checks the token and creates
+  /// the account.
+  Future<void> _finishWithFirebase(String idToken) async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final data = await api.post('/api/auth/register/verify-phone', {
+        'email': _emailController.text.trim().toLowerCase(),
+        'idToken': idToken,
+      });
+      await Session.instance.start((data as Map).cast<String, dynamic>());
+      await SmsVerification.signOut();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/pin-setup', (_) => false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = errorMessage(e);
+      });
+    }
+  }
+
   Future<void> _resend() async {
+    if (_sms) return _sendSms();
     try {
       final r = await api.post('/api/auth/register/resend',
           {'email': _emailController.text.trim().toLowerCase()});
@@ -155,6 +233,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _verifyAndCreate() async {
     FocusScope.of(context).unfocus();
+    if (_sms) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+      try {
+        final token = await _smsVerifier.confirm(_otpController.text.trim());
+        if (!mounted) return;
+        await _finishWithFirebase(token);
+      } catch (e) {
+        if (!mounted) return;
+        _otpController.clear();
+        setState(() {
+          _isLoading = false;
+          _error = errorMessage(e);
+        });
+      }
+      return;
+    }
     setState(() {
       _isLoading = true;
       _error = null;
@@ -392,19 +489,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final email = _emailController.text.trim();
     return Column(
       children: [
-        DPTopBar(title: 'Verify your email', onBack: _backToDetails),
+        DPTopBar(title: _sms ? 'Verify your phone' : 'Verify your email', onBack: _backToDetails),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const DPIconBadge(DPIcons.mail, size: 64, iconSize: 30),
+                DPIconBadge(_sms ? DPIcons.sms : DPIcons.mail, size: 64, iconSize: 30),
                 const SizedBox(height: 28),
                 Text('One quick check.', style: DP.display),
                 const SizedBox(height: 10),
                 Text(
-                  'Enter the 6-digit code we sent to $email.',
+                  _sms
+                      ? (_sendingSms
+                          ? 'Sending a 6-digit code by SMS to $_phoneE164…'
+                          : 'Enter the 6-digit code we texted to $_phoneE164.')
+                      : 'Enter the 6-digit code we sent to $email.',
                   style: DP.body.copyWith(color: DP.muted),
                 ),
                 const SizedBox(height: 26),
@@ -433,7 +534,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 22),
                 DPButton(
-                  label: _isLoading ? 'Creating your account…' : 'Verify email',
+                  label: _isLoading
+                      ? 'Creating your account…'
+                      : (_sms ? 'Verify phone' : 'Verify email'),
                   loading: _isLoading,
                   onPressed: _otpController.text.trim().length == 6 && !_isLoading
                       ? _verifyAndCreate
@@ -442,13 +545,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 10),
                 Center(
                   child: DPTextLink(
-                    label: 'Change email address',
+                    label: _sms ? 'Change phone number' : 'Change email address',
                     onTap: _isLoading ? null : _backToDetails,
                   ),
                 ),
                 const SizedBox(height: 18),
-                const DPBanner(
-                  'Can\'t find your code? Check your inbox and spam folder. Codes expire after 10 minutes.',
+                DPBanner(
+                  _sms
+                      ? 'The SMS can take up to a minute. Make sure the number is right and your phone has signal.'
+                      : 'Can\'t find your code? Check your inbox and spam folder. Codes expire after 10 minutes.',
                 ),
                 const SizedBox(height: 36),
                 Center(
