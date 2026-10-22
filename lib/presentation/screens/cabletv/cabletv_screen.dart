@@ -149,7 +149,8 @@ class _CableTvScreenState extends State<CableTvScreen> {
         _isValidating = false;
         _isValidated = true;
         _customer = r;
-        if (!_canRenew) _selectedAction = 'change';
+        _selectedPlan = null;
+        _selectedAction = _canRenew ? 'renew' : 'change';
         if (_quantity > _maxMonths) _quantity = _maxMonths;
       });
     } catch (e) {
@@ -309,58 +310,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
                     ),
                     if (_isValidated) ...[
                       const SizedBox(height: 12),
-                      DPCard(
-                        color: DP.mint,
-                        borderColor: null,
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(DPIcons.checkCircle,
-                                color: DP.green, size: 22),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    str(_customer['customerName']),
-                                    style: const TextStyle(
-                                      color: DP.green,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  if (_customer['currentPlan'] != null)
-                                    Text(
-                                      'Current: ${str(_customer['currentPlan'])}',
-                                      style: const TextStyle(
-                                        color: DP.green,
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                  if (_customer['balance'] != null)
-                                    Text(
-                                      'Decoder balance: ${DP.naira(toDouble(_customer['balance']))}',
-                                      style: const TextStyle(
-                                        color: DP.green,
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                  if (_customer['dueDate'] != null)
-                                    Text(
-                                      'Due: ${dateLabel(parseDate(_customer['dueDate']))}',
-                                      style: const TextStyle(
-                                        color: DP.green,
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      DPAppear(child: _buildCustomerDetails()),
                       const SizedBox(height: 20),
                       const SectionTitle('What do you want to do?'),
                       DPChipRow(
@@ -393,6 +343,8 @@ class _CableTvScreenState extends State<CableTvScreen> {
                         _amount > 0) ...[
                       const SizedBox(height: 16),
                       _buildMonths(),
+                      const SizedBox(height: 16),
+                      DPAppear(child: _buildAmountToPay()),
                     ],
                     const SizedBox(height: 20),
                     const DPLabel('Phone number'),
@@ -508,6 +460,69 @@ class _CableTvScreenState extends State<CableTvScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Everything the smartcard check returned, so the customer can confirm
+  /// it's the right decoder before choosing what to pay.
+  Widget _buildCustomerDetails() {
+    final c = _customer;
+    final renewal = toDouble(c['renewalAmount']);
+    return DPCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(DPIcons.checkCircle, color: DP.green, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Smartcard verified',
+                    style: DP.bodyStrong.copyWith(color: DP.green)),
+              ),
+              _providerLogo(_selectedProvider, size: 24),
+            ],
+          ),
+          const SizedBox(height: 6),
+          DPSummaryRow('Customer name', str(c['customerName'])),
+          DPSummaryRow('Smartcard / IUC', _smartCardController.text.trim()),
+          DPSummaryRow('Provider', _selectedProvider ?? ''),
+          if (c['currentPlan'] != null)
+            DPSummaryRow('Current package', str(c['currentPlan'])),
+          if (c['status'] != null && str(c['status']).isNotEmpty)
+            DPSummaryRow('Status', str(c['status'])),
+          if (c['dueDate'] != null)
+            DPSummaryRow('Due date', dateLabel(parseDate(c['dueDate']))),
+          if (c['balance'] != null)
+            DPSummaryRow('Decoder balance', DP.naira(toDouble(c['balance']))),
+          if (_canRenew && renewal > 0)
+            DPSummaryRow('Renewal amount', DP.naira(renewal),
+                strong: true, valueColor: DP.green),
+        ],
+      ),
+    );
+  }
+
+  /// What will be paid: package, months and the total, before review.
+  Widget _buildAmountToPay() {
+    final plan = _selectedAction == 'renew' ? _currentPlan : _selectedPlan;
+    return DPCard(
+      color: DP.mint,
+      borderColor: DP.mintLine,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Column(
+        children: [
+          DPSummaryRow(
+            _selectedAction == 'renew' ? 'Renew' : 'New package',
+            plan?.name.isNotEmpty == true ? plan!.name : 'Current package',
+          ),
+          DPSummaryRow('Price per month', DP.naira(_amount)),
+          DPSummaryRow('Months', '$_quantity'),
+          DPSummaryRow('Amount to pay', DP.naira(_amount * _quantity),
+              strong: true, valueColor: DP.green),
+        ],
       ),
     );
   }
