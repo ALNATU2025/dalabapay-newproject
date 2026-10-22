@@ -3,6 +3,7 @@
 // names update everywhere after a payment or profile change.
 import 'package:flutter/foundation.dart';
 
+import '../../ui/dp_tokens.dart';
 import 'api.dart';
 
 class AppUser {
@@ -27,6 +28,11 @@ class AppUser {
   double get commissionBalance =>
       num.tryParse('${json['commissionBalance']}')?.toDouble() ?? 0;
   String get referralCode => json['referralCode']?.toString() ?? '';
+
+  /// "NG" or "SL". Decides services, dashboard and currency.
+  String get country => json['country']?.toString() ?? 'NG';
+  bool get isSierraLeone => country == 'SL';
+  String get currency => json['currency']?.toString() ?? (isSierraLeone ? 'SLE' : 'NGN');
   List<String> get permissions =>
       (json['permissions'] as List? ?? const []).map((e) => '$e').toList();
   bool can(String permission) => permissions.contains(permission);
@@ -47,6 +53,16 @@ class AppUser {
 class Session extends ValueNotifier<AppUser?> {
   Session._() : super(null);
   static final Session instance = Session._();
+
+  /// Keeps money formatting (DP.naira) in the signed-in user's currency.
+  @override
+  set value(AppUser? u) {
+    DP.currency = u?.currency ?? 'NGN';
+    super.value = u;
+  }
+
+  /// True for Sierra Leone accounts.
+  bool get isSierraLeone => value?.isSierraLeone ?? false;
 
   /// Unread notifications for the bell badge.
   final ValueNotifier<int> unread = ValueNotifier<int>(0);

@@ -66,6 +66,19 @@ class Catalog {
     return _limits!;
   }
 
+  /// Whether a service's provider is connected (payments possible). True
+  /// when the server doesn't say, so older servers keep working.
+  static Future<bool> connected(String service) async {
+    try {
+      final st = asMap(await api.get('/api/services/status'));
+      final c = asMap(st['connected']);
+      final on = asMap(st['services'])[service] != false;
+      return on && (c.isEmpty || c[service] != false);
+    } catch (_) {
+      return true;
+    }
+  }
+
   static Future<ServiceLimit> limitFor(String service) async {
     try {
       return (await limits())[service] ?? const ServiceLimit();

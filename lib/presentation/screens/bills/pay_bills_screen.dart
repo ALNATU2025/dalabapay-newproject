@@ -4,6 +4,7 @@
 // opens it with the same logic as before.
 import 'package:flutter/material.dart';
 
+import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
 
 /// Pushed "All Services" screen (keeps the old PayBillsScreen API).
@@ -55,8 +56,18 @@ class ServicesView extends StatefulWidget {
 class _ServicesViewState extends State<ServicesView> {
   String _query = '';
 
+  bool get _sl => Session.instance.isSierraLeone;
+  List<DPService> get _catalog => servicesFor(sierraLeone: _sl);
+
   String? _routeForType(String text) {
     final t = text.toLowerCase();
+    if (_sl) {
+      if (t.contains('airtime')) return '/sl/airtime';
+      if (t.contains('data')) return '/sl/data';
+      if (t.contains('electric') || t.contains('edsa')) return '/sl/electricity';
+      if (t.contains('cable') || t.contains('tv')) return '/sl/cable';
+      return null;
+    }
     if (t.contains('international')) return '/international-airtime';
     if (t.contains('airtime')) return '/airtime';
     if (t.contains('data') || t.contains('internet')) return '/data';
@@ -73,7 +84,7 @@ class _ServicesViewState extends State<ServicesView> {
   }
 
   IconData _iconForRoute(String route) {
-    for (final s in kDalabapayServices) {
+    for (final s in _catalog) {
       if (s.route == route) return s.icon;
     }
     return DPIcons.receipt;
@@ -122,8 +133,8 @@ class _ServicesViewState extends State<ServicesView> {
   Widget build(BuildContext context) {
     final q = _query.trim().toLowerCase();
     final services = q.isEmpty
-        ? kDalabapayServices
-        : kDalabapayServices
+        ? _catalog
+        : _catalog
             .where((s) => s.name.toLowerCase().contains(q))
             .toList();
     final again = _payAgain();
@@ -210,6 +221,7 @@ class BillsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Session.instance.isSierraLeone) return _sierraLeone(context);
     const tiles = <DPService>[
       DPService('Electricity', DPIcons.bolt, '/electricity', DPAssets.svcElectricity, DP.green),
       DPService('DSTV', DPIcons.tv, '/cable', DPAssets.dstv, DP.navyIcon),
@@ -254,6 +266,48 @@ class BillsScreen extends StatelessWidget {
                       image: DPAssets.bannerBills,
                       icon: DPIcons.bolt,
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Sierra Leone bills: EDSA, TV, airtime and data.
+  Widget _sierraLeone(BuildContext context) {
+    const tiles = <DPService>[
+      DPService('EDSA Electricity', DPIcons.bolt, '/sl/electricity', DPAssets.svcElectricity, DP.green),
+      DPService('DSTV', DPIcons.tv, '/sl/cable', DPAssets.dstv, DP.navyIcon),
+      DPService('GOtv', DPIcons.tv, '/sl/cable', DPAssets.gotv, DP.green),
+      DPService('StarTimes', DPIcons.tv, '/sl/cable', DPAssets.startimes, DP.amber),
+      DPService('Airtime', DPIcons.smartphone, '/sl/airtime', DPAssets.svcAirtime, DP.navyIcon),
+      DPService('Data', DPIcons.wifi, '/sl/data', DPAssets.svcData, DP.navyIcon),
+    ];
+    return Scaffold(
+      backgroundColor: DP.bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            const DPTopBar(title: 'Pay Bills'),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
+                children: [
+                  DPServiceGrid(
+                    columns: 3,
+                    tiles: [
+                      for (final s in tiles)
+                        DPServiceTile(
+                          icon: s.icon,
+                          label: s.name,
+                          image: s.image,
+                          color: s.color,
+                          onTap: () => onSelect(s.route),
+                        ),
+                    ],
                   ),
                 ],
               ),

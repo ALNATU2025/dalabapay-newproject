@@ -119,7 +119,7 @@ class _AdminTransactionStatusPageState
                 DPSummaryRow('Reference', t.ref),
                 DPSummaryRow('Customer', t.userName),
                 DPSummaryRow('Service', t.service),
-                DPSummaryRow('Amount', DP.naira(t.amount), strong: true),
+                DPSummaryRow('Amount', t.money(t.amount), strong: true),
                 DPSummaryRow(
                   'Current',
                   t.status,
@@ -147,7 +147,7 @@ class _AdminTransactionStatusPageState
           if (!isFunding && (next == 'Refunded' || next == 'Failed') && !t.refunded) ...[
             const SizedBox(height: 12),
             DPBanner(
-              '${DP.naira(t.amount)} will be returned to ${t.userName}\'s wallet.',
+              '${t.money(t.amount)} will be returned to ${t.userName}\'s wallet.',
               tone: DPTone.info,
               icon: DPIcons.info,
             ),
@@ -155,7 +155,7 @@ class _AdminTransactionStatusPageState
           if (isFunding && next == 'Successful') ...[
             const SizedBox(height: 12),
             DPBanner(
-              '${DP.naira(t.amount)} will be added to ${t.userName}\'s wallet. Only do this once the money has arrived.',
+              '${t.money(t.amount)} will be added to ${t.userName}\'s wallet. Only do this once the money has arrived.',
               tone: DPTone.warning,
               icon: DPIcons.info,
             ),
@@ -297,7 +297,7 @@ class _AdminTransactionStatusPageState
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          DP.naira(t.amount),
+                          t.money(t.amount),
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: DP.ink,

@@ -191,8 +191,23 @@ class DP {
     colors: [Color(0xFF079A68), Color(0xFF02804F), Color(0xFF026C45)],
   );
 
-  /// ₦ formatting with thousands separators: 124850 → ₦124,850.00
-  static String naira(num? value, {bool decimals = true}) {
+  /// Currency of the signed-in account ("NGN" or "SLE"). Set by Session;
+  /// [naira] formats in it, so every screen shows the user's own money.
+  static String currency = 'NGN';
+
+  /// "₦" or "Le" for the signed-in account.
+  static String get currencySymbol => symbolFor(currency);
+
+  static String symbolFor(String? code) => code == 'SLE' ? 'Le' : '₦';
+
+  /// The signed-in user's money with thousands separators:
+  /// 124850 → ₦124,850.00 (Nigeria) or Le 124,850.00 (Sierra Leone).
+  static String naira(num? value, {bool decimals = true}) =>
+      moneyIn(value, currency, decimals: decimals);
+
+  /// Money in a given currency ("NGN"/"SLE") — for lists that can mix
+  /// countries, such as the admin console.
+  static String moneyIn(num? value, String? code, {bool decimals = true}) {
     final v = (value ?? 0).toDouble();
     final neg = v < 0;
     final fixed = v.abs().toStringAsFixed(decimals ? 2 : 0);
@@ -202,7 +217,8 @@ class DP {
       (m) => ',',
     );
     final s = parts.length > 1 ? '$whole.${parts[1]}' : whole;
-    return '${neg ? '-' : ''}₦$s';
+    final sign = neg ? '-' : '';
+    return code == 'SLE' ? '${sign}Le $s' : '$sign₦$s';
   }
 }
 

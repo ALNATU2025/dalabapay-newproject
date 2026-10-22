@@ -120,7 +120,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(u.name, style: DP.bodyStrong),
+                    Text('${u.name}  ${u.flag}', style: DP.bodyStrong),
                     Text(u.email, style: DP.caption),
                     const SizedBox(height: 4),
                     Wrap(
@@ -144,8 +144,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               children: [
                 DPSummaryRow('User ID', u.id),
                 DPSummaryRow('Phone', u.phone),
-                DPSummaryRow('Wallet balance', DP.naira(u.balance), strong: true),
-                DPSummaryRow('Commission', DP.naira(u.commission)),
+                DPSummaryRow('Wallet balance', u.money(u.balance), strong: true),
+                DPSummaryRow('Commission', u.money(u.commission)),
                 DPSummaryRow('KYC', u.kycStatus == 'none' ? 'Not started' : statusLabel(u.kycStatus)),
                 DPSummaryRow('Payment PIN', u.pinLocked ? 'Locked' : (u.pinSet ? 'Set' : 'Not set')),
                 DPSummaryRow('Joined', dateLabel(u.joined)),
@@ -268,7 +268,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${u.name} · Balance ${DP.naira(u.balance)}',
+            Text('${u.name} · Balance ${u.money(u.balance)}',
                 style: DP.caption),
             const SizedBox(height: 14),
             DPSegmented(
@@ -312,7 +312,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
               child: DPSummaryRow(
                 'New balance',
-                DP.naira(after),
+                u.money(after),
                 strong: true,
                 valueColor: after < 0 ? DP.red : null,
               ),
@@ -342,7 +342,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                       if (!mounted) return;
                       dpSnack(
                         context,
-                        '${credit ? 'Credited' : 'Debited'} ${DP.naira(a)} · ${u.name}',
+                        '${credit ? 'Credited' : 'Debited'} ${u.money(a)} · ${u.name}',
                         success: true,
                       );
                       _load();
@@ -426,14 +426,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 for (final u in users)
                   AdminUserRow(
                     name: u.name,
-                    subtitle: '${u.email} · ${u.phone}',
+                    subtitle: '${u.flag} ${u.email} · ${u.phone}',
                     onTap: () => _openUser(u),
                     trailing: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          DP.naira(u.balance, decimals: false),
+                          u.money(u.balance, decimals: false),
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: DP.ink,

@@ -36,8 +36,11 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       ? _phoneController.text.trim()
       : _emailController.text.trim();
 
+  /// Money only moves between accounts in the same country.
+  DPCountry get _country => DPCountry.of(Session.instance.user?.country);
+
   bool get _identifierValid => _mode == 0
-      ? _phoneController.text.trim().length == 11
+      ? _country.localPhone(_phoneController.text) != null
       : RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
           .hasMatch(_emailController.text.trim());
 
@@ -60,7 +63,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       });
 
   Map<String, dynamic> get _target => _mode == 0
-      ? {'phone': _phoneController.text.trim()}
+      ? {'phone': _country.localPhone(_phoneController.text) ?? _phoneController.text.trim()}
       : {'email': _emailController.text.trim().toLowerCase()};
 
   Future<void> _lookup() async {
@@ -106,7 +109,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
         DPReviewRow(_mode == 0 ? 'Phone number' : 'Email', _recipientLabel),
         if (_noteController.text.trim().isNotEmpty)
           DPReviewRow('Note', _noteController.text.trim()),
-        const DPReviewRow('Transfer fee', '₦0.00'),
+        DPReviewRow('Transfer fee', DP.naira(0)),
         DPReviewRow('Total to pay', DP.naira(_amount), strong: true),
       ],
       footnote: 'Transfers to the wrong person may not be recoverable.',
@@ -163,7 +166,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                       DPField(
                         key: const ValueKey('phone'),
                         controller: _phoneController,
-                        hint: 'e.g. 08012345678',
+                        hint: 'e.g. ${_country.phoneHint.replaceAll(' ', '')}',
                         keyboardType: TextInputType.phone,
                         textInputAction: TextInputAction.next,
                         inputFormatters: [
@@ -249,7 +252,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                     DPField(
                       controller: _amountController,
                       hint: '0.00',
-                      prefixText: '₦  ',
+                      prefixText: '${DP.currencySymbol}  ',
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [

@@ -153,8 +153,8 @@ class DPBalanceCard extends StatelessWidget {
                               )
                             : Semantics(
                                 label: 'Balance hidden',
-                                child: const ExcludeSemantics(
-                                  child: Text('₦ • • • • • •', style: _amount),
+                                child: ExcludeSemantics(
+                                  child: Text('${DP.currencySymbol} • • • • • •', style: _amount),
                                 ),
                               ),
                       ),
@@ -179,7 +179,7 @@ class DPBalanceCard extends StatelessWidget {
                             const Icon(DPIcons.sparkle, size: 13, color: Color(0xFF7FE3BC)),
                             const SizedBox(width: 6),
                             Text(
-                              'Earnings ${visible ? DP.naira(earnings) : '₦ ••••'}',
+                              'Earnings ${visible ? DP.naira(earnings) : '${DP.currencySymbol} ••••'}',
                               style: const TextStyle(
                                 color: Color(0xFF9DF0CF),
                                 fontSize: 12.5,

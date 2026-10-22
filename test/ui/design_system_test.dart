@@ -178,8 +178,88 @@ Widget _history() {
   );
 }
 
+Widget _signupCountry() {
+  return SingleChildScrollView(
+    padding: const EdgeInsets.all(20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const DPHeadline('Make room for simpler.', subtitle: 'Your bills, wallet and rewards. Together.'),
+        const DPLabel('Where do you live?'),
+        DPCountryPicker(selected: 'SL', onChanged: (_) {}),
+        const SizedBox(height: 6),
+        const DPHelper('You\'ll see Sierra Leone services and pay in Leones (Le).'),
+        const SizedBox(height: 16),
+        const DPLabel('Phone number'),
+        const DPField(
+          hint: '076 123 456',
+          prefix: Padding(
+            padding: EdgeInsets.only(left: 14, right: 6),
+            child: Text('🇸🇱', style: TextStyle(fontSize: 20)),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Home for a Sierra Leone account: Leones and SL services.
+Widget _homeSl() {
+  DP.currency = 'SLE';
+  return Column(
+    children: [
+      Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Hello, Fatmata!', style: DP.title),
+              Text('Good morning', style: DP.caption),
+              DPSpace.h16,
+              DPBalanceCard(
+                balance: 1250.5,
+                earnings: 12,
+                visible: true,
+                onToggleVisible: () {},
+                onEarnings: () {},
+                actions: [
+                  DPQuickAction(DPIcons.plus, 'Add Money', () {}),
+                  DPQuickAction(DPIcons.upRight, 'Send', () {}),
+                  DPQuickAction(DPIcons.receipt, 'Pay Bills', () {}),
+                  DPQuickAction(DPIcons.history, 'History', () {}),
+                ],
+              ),
+              DPSpace.h20,
+              DPSectionHeader('Essential Services', actionLabel: 'More', onAction: () {}),
+              DPServiceGrid(columns: 3, tiles: [
+                for (final svc in kSierraLeoneServices.take(6))
+                  DPServiceTile(icon: svc.icon, label: svc.name, color: svc.color, onTap: () {}),
+              ]),
+              DPSpace.h20,
+              DPCard(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: TransactionRow(tx: {
+                  'type': 'sl_electricity',
+                  'description': 'EDSA Prepaid',
+                  'amount': 50,
+                  'currency': 'SLE',
+                  'status': 'success',
+                  'createdAt': _now.toIso8601String(),
+                }),
+              ),
+            ],
+          ),
+        ),
+      ),
+      DPBottomNav(index: 0, items: kDPTabs, onTap: (_) {}, onCenter: () {}),
+    ],
+  );
+}
+
 void main() {
   setUpAll(loadTestFonts);
+  tearDown(() => DP.currency = 'NGN');
   tearDown(() => DP.isDark = false);
 
   for (final dark in [false, true]) {
@@ -195,7 +275,27 @@ void main() {
     testWidgets('history${dark ? ' (dark)' : ''}', (tester) async {
       await snap(tester, 'history', _history, dark: dark);
     });
+    testWidgets('Sierra Leone home${dark ? ' (dark)' : ''}', (tester) async {
+      await snap(tester, 'home_sl', _homeSl, dark: dark);
+      expect(find.text('Le 1,250.50'), findsOneWidget);
+    });
   }
+
+  testWidgets('sign-up country choice', (tester) async {
+    await snap(tester, 'signup_country', _signupCountry);
+  });
+
+  test('money formats in the account currency', () {
+    DP.currency = 'SLE';
+    expect(DP.naira(1250.5), 'Le 1,250.50');
+    DP.currency = 'NGN';
+    expect(DP.naira(1250.5), '₦1,250.50');
+    expect(DP.moneyIn(-20, 'SLE'), '-Le 20.00');
+    expect(DPCountry.sierraLeone.localPhone('+232 76 123 456'), '076123456');
+    expect(DPCountry.sierraLeone.localPhone('76123456'), '076123456');
+    expect(DPCountry.sierraLeone.localPhone('08031234567'), isNull);
+    expect(DPCountry.nigeria.localPhone('+2348031234567'), '08031234567');
+  });
 
   testWidgets('tablet frame', (tester) async {
     tester.view.physicalSize = const Size(1024, 768) * 1.5;

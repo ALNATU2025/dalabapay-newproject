@@ -34,6 +34,21 @@ const List<DPService> kDalabapayServices = [
   DPService('Earnings', DPIcons.sparkle, '/commission', DPAssets.svcEarnings, DP.green),
 ];
 
+/// Sierra Leone services (Leones). Same special routes as above.
+const List<DPService> kSierraLeoneServices = [
+  DPService('Airtime', DPIcons.smartphone, '/sl/airtime', DPAssets.svcAirtime, DP.navyIcon),
+  DPService('Data', DPIcons.wifi, '/sl/data', DPAssets.svcData, DP.navyIcon),
+  DPService('EDSA Electricity', DPIcons.bolt, '/sl/electricity', DPAssets.svcElectricity, DP.green),
+  DPService('TV Packages', DPIcons.tv, '/sl/cable', DPAssets.svcTv, DP.navyIcon),
+  DPService('Add Money', DPIcons.plus, '/wallet:add', DPAssets.svcAddMoney, DP.green),
+  DPService('Send Money', DPIcons.upRight, '/wallet:send', DPAssets.svcSendMoney, DP.navyIcon),
+  DPService('Earnings', DPIcons.sparkle, '/commission', DPAssets.svcEarnings, DP.green),
+];
+
+/// The services for the signed-in account's country.
+List<DPService> servicesFor({required bool sierraLeone}) =>
+    sierraLeone ? kSierraLeoneServices : kDalabapayServices;
+
 /// Navy promo banner with an illustration on the right (Refer a Friend,
 /// Quick & Easy Bill Payments).
 class DPPromoBanner extends StatelessWidget {

@@ -31,6 +31,10 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _period = 'Today';
+
+  /// Figures are per country (different currencies).
+  String _country = 'NG';
+  String _m(num v) => DP.moneyIn(v, str(_data['currency'], 'NGN'), decimals: false);
   Map<String, dynamic> _data = {};
   int _unreadAlerts = 0;
   bool _loading = true;
@@ -53,7 +57,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _load() async {
     try {
       final d = asMap(await api.get('/api/admin/dashboard',
-          query: {'period': _periodValues[_period]}));
+          query: {'period': _periodValues[_period], 'country': _country}));
       int unread = _unreadAlerts;
       if (adminCan('alerts:read')) {
         try {
@@ -101,6 +105,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _Tool('Provider Settings', 'Bill provider & services', Icons.api_rounded, DP.amber, '/admin/vtpass', 'settings:read'),
     _Tool('Service Commission', 'Rates & revenue', Icons.trending_up_rounded, DP.green, '/admin/commission', 'commission:read'),
     _Tool('Transaction Limits', 'Caps & maintenance', Icons.speed_rounded, DP.amber, '/admin/limits', 'limits:read'),
+    _Tool('Sierra Leone', 'Payment accounts & bonuses', Icons.flag_outlined, DP.green, '/admin/sl-funding', 'settings:read'),
   ];
 
   List<_Tool> get _allowedTools =>
@@ -172,6 +177,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           children: [
             DPAppear(child: _welcome()),
             const SizedBox(height: 16),
+            DPSegmented(
+              options: const ['🇳🇬  Nigeria', '🇸🇱  Sierra Leone'],
+              index: _country == 'SL' ? 1 : 0,
+              onChanged: (i) {
+                setState(() => _country = i == 1 ? 'SL' : 'NG');
+                _load();
+              },
+            ),
+            const SizedBox(height: 12),
             DPChipScroller(
               options: _periods,
               selected: _period,
@@ -185,7 +199,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               stats: [
                 AdminStat(
                   label: 'Revenue',
-                  value: DP.naira(revenue, decimals: false),
+                  value: _m(revenue),
                   icon: Icons.payments_outlined,
                   color: DP.green,
                   sub: _change(_data['revenueChange']),
@@ -198,7 +212,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 AdminStat(
                   label: 'Sales Volume',
-                  value: DP.naira(toDouble(_data['volume']), decimals: false),
+                  value: _m(toDouble(_data['volume'])),
                   icon: Icons.receipt_long_outlined,
                   color: DP.navyInk,
                   sub: '$txns txns · ${_change(_data['volumeChange'])}',
@@ -216,7 +230,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               'Sales Volume (Last 7 Days)',
               AdminBarChart(
                 values: volume7d.isEmpty ? List.filled(7, 0.0) : volume7d,
-                format: (v) => DP.naira(v, decimals: false),
+                format: _m,
               ),
             ),
             const SizedBox(height: 12),
@@ -266,7 +280,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          DP.naira(t.amount),
+                          t.money(t.amount),
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: DP.ink,

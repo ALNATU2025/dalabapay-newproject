@@ -95,7 +95,7 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(u.name, style: DP.bodyStrong),
-                      Text('Current Balance ${DP.naira(u.balance)}',
+                      Text('Current Balance ${u.money(u.balance)}',
                           style: DP.caption),
                     ],
                   ),
@@ -125,7 +125,7 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
             const SizedBox(height: 14),
             DPCard(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-              child: DPSummaryRow('New Balance', DP.naira(u.balance + a),
+              child: DPSummaryRow('New Balance', u.money(u.balance + a),
                   strong: true),
             ),
             const SizedBox(height: 18),
@@ -150,7 +150,7 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
                       }
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (!mounted) return;
-                      dpSnack(context, 'Funded ${DP.naira(a)} · ${u.name}',
+                      dpSnack(context, 'Funded ${u.money(a)} · ${u.name}',
                           success: true);
                       _load();
                     },
@@ -228,7 +228,7 @@ class _AdminFundWalletPageState extends State<AdminFundWalletPage> {
                 for (final u in users)
                   AdminUserRow(
                     name: u.name,
-                    subtitle: '${u.email} · ${DP.naira(u.balance)}',
+                    subtitle: '${u.email} · ${u.money(u.balance)}',
                     onTap: () => _fund(u),
                     trailing: SizedBox(
                       height: 34,

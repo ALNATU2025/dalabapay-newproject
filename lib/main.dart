@@ -17,6 +17,7 @@ import 'presentation/screens/admin/admin_notifications_page.dart';
 import 'presentation/screens/admin/admin_refund_system_page.dart';
 import 'presentation/screens/admin/admin_self_fund_page.dart';
 import 'presentation/screens/admin/admin_send_notification_page.dart';
+import 'presentation/screens/admin/admin_sl_funding_page.dart';
 import 'presentation/screens/admin/admin_service_commission_page.dart';
 import 'presentation/screens/admin/admin_transaction_limits_page.dart';
 import 'presentation/screens/admin/admin_transaction_status_page.dart';
@@ -49,6 +50,10 @@ import 'presentation/screens/notifications/notifications_screen.dart';
 import 'presentation/screens/onboarding/onboarding_screen.dart';
 import 'presentation/screens/referral/referral_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
+import 'presentation/screens/sierra_leone/sl_add_money_screen.dart';
+import 'presentation/screens/sierra_leone/sl_cable_screen.dart';
+import 'presentation/screens/sierra_leone/sl_electricity_screen.dart';
+import 'presentation/screens/sierra_leone/sl_topup_screen.dart';
 import 'presentation/screens/splash/splash_screen.dart';
 import 'presentation/screens/transactions/transactions_screen.dart';
 import 'presentation/screens/validation/transaction_validation_page.dart';
@@ -122,7 +127,16 @@ class DalabapayApp extends StatelessWidget {
     '/insurance': (_) => const InsuranceScreen(),
     '/commission': (_) => const CommissionScreen(),
     '/referral': (_) => const ReferralScreen(),
-    '/wallet': (_) => const WalletTopUpScreen(),
+    // Sierra Leone accounts add money by mobile money / bank ("I've paid").
+    '/wallet': (_) => Session.instance.isSierraLeone
+        ? const SlAddMoneyScreen()
+        : const WalletTopUpScreen(),
+    // Sierra Leone services (Leones)
+    '/sl/airtime': (_) => const SlTopUpScreen(),
+    '/sl/data': (_) => const SlTopUpScreen(data: true),
+    '/sl/electricity': (_) => const SlElectricityScreen(),
+    '/sl/cable': (_) => const SlCableScreen(),
+    '/sl/add-money': (_) => const SlAddMoneyScreen(),
     '/send-money': (_) => const SendMoneyScreen(),
     // Admin console (staff roles only; the server checks permissions)
     '/admin': (_) => const AdminDashboardScreen(),
@@ -139,6 +153,7 @@ class DalabapayApp extends StatelessWidget {
     '/admin/vtpass': (_) => const VtpassSettingsDashboard(),
     '/admin/commission': (_) => const AdminServiceCommissionPage(),
     '/admin/limits': (_) => const AdminTransactionLimitsPage(),
+    '/admin/sl-funding': (_) => const AdminSlFundingPage(),
   };
 
   @override

@@ -10,6 +10,13 @@ import 'payment_flow.dart';
 bool txIsCredit(Map<String, dynamic> t) =>
     t['isCredit'] == true || t['direction'] == 'credit';
 
+/// The transaction's currency ("NGN"/"SLE"), for formatting its amounts.
+String txCurrency(Map<String, dynamic> t) =>
+    t['currency']?.toString() ?? DP.currency;
+
+/// Formats an amount of [t] in its own currency.
+String txMoney(Map<String, dynamic> t, num? v) => DP.moneyIn(v, txCurrency(t));
+
 bool txIsCommissionWallet(Map<String, dynamic> t) => t['wallet'] == 'commission';
 
 IconData transactionIcon(String type) {
@@ -67,6 +74,14 @@ String transactionTypeLabel(String type) {
       return 'Wallet Credit';
     case 'admin_debit':
       return 'Wallet Debit';
+    case 'sl_airtime':
+      return 'Airtime Purchase';
+    case 'sl_data':
+      return 'Data Purchase';
+    case 'sl_electricity':
+      return 'EDSA Electricity';
+    case 'sl_cable':
+      return 'Cable TV Purchase';
   }
   return 'Transaction';
 }
@@ -94,7 +109,7 @@ class TransactionRow extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '${str(tx['description'], transactionTypeLabel(type))}, ${isCredit ? 'received' : 'paid'} ${DP.naira(amount)}, $status, ${dateTimeLabel(date)}',
+          '${str(tx['description'], transactionTypeLabel(type))}, ${isCredit ? 'received' : 'paid'} ${txMoney(tx, amount)}, $status, ${dateTimeLabel(date)}',
       excludeSemantics: true,
       child: DPListRow(
         onTap: () => showTransactionReceipt(context, tx),
@@ -116,7 +131,7 @@ class TransactionRow extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${failed ? '' : (isCredit ? '+ ' : '- ')}${DP.naira(amount)}',
+              '${failed ? '' : (isCredit ? '+ ' : '- ')}${txMoney(tx, amount)}',
               style: TextStyle(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w700,
@@ -227,7 +242,7 @@ Future<void> showTransactionReceipt(
             ),
             const SizedBox(height: 4),
             Text(
-              DP.naira(amount),
+              txMoney(tx, amount),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 32,
@@ -279,13 +294,13 @@ Future<void> showTransactionReceipt(
                     DPSummaryRow('Note', str(meta['note'])),
                   DPSummaryRow('Date & time', dateTimeLabel(date)),
                   DPSummaryRow('Reference', str(tx['reference'])),
-                  DPSummaryRow('Fee', DP.naira(fee)),
+                  DPSummaryRow('Fee', txMoney(tx, fee)),
                   if (commission > 0)
-                    DPSummaryRow('Commission earned', DP.naira(commission),
+                    DPSummaryRow('Commission earned', txMoney(tx, commission),
                         valueColor: DP.green),
                   if (tx['refunded'] == true)
                     const DPSummaryRow('Refund', 'Returned to wallet'),
-                  DPSummaryRow('Total', DP.naira(txIsCredit(tx) ? amount : amount + fee), strong: true),
+                  DPSummaryRow('Total', txMoney(tx, txIsCredit(tx) ? amount : amount + fee), strong: true),
                 ],
               ),
             ),

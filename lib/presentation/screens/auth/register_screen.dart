@@ -27,6 +27,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _referralCodeController = TextEditingController();
   final _otpController = TextEditingController();
 
+  /// NG or SL — decides the account's services, dashboard and currency.
+  String _country = 'NG';
+  DPCountry get _countryInfo => DPCountry.of(_country);
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreedToTerms = false;
@@ -103,7 +107,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final r = await api.post('/api/auth/register', {
         'fullName': _fullNameController.text.trim(),
         'email': _emailController.text.trim().toLowerCase(),
-        'phone': _phoneController.text.trim(),
+        'phone': _countryInfo.localPhone(_phoneController.text) ??
+            _phoneController.text.trim(),
+        'country': _country,
         'password': _passwordController.text,
         'referralCode': _referralCodeController.text.trim(),
       });
@@ -219,6 +225,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   'Make room for simpler.',
                   subtitle: 'Your bills, wallet and rewards. Together.',
                 ),
+                const DPLabel('Where do you live?'),
+                DPCountryPicker(
+                  selected: _country,
+                  onChanged: (c) => setState(() {
+                    _country = c;
+                    _phoneController.clear();
+                  }),
+                ),
+                const SizedBox(height: 6),
+                DPHelper(
+                  'You\'ll see ${_countryInfo.name} services and pay in ${_countryInfo.currencyName}. This can\'t be changed later.',
+                ),
+                const SizedBox(height: 16),
                 const DPLabel('Full name'),
                 DPField(
                   controller: _fullNameController,
@@ -239,12 +258,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
                 const DPLabel('Phone number'),
                 DPField(
+                  key: ValueKey('phone_$_country'),
                   controller: _phoneController,
-                  hint: '0803 456 7890',
+                  hint: _countryInfo.phoneHint,
                   keyboardType: TextInputType.phone,
-                  maxLength: 11,
+                  maxLength: _countryInfo.phoneLength,
                   textInputAction: TextInputAction.next,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  prefix: Padding(
+                    padding: const EdgeInsets.only(left: 14, right: 6),
+                    child: Text(_countryInfo.flag, style: const TextStyle(fontSize: 20)),
+                  ),
                   suffix: const Icon(DPIcons.phone, size: 21),
                 ),
                 const SizedBox(height: 16),

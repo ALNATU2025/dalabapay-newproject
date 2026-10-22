@@ -174,7 +174,7 @@ class _AdminUserHistoryPageState extends State<AdminUserHistoryPage> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '${t.credit ? '+' : '-'}${DP.naira(t.amount)}',
+                          '${t.credit ? '+' : '-'}${t.money(t.amount)}',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: t.credit ? DP.green : DP.red,

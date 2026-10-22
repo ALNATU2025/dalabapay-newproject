@@ -2,6 +2,7 @@
 // Admin console data, read from /api/admin/*. Money is in naira.
 import '../../../core/api/session.dart';
 import '../../../core/format.dart';
+import '../../../ui/dp_tokens.dart';
 import '../../widgets/transaction_widgets.dart';
 
 class AdminUser {
@@ -19,6 +20,12 @@ class AdminUser {
   final DateTime joined;
   int transactions;
   final String kycStatus;
+  final String country; // NG | SL
+  String get currency => country == 'SL' ? 'SLE' : 'NGN';
+  String get flag => country == 'SL' ? '🇸🇱' : '🇳🇬';
+
+  /// Money in this user's currency (₦ or Le).
+  String money(num? v, {bool decimals = true}) => DP.moneyIn(v, currency, decimals: decimals);
 
   AdminUser({
     required this.id,
@@ -35,6 +42,7 @@ class AdminUser {
     required this.joined,
     this.transactions = 0,
     this.kycStatus = 'none',
+    this.country = 'NG',
   });
 
   factory AdminUser.fromJson(Map<String, dynamic> j) => AdminUser(
@@ -52,6 +60,7 @@ class AdminUser {
         joined: parseDate(j['createdAt']),
         transactions: toInt(j['transactions']),
         kycStatus: str(asMap(j['kyc'])['status'], 'none'),
+        country: str(j['country'], 'NG'),
       );
 
   bool get isAdmin => role != 'user';
@@ -168,6 +177,10 @@ class AdminTxn {
 
   int get minutesAgo => DateTime.now().difference(date).inMinutes;
   bool get isPayment => !credit;
+
+  /// "NGN" / "SLE" — admin lists mix both countries.
+  String get currency => str(json['currency'], 'NGN');
+  String money(num? v, {bool decimals = true}) => DP.moneyIn(v, currency, decimals: decimals);
 }
 
 class AdminDispute {
@@ -180,6 +193,7 @@ class AdminDispute {
   final String reason;
   final String description;
   final double amount;
+  final String currency;
   String status; // pending, investigating, resolved, rejected
   final DateTime date;
   String? resolution;
@@ -194,11 +208,13 @@ class AdminDispute {
         reason = str(j['reason']),
         description = str(j['description']),
         amount = toDouble(asMap(j['transaction'])['amount']),
+        currency = str(asMap(j['transaction'])['currency'], 'NGN'),
         status = str(j['status']),
         date = parseDate(j['createdAt']),
         resolution = j['resolution']?.toString();
 
   int get hoursAgo => DateTime.now().difference(date).inHours;
+  String money(num? v, {bool decimals = true}) => DP.moneyIn(v, currency, decimals: decimals);
   bool get open => status == 'pending' || status == 'investigating';
 }
 

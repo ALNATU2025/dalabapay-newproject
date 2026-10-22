@@ -93,8 +93,10 @@ class _AdminTransactionLimitsPageState
     }
   }
 
-  String _fmt(double? v) =>
-      v == null ? 'UNLIMITED' : DP.naira(v, decimals: false);
+  /// Sierra Leone services (sl_…) are in Leones.
+  String _fmt(double? v, [String service = '']) => v == null
+      ? 'UNLIMITED'
+      : DP.moneyIn(v, service.startsWith('sl_') ? 'SLE' : 'NGN', decimals: false);
 
   String _label(String service) => _labels[service] ?? service;
 
@@ -290,7 +292,7 @@ class _AdminTransactionLimitsPageState
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   title: _label(s),
                   subtitle:
-                      '${_fmt(limits[s]!.perTxn)} per txn · ${_fmt(limits[s]!.daily)} daily',
+                      '${_fmt(limits[s]!.perTxn, s)} per txn · ${_fmt(limits[s]!.daily, s)} daily',
                   trailing: limits[s]!.custom
                       ? const StatusPill('CUSTOM', color: DP.navyIcon)
                       : Icon(DPIcons.edit, size: 18, color: DP.muted),
@@ -383,7 +385,7 @@ class _AdminTransactionLimitsPageState
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       title: _label(s),
                       subtitle:
-                          '${_fmt(_defaults[s]!.perTxn)} per transaction\n${_fmt(_defaults[s]!.daily)} daily cap',
+                          '${_fmt(_defaults[s]!.perTxn, s)} per transaction\n${_fmt(_defaults[s]!.daily, s)} daily cap',
                       subtitleMaxLines: 2,
                       trailing: Icon(DPIcons.edit, size: 18, color: DP.muted),
                     ),

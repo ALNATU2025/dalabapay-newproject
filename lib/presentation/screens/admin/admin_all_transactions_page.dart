@@ -107,7 +107,7 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
         children: [
           Center(
             child: Text(
-              DP.naira(t.amount),
+              t.money(t.amount),
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.w800,
@@ -130,11 +130,11 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                 if (t.json['recipient'] != null)
                   DPSummaryRow('Recipient', str(t.json['recipient'])),
                 DPSummaryRow('Type', t.credit ? 'Credit' : 'Debit'),
-                if (t.fee > 0) DPSummaryRow('Fee', DP.naira(t.fee)),
+                if (t.fee > 0) DPSummaryRow('Fee', t.money(t.fee)),
                 if (toDouble(t.json['commission']) > 0)
-                  DPSummaryRow('User commission', DP.naira(toDouble(t.json['commission']))),
+                  DPSummaryRow('User commission', t.money(toDouble(t.json['commission']))),
                 if (toDouble(t.json['platformRevenue']) > 0)
-                  DPSummaryRow('Platform revenue', DP.naira(toDouble(t.json['platformRevenue']))),
+                  DPSummaryRow('Platform revenue', t.money(toDouble(t.json['platformRevenue']))),
                 if (t.json['providerReference'] != null)
                   DPSummaryRow('Provider ref', str(t.json['providerReference'])),
                 if (asMap(t.json['actor'])['fullName'] != null)
@@ -328,7 +328,7 @@ class _AdminAllTransactionsPageState extends State<AdminAllTransactionsPage> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          DP.naira(t.amount),
+                          t.money(t.amount),
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: DP.ink,

@@ -64,6 +64,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return r;
   }
 
+  bool get _sl => Session.instance.isSierraLeone;
+
+  static const List<DPService> _slBillGroup = [
+    DPService('EDSA', DPIcons.bolt, '/sl/electricity', DPAssets.svcElectricity, DP.green),
+    DPService('Airtime', DPIcons.smartphone, '/sl/airtime', DPAssets.svcAirtime, DP.navyIcon),
+    DPService('Data', DPIcons.wifi, '/sl/data', DPAssets.svcData, DP.navyIcon),
+  ];
+  static const List<DPService> _slTvGroup = [
+    DPService('DSTV', DPIcons.tv, '/sl/cable', DPAssets.dstv, DP.navyIcon),
+    DPService('GOtv', DPIcons.tv, '/sl/cable', DPAssets.gotv, DP.green),
+    DPService('StarTimes', DPIcons.tv, '/sl/cable', DPAssets.startimes, DP.amber),
+  ];
+
+  List<DPService> get _billGroup => _sl ? _slBillGroup : _payBillGroup;
+  List<DPService> get _tvGroup => _sl ? _slTvGroup : _payTvGroup;
+
   static const List<DPService> _payBillGroup = [
     DPService('Electricity', DPIcons.bolt, '/electricity', DPAssets.svcElectricity, DP.green),
     DPService('Airtime', DPIcons.smartphone, '/airtime', DPAssets.svcAirtime, DP.navyIcon),
@@ -312,8 +328,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Pay Bills',
             () => _showServiceGroup(
               'Pay Bill',
-              'Electricity, airtime and data',
-              _payBillGroup,
+              _sl ? 'EDSA, airtime and data' : 'Electricity, airtime and data',
+              _billGroup,
             ),
           ),
           DPQuickAction(DPIcons.history, 'History', () => _onNavTap(1)),
@@ -343,8 +359,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: DP.green,
                 onTap: () => _showServiceGroup(
                   'Pay Bill',
-                  'Electricity, airtime and data',
-                  _payBillGroup,
+                  _sl ? 'EDSA, airtime and data' : 'Electricity, airtime and data',
+                  _billGroup,
                 ),
               ),
               DPServiceTile(
@@ -355,16 +371,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onTap: () => _showServiceGroup(
                   'Pay TV',
                   'DSTV, GOtv and StarTimes',
-                  _payTvGroup,
+                  _tvGroup,
                 ),
               ),
-              DPServiceTile(
-                icon: DPIcons.globe,
-                label: 'International Airtime',
-                image: DPAssets.svcInternational,
-                color: DP.navyIcon,
-                onTap: () => _openServiceRoute('/international-airtime'),
-              ),
+              if (_sl)
+                DPServiceTile(
+                  icon: DPIcons.bolt,
+                  label: 'EDSA Electricity',
+                  image: DPAssets.svcElectricity,
+                  color: DP.green,
+                  onTap: () => _openServiceRoute('/sl/electricity'),
+                )
+              else
+                DPServiceTile(
+                  icon: DPIcons.globe,
+                  label: 'International Airtime',
+                  image: DPAssets.svcInternational,
+                  color: DP.navyIcon,
+                  onTap: () => _openServiceRoute('/international-airtime'),
+                ),
             ],
           ),
         ],
@@ -473,7 +498,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       (DPIcons.shieldCheck, 'Transaction Validation', '/transaction-validation'),
       (Icons.gavel_rounded, 'My Disputes', '/user-disputes'),
       (DPIcons.referral, 'Refer & Earn', '/referral'),
-      (DPIcons.badge, 'Verify Identity (KYC)', '/kyc'),
+      // BVN/NIN checks are Nigerian.
+      if (!_sl) (DPIcons.badge, 'Verify Identity (KYC)', '/kyc'),
       (DPIcons.settings, 'App Settings', '/settings'),
       (DPIcons.help, 'Help & Support', '/help'),
     ];
@@ -678,7 +704,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 DPAppear(
                                   delay: const Duration(milliseconds: 260),
                                   child: _HomeBanners(
-                                    banners: [
+                                    banners: _sl
+                                        ? [
+                                            _HomeBannerData(
+                                              title: 'EDSA Units\nin Seconds',
+                                              subtitle: 'Buy prepaid electricity and get your token instantly.',
+                                              image: DPAssets.bannerBills,
+                                              icon: DPIcons.bolt,
+                                              onTap: () => _openServiceRoute('/sl/electricity'),
+                                            ),
+                                            _HomeBannerData(
+                                              title: 'Never Miss\nYour Shows',
+                                              subtitle: 'Renew DStv, GOtv & StarTimes in Leones.',
+                                              image: DPAssets.bannerCable,
+                                              icon: DPIcons.tv,
+                                              onTap: () => _openServiceRoute('/sl/cable'),
+                                            ),
+                                            _HomeBannerData(
+                                              title: 'Refer a Friend',
+                                              subtitle: 'Invite friends in Sierra Leone to Dalabapay.',
+                                              image: DPAssets.bannerRefer,
+                                              icon: DPIcons.gift,
+                                              onTap: () => _go('/referral'),
+                                            ),
+                                          ]
+                                        : [
                                       _HomeBannerData(
                                         title: 'International\nAirtime',
                                         subtitle:

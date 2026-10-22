@@ -96,7 +96,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
                 DPSummaryRow('Reason', d.reason),
                 if (d.description.isNotEmpty)
                   DPSummaryRow('Details', d.description),
-                DPSummaryRow('Amount', DP.naira(d.amount), strong: true),
+                DPSummaryRow('Amount', d.money(d.amount), strong: true),
                 DPSummaryRow('Opened', dateTimeLabel(d.date)),
               ],
             ),
@@ -110,12 +110,12 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
           ),
           const SizedBox(height: 18),
           DPButton(
-            label: 'Approve & Refund ${DP.naira(d.amount)}',
+            label: 'Approve & Refund ${d.money(d.amount)}',
             onPressed: () => _resolveCall(
               d,
               'approve',
               notes.text.trim().length < 3
-                  ? 'Refunded ${DP.naira(d.amount)} to your wallet'
+                  ? 'Refunded ${d.money(d.amount)} to your wallet'
                   : notes.text.trim(),
               ctx,
             ),
@@ -176,7 +176,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
             DPField(controller: reason, hint: 'Additional notes (optional)'),
             const SizedBox(height: 18),
             DPButton(
-              label: 'Refund ${DP.naira(a)}',
+              label: 'Refund ${t.money(a)}',
               loading: saving,
               onPressed: a <= 0 || a > t.amount || saving
                   ? null
@@ -194,7 +194,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
                       }
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (!mounted) return;
-                      dpSnack(context, 'Refunded ${DP.naira(a)} to ${t.userName}',
+                      dpSnack(context, 'Refunded ${t.money(a)} to ${t.userName}',
                           success: true);
                       _load();
                     },
@@ -295,7 +295,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(DP.naira(t.amount),
+                          Text(t.money(t.amount),
                               style: TextStyle(
                                   fontWeight: FontWeight.w700, color: DP.ink)),
                           const SizedBox(height: 3),
@@ -368,7 +368,7 @@ class _AdminRefundSystemPageState extends State<AdminRefundSystemPage> {
             Row(
               children: [
                 Text(
-                  DP.naira(d.amount),
+                  d.money(d.amount),
                   style: TextStyle(
                       fontWeight: FontWeight.w700, color: DP.ink),
                 ),

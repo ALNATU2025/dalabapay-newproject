@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dalabapay/core/api/api.dart';
+import 'package:dalabapay/core/api/catalog.dart';
 import 'package:dalabapay/core/api/session.dart';
 import 'package:dalabapay/core/format.dart';
 import 'package:dalabapay/presentation/screens/admin/admin_models.dart';
@@ -26,14 +27,15 @@ String _uniq() {
 }
 
 /// Sign-up exactly as RegisterScreen does. Returns {token, user, email, phone}.
-Future<Map<String, dynamic>> _signUp(String name, {String referral = ''}) async {
+Future<Map<String, dynamic>> _signUp(String name, {String referral = '', String country = 'NG'}) async {
   final id = _uniq();
   final email = 'c$id@example.com';
-  final phone = '080$id';
+  final phone = country == 'SL' ? '07${id.substring(1)}' : '080$id';
   final r = asMap(await api.post('/api/auth/register', {
     'fullName': name,
     'email': email,
     'phone': phone,
+    'country': country,
     'password': 'Passw0rdOk',
     'referralCode': referral,
   }));
@@ -570,6 +572,97 @@ void main() {
 
     // AdminEditUserPage PIN controls (friend never set a PIN → reset is a no-op path)
     await api.post('/api/admin/users/${fu.id}/pin/unlock');
+  });
+
+  test('Sierra Leone account: services in Leones, add money, admin approval', () async {
+    final backend = Platform.environment['BACKEND_DIR'];
+    if (backend == null) {
+      markTestSkipped('BACKEND_DIR not set');
+      return;
+    }
+    Future<void> asAdmin() async => Session.instance.start(asMap(await api.post('/api/auth/login', {
+          'identifier': me['email'],
+          'password': 'Passw0rdOk2',
+        })));
+
+    // AdminSlFundingPage
+    await asAdmin();
+    final saved = asMap(await api.patch('/api/admin/settings', {
+      'slFunding': {
+        'minAmount': 10.0,
+        'maxAmount': 50000.0,
+        'instructions': 'Send the money, then tap "I\'ve paid".',
+        'methods': [
+          {'id': 'orange', 'name': 'Orange Money', 'account': '076000111', 'accountName': 'Dalabapay SL'},
+          {'id': 'afrimoney', 'name': 'Afrimoney', 'account': '', 'accountName': ''},
+        ],
+      },
+    }));
+    expect(asList(asMap(saved['slFunding'])['methods']).length, 2);
+    final slDash = asMap(await api.get('/api/admin/dashboard', query: {'period': 'week', 'country': 'SL'}));
+    expect(slDash['currency'], 'SLE');
+
+    // RegisterScreen with Sierra Leone chosen
+    final sl = await _signUp('Fatmata Kamara', country: 'SL');
+    final user = Session.instance.user!;
+    expect(user.isSierraLeone, isTrue);
+    expect(user.currency, 'SLE');
+    expect(sl['phone'], hasLength(9));
+    await api.post('/api/auth/pin/set', {'pin': pin});
+
+    // Nigerian services are closed to this account
+    try {
+      await api.get('/api/services/networks');
+      fail('should be blocked');
+    } on ApiException catch (e) {
+      expect(e.code, 'WRONG_COUNTRY');
+    }
+
+    // SlAddMoneyScreen
+    final info = asMap(await api.get('/api/wallet/sl-funding'));
+    expect(asList(info['methods']).map((m) => m['id']), ['orange']);
+    final topUp = _txn(await api.post('/api/wallet/fund/sl-request', {
+      'amount': 500.0,
+      'method': 'orange',
+      'reference': 'OM${_uniq()}',
+      'senderNumber': '076222333',
+    }));
+    expect(topUp['status'], 'pending');
+    expect(topUp['currency'], 'SLE');
+
+    // Admin approves it in Status Update
+    await asAdmin();
+    await api.patch('/api/admin/transactions/${topUp['id']}/status', {'status': 'success', 'note': 'Seen on Orange Money'});
+    final login = asMap(await api.post('/api/auth/login', {'identifier': sl['phone'], 'password': 'Passw0rdOk'}));
+    await Session.instance.start(login);
+    expect(Session.instance.user!.balance, 500);
+
+    // Services as the Sierra Leone screens call them
+    final status = asMap(await api.get('/api/services/status'));
+    expect(asMap(status['connected']).containsKey('sl_airtime'), isTrue);
+    final nets = asList(await api.get('/api/services/sl/networks'));
+    expect(nets.map((n) => n['id']), containsAll(['africell', 'orange', 'qcell']));
+    final air = _txn(await api.post('/api/services/sl/airtime', {'network': 'africell', 'phone': '076555123', 'amount': 20.0, 'pin': pin}));
+    _expectTxn(air);
+    expect(air['currency'], 'SLE');
+    final plans = asList(await api.get('/api/services/sl/data/plans', query: {'network': 'orange'}));
+    final plan = Plan.fromJson(plans.first);
+    _expectTxn(_txn(await api.post('/api/services/sl/data', {'network': 'orange', 'phone': '078111222', 'planCode': plan.code, 'pin': pin})));
+    final meter = asMap(await api.post('/api/services/sl/electricity/verify', {'meterNumber': '37012345678'}));
+    expect(meter['customerName'], isNotEmpty);
+    final edsa = _txn(await api.post('/api/services/sl/electricity', {'meterNumber': '37012345678', 'amount': 50.0, 'pin': pin}));
+    expect(asMap(edsa['metadata'])['token'], isNotNull);
+    final tvPlans = asList(await api.get('/api/services/sl/cable/plans', query: {'provider': 'gotv'}));
+    final card = asMap(await api.post('/api/services/sl/cable/verify', {'provider': 'gotv', 'smartcardNumber': '7012345678'}));
+    expect(card['customerName'], isNotEmpty);
+    _expectTxn(_txn(await api.post('/api/services/sl/cable', {
+      'provider': 'gotv',
+      'smartcardNumber': '7012345678',
+      'planCode': str(tvPlans.first['code']),
+      'pin': pin,
+    })));
+    final limits = asMap(await api.get('/api/services/limits'));
+    expect(limits.containsKey('sl_electricity'), isTrue);
   });
 
   test('logged-out requests are rejected and clear the session', () async {

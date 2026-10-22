@@ -388,7 +388,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: _balanceHidden
-                    ? const Text('₦ ••••••', style: balanceStyle)
+                    ? Text('${DP.currencySymbol} ••••••', style: balanceStyle)
                     : ValueListenableBuilder(
                         valueListenable: Session.instance,
                         builder: (context, user, _) => DPCountUp(
