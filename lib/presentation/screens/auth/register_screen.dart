@@ -28,8 +28,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _otpController = TextEditingController();
 
   /// NG or SL — decides the account's services, dashboard and currency.
-  String _country = 'NG';
+  /// Null until the person picks one (they must choose).
+  String? _country;
   DPCountry get _countryInfo => DPCountry.of(_country);
+  bool get _sl => _country == 'SL';
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -46,6 +48,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get _hasNumber => _passwordController.text.contains(RegExp(r'[0-9]'));
 
   bool get _detailsValid =>
+      _country != null &&
       _fullNameController.text.trim().isNotEmpty &&
       _emailController.text.trim().isNotEmpty &&
       _phoneController.text.trim().isNotEmpty &&
@@ -225,23 +228,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   'Make room for simpler.',
                   subtitle: 'Your bills, wallet and rewards. Together.',
                 ),
-                const DPLabel('Where do you live?'),
-                DPCountryPicker(
-                  selected: _country,
-                  onChanged: (c) => setState(() {
-                    _country = c;
-                    _phoneController.clear();
-                  }),
+                const DPLabel('Select country'),
+                DPSelectField(
+                  value: _country == null
+                      ? null
+                      : '${_countryInfo.name} · ${_countryInfo.currencyName}',
+                  hint: 'Select country',
+                  leading: _country == null
+                      ? const Icon(DPIcons.globe, size: 21)
+                      : DPFlag(_country!, width: 24),
+                  onTap: () async {
+                    final picked = await dpPickFromList<DPCountry>(
+                      context,
+                      title: 'Select country',
+                      items: DPCountry.all,
+                      selected: _country == null ? null : _countryInfo,
+                      labelOf: (c) => c.name,
+                      subtitleOf: (c) => c.currencyName,
+                      leadingOf: (c) => DPFlag(c.code, width: 28),
+                    );
+                    if (picked == null || !mounted) return;
+                    setState(() {
+                      if (picked.code != _country) _phoneController.clear();
+                      _country = picked.code;
+                    });
+                  },
                 ),
-                const SizedBox(height: 6),
-                DPHelper(
-                  'You\'ll see ${_countryInfo.name} services and pay in ${_countryInfo.currencyName}. This can\'t be changed later.',
-                ),
+                if (_country != null) ...[
+                  const SizedBox(height: 6),
+                  DPHelper(
+                    'You\'ll see ${_countryInfo.name} services and pay in ${_countryInfo.currencyName}. This can\'t be changed later.',
+                  ),
+                ],
                 const SizedBox(height: 16),
                 const DPLabel('Full name'),
                 DPField(
                   controller: _fullNameController,
-                  hint: 'Adaeze Okafor',
+                  hint: _sl ? 'Fatmata Kamara' : 'Adaeze Okafor',
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
                   suffix: const Icon(DPIcons.user, size: 21),
@@ -265,10 +288,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   maxLength: _countryInfo.phoneLength,
                   textInputAction: TextInputAction.next,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  prefix: Padding(
-                    padding: const EdgeInsets.only(left: 14, right: 6),
-                    child: DPFlag(_country, width: 24),
-                  ),
+                  prefix: _country == null
+                      ? null
+                      : Padding(
+                          padding: const EdgeInsets.only(left: 14, right: 6),
+                          child: DPFlag(_country!, width: 24),
+                        ),
                   suffix: const Icon(DPIcons.phone, size: 21),
                 ),
                 const SizedBox(height: 16),

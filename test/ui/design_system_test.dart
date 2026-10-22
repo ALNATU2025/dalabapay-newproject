@@ -58,6 +58,9 @@ Widget _components() {
         const DPButton(label: 'Paying…', onPressed: null, loading: true),
         DPSpace.h24,
         const DPSectionHeader('Fields'),
+        const DPLabel('Full name'),
+        const DPField(hint: 'Fatmata Kamara'),
+        const SizedBox(height: 16),
         const DPLabel('Phone number'),
         const DPField(hint: '0803 123 4567', prefix: Icon(DPIcons.smartphone)),
         DPSpace.h12,
@@ -185,8 +188,27 @@ Widget _signupCountry() {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const DPHeadline('Make room for simpler.', subtitle: 'Your bills, wallet and rewards. Together.'),
-        const DPLabel('Where do you live?'),
-        DPCountryPicker(selected: 'SL', onChanged: (_) {}),
+        const DPLabel('Select country'),
+        DPSelectField(
+          value: 'Sierra Leone · Leones (Le)',
+          hint: 'Select country',
+          leading: const DPFlag('SL', width: 24),
+          onTap: () {},
+        ),
+        const SizedBox(height: 12),
+        // The list that opens when the field is tapped.
+        DPCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Column(children: [
+            for (final c in DPCountry.all)
+              DPListRow(
+                leading: DPFlag(c.code, width: 28),
+                title: c.name,
+                subtitle: c.currencyName,
+                trailing: c.code == 'SL' ? const Icon(DPIcons.checkCircle, color: DP.green) : null,
+              ),
+          ]),
+        ),
         const SizedBox(height: 6),
         const DPHelper('You\'ll see Sierra Leone services and pay in Leones (Le).'),
         const SizedBox(height: 16),
