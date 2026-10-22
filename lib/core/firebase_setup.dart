@@ -3,7 +3,8 @@
 // decides when SMS is used (SIGNUP_VERIFICATION=sms); otherwise the email
 // code flow runs and Firebase is never started.
 //
-// Fill in the values below from Firebase console → Project settings →
+// Project: dalabapay-sms (Android app com.dalabapay.newproject).
+// To change them, take the values from Firebase console → Project settings →
 // Your apps (or from android/app/google-services.json):
 //   apiKey      ← "current_key"           (client → api_key)
 //   androidAppId← "mobilesdk_app_id"      (client → client_info)
@@ -20,11 +21,11 @@ import 'api/api.dart';
 class FirebaseSetup {
   FirebaseSetup._();
 
-  static const String apiKey = String.fromEnvironment('FIREBASE_API_KEY', defaultValue: '');
-  static const String androidAppId = String.fromEnvironment('FIREBASE_ANDROID_APP_ID', defaultValue: '');
+  static const String apiKey = String.fromEnvironment('FIREBASE_API_KEY', defaultValue: 'AIzaSyAKWLXo5Y2LjjYX9sy1eeQxftiGubDWlzI');
+  static const String androidAppId = String.fromEnvironment('FIREBASE_ANDROID_APP_ID', defaultValue: '1:128477486698:android:ea21ec30876d16b367f413');
   static const String iosAppId = String.fromEnvironment('FIREBASE_IOS_APP_ID', defaultValue: '');
-  static const String senderId = String.fromEnvironment('FIREBASE_SENDER_ID', defaultValue: '');
-  static const String projectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '');
+  static const String senderId = String.fromEnvironment('FIREBASE_SENDER_ID', defaultValue: '128477486698');
+  static const String projectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'dalabapay-sms');
   static const String iosBundleId = String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID', defaultValue: 'com.dalabapay.newproject');
 
   static String get _appId =>
