@@ -98,7 +98,11 @@ class DPFlag extends StatelessWidget {
             Expanded(child: Container(color: Colors.white)),
             Expanded(child: Container(color: ngGreen)),
           ]);
-    return Semantics(
+    // Keeps its own size inside stretching slots (e.g. a field's prefix).
+    return Center(
+      widthFactor: 1,
+      heightFactor: 1,
+      child: Semantics(
       label: country == 'SL' ? 'Sierra Leone flag' : 'Nigeria flag',
       child: Container(
         width: width,
@@ -109,6 +113,7 @@ class DPFlag extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: stripes,
+      ),
       ),
     );
   }
@@ -157,7 +162,7 @@ class DPCountryPicker extends StatelessWidget {
             ),
             child: Row(
               children: [
-                DPFlag(c.code, width: 30),
+                DPFlag(c.code, width: 26),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -165,7 +170,7 @@ class DPCountryPicker extends StatelessWidget {
                     children: [
                       Text(
                         c.name,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: DP.ink),
                       ),
@@ -174,10 +179,15 @@ class DPCountryPicker extends StatelessWidget {
                     ],
                   ),
                 ),
-                AnimatedOpacity(
+                // The tick only takes room when selected.
+                AnimatedSize(
                   duration: DPMotion.fast,
-                  opacity: on ? 1 : 0,
-                  child: const Icon(DPIcons.checkCircle, color: DP.green, size: 20),
+                  child: on
+                      ? const Padding(
+                          padding: EdgeInsets.only(left: 4),
+                          child: Icon(DPIcons.checkCircle, color: DP.green, size: 18),
+                        )
+                      : const SizedBox.shrink(),
                 ),
               ],
             ),
