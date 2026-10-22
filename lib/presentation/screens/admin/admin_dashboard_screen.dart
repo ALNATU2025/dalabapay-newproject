@@ -178,7 +178,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             DPAppear(child: _welcome()),
             const SizedBox(height: 16),
             DPSegmented(
-              options: const ['🇳🇬  Nigeria', '🇸🇱  Sierra Leone'],
+              options: const ['Nigeria (₦)', 'Sierra Leone (Le)'],
               index: _country == 'SL' ? 1 : 0,
               onChanged: (i) {
                 setState(() => _country = i == 1 ? 'SL' : 'NG');

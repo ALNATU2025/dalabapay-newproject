@@ -73,6 +73,47 @@ class DPCountry {
       : 'Enter a valid 11-digit Nigerian number';
 }
 
+/// A small drawn flag (doesn't depend on the device having emoji fonts).
+/// Nigeria: green-white-green vertical. Sierra Leone: green-white-blue
+/// horizontal.
+class DPFlag extends StatelessWidget {
+  final String country;
+  final double width;
+  const DPFlag(this.country, {super.key, this.width = 26});
+
+  @override
+  Widget build(BuildContext context) {
+    final h = width * 2 / 3;
+    const ngGreen = Color(0xFF008751);
+    const slGreen = Color(0xFF1EB53A);
+    const slBlue = Color(0xFF0072C6);
+    final stripes = country == 'SL'
+        ? Column(children: [
+            Expanded(child: Container(color: slGreen)),
+            Expanded(child: Container(color: Colors.white)),
+            Expanded(child: Container(color: slBlue)),
+          ])
+        : Row(children: [
+            Expanded(child: Container(color: ngGreen)),
+            Expanded(child: Container(color: Colors.white)),
+            Expanded(child: Container(color: ngGreen)),
+          ]);
+    return Semantics(
+      label: country == 'SL' ? 'Sierra Leone flag' : 'Nigeria flag',
+      child: Container(
+        width: width,
+        height: h,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(3),
+          border: Border.all(color: const Color(0x22000000), width: 0.6),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: stripes,
+      ),
+    );
+  }
+}
+
 /// Two cards: Nigeria / Sierra Leone. The choice decides the account's
 /// services, dashboard and currency.
 class DPCountryPicker extends StatelessWidget {
@@ -116,7 +157,7 @@ class DPCountryPicker extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Text(c.flag, style: const TextStyle(fontSize: 26)),
+                DPFlag(c.code, width: 30),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(

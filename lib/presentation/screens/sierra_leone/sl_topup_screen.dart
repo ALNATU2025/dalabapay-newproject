@@ -202,7 +202,7 @@ class _SlTopUpScreenState extends State<SlTopUpScreen> with SlAvailability {
                       onChanged: (_) => setState(() {}),
                       prefix: const Padding(
                         padding: EdgeInsets.only(left: 14, right: 6),
-                        child: Text('🇸🇱', style: TextStyle(fontSize: 20)),
+                        child: DPFlag('SL', width: 24),
                       ),
                       suffix: IconButton(
                         tooltip: 'Use my number',

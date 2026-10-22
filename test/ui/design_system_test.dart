@@ -195,7 +195,7 @@ Widget _signupCountry() {
           hint: '076 123 456',
           prefix: Padding(
             padding: EdgeInsets.only(left: 14, right: 6),
-            child: Text('🇸🇱', style: TextStyle(fontSize: 20)),
+            child: DPFlag('SL', width: 24),
           ),
         ),
       ],

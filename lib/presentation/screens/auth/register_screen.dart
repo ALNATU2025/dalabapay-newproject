@@ -267,7 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   prefix: Padding(
                     padding: const EdgeInsets.only(left: 14, right: 6),
-                    child: Text(_countryInfo.flag, style: const TextStyle(fontSize: 20)),
+                    child: DPFlag(_country, width: 24),
                   ),
                   suffix: const Icon(DPIcons.phone, size: 21),
                 ),

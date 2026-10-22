@@ -120,7 +120,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${u.name}  ${u.flag}', style: DP.bodyStrong),
+                    Row(children: [
+                      Flexible(child: Text(u.name, style: DP.bodyStrong)),
+                      const SizedBox(width: 6),
+                      DPFlag(u.country, width: 20),
+                    ]),
                     Text(u.email, style: DP.caption),
                     const SizedBox(height: 4),
                     Wrap(
@@ -426,7 +430,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 for (final u in users)
                   AdminUserRow(
                     name: u.name,
-                    subtitle: '${u.flag} ${u.email} · ${u.phone}',
+                    subtitle: '${u.flag} · ${u.email} · ${u.phone}',
                     onTap: () => _openUser(u),
                     trailing: Column(
                       mainAxisSize: MainAxisSize.min,

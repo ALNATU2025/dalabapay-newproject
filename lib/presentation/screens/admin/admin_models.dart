@@ -22,7 +22,8 @@ class AdminUser {
   final String kycStatus;
   final String country; // NG | SL
   String get currency => country == 'SL' ? 'SLE' : 'NGN';
-  String get flag => country == 'SL' ? '🇸🇱' : '🇳🇬';
+  /// Short country tag for lists ("NG" / "SL").
+  String get flag => country;
 
   /// Money in this user's currency (₦ or Le).
   String money(num? v, {bool decimals = true}) => DP.moneyIn(v, currency, decimals: decimals);
