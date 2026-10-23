@@ -41,6 +41,10 @@ class _RegisterScreenState extends State<RegisterScreen>
   /// "Verify by email instead" (Firebase link) is available.
   bool _emailBackup = false;
 
+  /// The server lets the person pick SMS or email (both via Firebase).
+  bool _choose = false;
+  bool _canChoose = false;
+
   /// Any phone-code screen (server or Firebase SMS).
   bool get _phoneCode => _sms || _serverSms;
 
@@ -147,6 +151,8 @@ class _RegisterScreenState extends State<RegisterScreen>
       setState(() {
         _isLoading = false;
         _showVerifyStep = true;
+        _choose = data['verification'] == 'choose';
+        _canChoose = _choose;
         _sms = data['verification'] == 'sms';
         _serverSms = data['verification'] == 'sms_code';
         _emailLink = data['verification'] == 'email_link';
@@ -308,6 +314,15 @@ class _RegisterScreenState extends State<RegisterScreen>
                     onTap: _isLoading ? null : _backToDetails,
                   ),
                 ),
+                if (_canChoose) ...[
+                  const SizedBox(height: 6),
+                  Center(
+                    child: DPTextLink(
+                      label: 'Verify by SMS code instead',
+                      onTap: _isLoading ? null : () => _pick('sms'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 const DPBanner(
                   'The email comes from Dalabapay (noreply@dalabapay-sms.firebaseapp.com). Can\'t find it? Check your spam or promotions folder.',
@@ -394,6 +409,95 @@ class _RegisterScreenState extends State<RegisterScreen>
     } catch (e) {
       if (mounted) dpSnack(context, errorMessage(e), error: true);
     }
+  }
+
+  /// The person picked how to verify (or switched to the other way).
+  Future<void> _pick(String option) async {
+    _resendTimer?.cancel();
+    _otpController.clear();
+    setState(() {
+      _choose = false;
+      _sms = option == 'sms';
+      _emailLink = option == 'email_link';
+      _resendSeconds = 0;
+      _error = null;
+    });
+    if (_sms) {
+      await _sendSms();
+    } else {
+      await _sendEmailLink();
+    }
+  }
+
+  /// Step 2 when both ways are offered.
+  Widget _buildChooseBlock() {
+    final email = _emailController.text.trim();
+    Widget option({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap,
+    }) =>
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: DPCard(
+            onTap: onTap,
+            padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+            child: Row(
+              children: [
+                DPIconBadge(icon, size: 48, iconSize: 22),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: DP.bodyStrong),
+                      const SizedBox(height: 2),
+                      Text(subtitle, style: DP.caption),
+                    ],
+                  ),
+                ),
+                Icon(DPIcons.chevronRight, color: DP.muted),
+              ],
+            ),
+          ),
+        );
+    return Column(
+      children: [
+        DPTopBar(title: 'Verify your account', onBack: _backToDetails),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const DPIconBadge(DPIcons.shieldCheck, size: 64, iconSize: 30),
+                const SizedBox(height: 28),
+                Text('How should we verify you?', style: DP.display),
+                const SizedBox(height: 10),
+                Text(
+                  'Pick one. You can switch to the other if it doesn\'t arrive.',
+                  style: DP.body.copyWith(color: DP.muted),
+                ),
+                const SizedBox(height: 24),
+                option(
+                  icon: DPIcons.sms,
+                  title: 'Text me a code',
+                  subtitle: '6-digit SMS to $_phoneE164',
+                  onTap: () => _pick('sms'),
+                ),
+                option(
+                  icon: DPIcons.mail,
+                  title: 'Email me a link',
+                  subtitle: 'Verification link to $email',
+                  onTap: () => _pick('email_link'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /// The SMS didn't arrive: switch this sign-up to the Firebase email link.
@@ -499,9 +603,11 @@ class _RegisterScreenState extends State<RegisterScreen>
             child: _showVerifyStep
                 ? KeyedSubtree(
                     key: const ValueKey('verify'),
-                    child: _emailLink
-                        ? _buildEmailLinkBlock()
-                        : _buildEmailVerificationBlock(),
+                    child: _choose
+                        ? _buildChooseBlock()
+                        : _emailLink
+                            ? _buildEmailLinkBlock()
+                            : _buildEmailVerificationBlock(),
                   )
                 : KeyedSubtree(
                     key: const ValueKey('details'),
@@ -761,12 +867,14 @@ class _RegisterScreenState extends State<RegisterScreen>
                     onTap: _isLoading ? null : _backToDetails,
                   ),
                 ),
-                if (_phoneCode && _emailBackup) ...[
+                if (_phoneCode && (_emailBackup || _canChoose)) ...[
                   const SizedBox(height: 6),
                   Center(
                     child: DPTextLink(
                       label: 'Didn\'t get the SMS? Verify by email instead',
-                      onTap: _isLoading ? null : _switchToEmail,
+                      onTap: _isLoading
+                          ? null
+                          : (_canChoose ? () => _pick('email_link') : _switchToEmail),
                     ),
                   ),
                 ],
