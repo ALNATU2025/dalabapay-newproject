@@ -27,3 +27,13 @@
 
 # Keep your model classes if you have any
 -keep class com.dalabapay.official.models.** { *; }
+# Flutter's deferred-components code refers to Google Play Core, which this
+# app doesn't include. Without these lines R8 stops the release build with
+# "Missing class com.google.android.play.core...".
+-dontwarn com.google.android.play.core.**
+
+# Firebase Auth (SMS sign-up): optional classes it may refer to.
+-dontwarn com.google.android.recaptcha.**
+-dontwarn com.google.firebase.appcheck.**
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.internal.firebase-auth-api.** { *; }
