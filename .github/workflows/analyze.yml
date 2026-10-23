@@ -128,10 +128,14 @@ jobs:
           cache: true
       - run: flutter pub get
       - name: Build APK
-        run: flutter build apk --release --target-platform android-arm64 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter build apk --release --target-platform android-arm64 2>&1 | tee build.log
       - name: Build errors
         if: failure()
-        run: grep -E "^e: |error:|What went wrong|> " build.log | head -n 20 | while read -r l; do echo "::error title=android::$l"; done
+        run: |
+          grep -E "^e: |error:|What went wrong|> " build.log | head -n 20 | while read -r l; do echo "::error title=android::$l"; done
 
   # Runs the app's API client against the real backend + MongoDB.
   contract:
