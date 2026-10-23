@@ -291,20 +291,18 @@ class _PayoutScreenState extends State<PayoutScreen> {
     }
   }
 
-  /// Rows explaining where the money goes (form preview and review).
+  /// Rows explaining the cost (form preview and review): what arrives,
+  /// the service fee, the rate and the total.
   List<DPReviewRow> _breakdownRows(Map<String, dynamic> b) {
     final send = str(b['sendCurrency']);
     final cw = asMap(b['cashwyre']);
     final cross = send != DP.currency;
-    final cwFee = toDouble(cw['fee']);
+    final serviceFee = toDouble(cw['feeInYourCurrency']) + toDouble(b['dalabapayFee']);
     return [
-      DPReviewRow('They receive', '${moneyCode(toDouble(b['sendAmount']), send)}${cross ? ' (≈ ${DP.naira(toDouble(b['amountInYourCurrency']))})' : ''}'),
-      DPReviewRow('Cashwyre fee', '${moneyCode(cwFee, str(cw['feeCurrency'], send))}${cross ? ' (≈ ${DP.naira(toDouble(cw['feeInYourCurrency']))})' : ''}'),
-      if (cross && cw['rate'] != null)
-        DPReviewRow('Cashwyre rate', str(cw['rateInfo']).isNotEmpty ? str(cw['rateInfo']) : '\$1 = ${moneyCode(toDouble(cw['rate']), send)}'),
-      if (cross && b['usdRate'] != null) DPReviewRow('Dollar rate', '\$1 = ${DP.naira(toDouble(b['usdRate']))}'),
-      if (cross && b['rate'] != null) DPReviewRow('Exchange rate', '1 $send = ${DP.naira(toDouble(b['rate']))}'),
-      DPReviewRow('Dalabapay fee', DP.naira(toDouble(b['dalabapayFee']))),
+      DPReviewRow('They receive', moneyCode(toDouble(b['sendAmount']), send)),
+      if (cross) DPReviewRow('Amount in ${DP.currency == 'SLE' ? 'Leones' : 'Naira'}', DP.naira(toDouble(b['amountInYourCurrency']))),
+      DPReviewRow('Service fee', DP.naira(serviceFee)),
+      if (cross && b['rate'] != null) DPReviewRow('Rate', '1 $send = ${DP.naira(toDouble(b['rate']))}'),
       DPReviewRow('Total to pay', DP.naira(toDouble(b['total'])), strong: true),
     ];
   }
@@ -575,16 +573,13 @@ class _PayoutScreenState extends State<PayoutScreen> {
                   children: [
                     for (final r in _breakdownRows(_fee!)) DPSummaryRow(r.label, r.value, strong: r.strong),
                     const SizedBox(height: 4),
-                    Text(
-                      'Cashwyre\'s fee is paid from our Cashwyre wallet and is included in your total.',
-                      style: DP.tiny,
-                    ),
+                    Text('The service fee and rate are included in your total.', style: DP.tiny),
                   ],
                 ),
               ),
             )
           else
-            const DPHelper('Type an amount to see Cashwyre\'s fee, the rate and your total.'),
+            const DPHelper('Type an amount to see the service fee, the rate and your total.'),
           const SizedBox(height: 18),
           const DPLabel('Note (optional)'),
           DPField(

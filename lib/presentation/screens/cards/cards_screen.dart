@@ -143,7 +143,7 @@ class _CardsScreenState extends State<CardsScreen> {
   }
 
   Future<void> _topUp(Map<String, dynamic> card) async {
-    final amount = await _askUsd('Add money to card', 'Paid from your wallet. Cashwyre\'s top-up fee is ${toDouble(asMap(_config['fees'])['topupPercent'])}%.');
+    final amount = await _askUsd('Add money to card', 'Paid from your wallet. The top-up fee is ${toDouble(asMap(_config['fees'])['topupPercent'])}% plus a small service fee.');
     if (amount == null || !mounted) return;
     final q = await _quote('topup', amount);
     if (q == null || !mounted) return;
