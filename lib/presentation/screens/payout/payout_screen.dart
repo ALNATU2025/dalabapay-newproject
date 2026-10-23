@@ -149,16 +149,23 @@ class _PayoutScreenState extends State<PayoutScreen> {
       title: 'Send to which country?',
       items: _countries,
       labelOf: (c) => str(c['name']),
-      subtitleOf: (c) => [
-        str(c['currency']),
-        if (c['bank'] != false) 'Bank',
-        if (c['mobileMoney'] != false) 'Mobile money',
-      ].join(' · '),
+      subtitleOf: (c) => c['available'] == false
+          ? '${str(c['currency'])} · Unavailable right now'
+          : [
+              str(c['currency']),
+              if (c['bank'] != false) 'Bank',
+              if (c['mobileMoney'] != false) 'Mobile money',
+            ].join(' · '),
       leadingOf: (c) => countryFlag(str(c['code'])),
       selected: _country,
       searchable: true,
     );
-    if (c != null) _selectCountry(c);
+    if (c == null || !mounted) return;
+    if (c['available'] == false) {
+      dpSnack(context, 'Transfers to ${str(c['name'])} aren\'t available right now. Please try again later.', error: true);
+      return;
+    }
+    _selectCountry(c);
   }
 
   Future<void> _pickBank() async {
