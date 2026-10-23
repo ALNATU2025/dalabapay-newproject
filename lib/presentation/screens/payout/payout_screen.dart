@@ -3,9 +3,12 @@
 // another country (through Cashwyre):
 //   GET  /api/payouts/countries
 //   GET  /api/payouts/banks?country=&type=bank|mobile_money
-//   POST /api/payouts/lookup   (account name, where supported)
+//   POST /api/payouts/lookup   (account name, as the number is typed)
+//   POST /api/payouts/fee      (Cashwyre's fee and rate, as the amount is typed)
 //   POST /api/payouts/quote    (price in the sender's currency)
 //   POST /api/payouts/send     (quote + PIN)
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -60,6 +63,15 @@ class _PayoutScreenState extends State<PayoutScreen> {
   bool _lookingUp = false;
   bool _quoting = false;
   String? _lookedUpFor;
+  String? _verifiedName; // from the bank / provider
+  bool _lookupFailed = false;
+  Timer? _lookupTimer;
+  int _lookupSeq = 0;
+  Map<String, dynamic>? _fee; // fee preview
+  String? _feeError;
+  bool _feeLoading = false;
+  Timer? _feeTimer;
+  int _feeSeq = 0;
 
   bool get _sl => Session.instance.isSierraLeone;
   String get _service => _sl ? 'sl_payout' : 'payout';
@@ -74,6 +86,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
   @override
   void dispose() {
     _number.dispose();
+    _lookupTimer?.cancel();
+    _feeTimer?.cancel();
     _name.dispose();
     _amount.dispose();
     _note.dispose();
@@ -116,9 +130,10 @@ class _PayoutScreenState extends State<PayoutScreen> {
       _country = c;
       _type = type;
       _bank = null;
-      _lookedUpFor = null;
+      _resetName();
     });
     _loadBanks();
+    _loadFee();
   }
 
   Future<void> _loadBanks() async {
@@ -180,7 +195,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
     if (b != null) {
       setState(() {
         _bank = b;
-        _lookedUpFor = null;
+        _resetName();
       });
       _lookup();
     }
@@ -188,7 +203,24 @@ class _PayoutScreenState extends State<PayoutScreen> {
 
   String get _cleanNumber => _number.text.replaceAll(RegExp(r'[\s-]'), '');
 
-  /// Fills the account name when the country supports a name check.
+  void _resetName() {
+    _lookupTimer?.cancel();
+    _lookupSeq++;
+    _lookedUpFor = null;
+    _verifiedName = null;
+    _lookupFailed = false;
+    _lookingUp = false;
+  }
+
+  /// As the number is typed: wait a moment, then ask for the name.
+  void _numberChanged(String _) {
+    setState(_resetName);
+    if (_cleanNumber.length >= 7) {
+      _lookupTimer = Timer(const Duration(milliseconds: 700), _lookup);
+    }
+  }
+
+  /// Fills the account holder's name from the bank / mobile money provider.
   Future<void> _lookup() async {
     final b = _bank;
     final c = _country;
@@ -196,24 +228,85 @@ class _PayoutScreenState extends State<PayoutScreen> {
     if (b == null || c == null || n.length < 6) return;
     final key = '${c['code']}:${b['code']}:$n';
     if (_lookedUpFor == key) return;
-    setState(() => _lookingUp = true);
+    final seq = ++_lookupSeq;
+    setState(() {
+      _lookingUp = true;
+      _lookupFailed = false;
+    });
     try {
       final r = asMap(await api.post('/api/payouts/lookup', {
         'country': c['code'],
         'bankCode': b['code'],
         'accountNumber': n,
       }));
-      if (!mounted) return;
+      if (!mounted || seq != _lookupSeq) return;
       final name = str(r['accountName']);
       setState(() {
         _lookedUpFor = key;
+        _verifiedName = name.isEmpty ? null : name;
+        _lookupFailed = name.isEmpty;
         if (name.isNotEmpty) _name.text = name;
       });
     } catch (_) {
-      // The name can be typed in.
+      if (mounted && seq == _lookupSeq) setState(() => _lookupFailed = true);
     } finally {
-      if (mounted) setState(() => _lookingUp = false);
+      if (mounted && seq == _lookupSeq) setState(() => _lookingUp = false);
     }
+  }
+
+  /// As the amount is typed: Cashwyre's fee and rate, and the total.
+  void _amountChanged(String _) {
+    _feeTimer?.cancel();
+    _feeTimer = Timer(const Duration(milliseconds: 600), _loadFee);
+  }
+
+  Future<void> _loadFee() async {
+    final c = _country;
+    final amount = double.tryParse(_amount.text) ?? 0;
+    final seq = ++_feeSeq;
+    if (c == null || amount <= 0) {
+      setState(() {
+        _fee = null;
+        _feeError = null;
+        _feeLoading = false;
+      });
+      return;
+    }
+    setState(() => _feeLoading = true);
+    try {
+      final r = asMap(await api.post('/api/payouts/fee', {'country': c['code'], 'amount': amount, 'accountType': _type}));
+      if (!mounted || seq != _feeSeq) return;
+      setState(() {
+        _fee = r;
+        _feeError = null;
+        _feeLoading = false;
+      });
+    } catch (e) {
+      if (!mounted || seq != _feeSeq) return;
+      setState(() {
+        _fee = null;
+        _feeError = errorMessage(e);
+        _feeLoading = false;
+      });
+    }
+  }
+
+  /// Rows explaining where the money goes (form preview and review).
+  List<DPReviewRow> _breakdownRows(Map<String, dynamic> b) {
+    final send = str(b['sendCurrency']);
+    final cw = asMap(b['cashwyre']);
+    final cross = send != DP.currency;
+    final cwFee = toDouble(cw['fee']);
+    return [
+      DPReviewRow('They receive', '${moneyCode(toDouble(b['sendAmount']), send)}${cross ? ' (≈ ${DP.naira(toDouble(b['amountInYourCurrency']))})' : ''}'),
+      DPReviewRow('Cashwyre fee', '${moneyCode(cwFee, str(cw['feeCurrency'], send))}${cross ? ' (≈ ${DP.naira(toDouble(cw['feeInYourCurrency']))})' : ''}'),
+      if (cross && cw['rate'] != null)
+        DPReviewRow('Cashwyre rate', str(cw['rateInfo']).isNotEmpty ? str(cw['rateInfo']) : '\$1 = ${moneyCode(toDouble(cw['rate']), send)}'),
+      if (cross && b['usdRate'] != null) DPReviewRow('Dollar rate', '\$1 = ${DP.naira(toDouble(b['usdRate']))}'),
+      if (cross && b['rate'] != null) DPReviewRow('Exchange rate', '1 $send = ${DP.naira(toDouble(b['rate']))}'),
+      DPReviewRow('Dalabapay fee', DP.naira(toDouble(b['dalabapayFee']))),
+      DPReviewRow('Total to pay', DP.naira(toDouble(b['total'])), strong: true),
+    ];
   }
 
   Future<void> _review() async {
@@ -228,7 +321,9 @@ class _PayoutScreenState extends State<PayoutScreen> {
       err = _type == 'bank' ? 'Choose the bank' : 'Choose the mobile money provider';
     } else if (_cleanNumber.length < 5) {
       err = _type == 'bank' ? 'Enter the account number' : 'Enter the mobile money number';
-    } else if (_name.text.trim().length < 2) {
+    } else if (_lookingUp) {
+      err = 'Checking the account name… one moment';
+    } else if (_verifiedName == null && _name.text.trim().length < 2) {
       err = 'Enter the account holder\'s name';
     } else if (amount <= 0) {
       err = 'Enter the amount to send';
@@ -245,7 +340,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
         'accountType': _type,
         'bankCode': b!['code'],
         'accountNumber': _cleanNumber,
-        'accountName': _name.text.trim(),
+        if (_name.text.trim().length >= 2) 'accountName': _verifiedName ?? _name.text.trim(),
         'amount': amount,
         if (_note.text.trim().isNotEmpty) 'narration': _note.text.trim(),
       }));
@@ -271,14 +366,15 @@ class _PayoutScreenState extends State<PayoutScreen> {
       amount: charge,
       service: _service,
       rows: [
-        DPReviewRow('Recipient', str(q['accountName'])),
+        DPReviewRow('Recipient', '${str(q['accountName'])}${q['nameVerified'] == true ? ' ✓' : ''}'),
         DPReviewRow(method, '${str(q['bankName'])} · ${str(q['accountNumber'])}'),
         DPReviewRow('Country', str(q['countryName'])),
-        DPReviewRow('They receive', moneyCode(toDouble(q['amount']), sendCode)),
-        if (!cross && q['fee'] != null) DPReviewRow('Fee', DP.naira(toDouble(q['fee']))),
-        if (cross && q['rate'] != null)
-          DPReviewRow('Rate', '1 $sendCode = ${DP.naira(toDouble(q['rate']))} (fees included)'),
-        DPReviewRow('Total to pay', DP.naira(charge), strong: true),
+        ...(q['breakdown'] is Map
+            ? _breakdownRows(asMap(q['breakdown']))
+            : [
+                DPReviewRow('They receive', moneyCode(toDouble(q['amount']), sendCode)),
+                DPReviewRow('Total to pay', DP.naira(charge), strong: true),
+              ]),
       ],
       footnote: 'Check the details. Money sent to the wrong account may not be recoverable. This price is held for 10 minutes.',
       successTitle: 'Transfer sent',
@@ -370,9 +466,10 @@ class _PayoutScreenState extends State<PayoutScreen> {
               onChanged: (i) {
                 setState(() {
                   _type = types[i];
-                  _lookedUpFor = null;
+                  _resetName();
                 });
                 _loadBanks();
+                _loadFee();
               },
             ),
             const SizedBox(height: 18),
@@ -402,27 +499,60 @@ class _PayoutScreenState extends State<PayoutScreen> {
               FilteringTextInputFormatter.allow(RegExp(r'[\d+ -]')),
               LengthLimitingTextInputFormatter(20),
             ],
-            onChanged: (_) => _lookedUpFor = null,
+            onChanged: _numberChanged,
             onSubmitted: (_) => _lookup(),
             suffix: _lookingUp
                 ? const Padding(
                     padding: EdgeInsets.all(14),
                     child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                   )
-                : IconButton(
-                    tooltip: 'Check name',
-                    icon: Icon(DPIcons.search, color: DP.muted),
-                    onPressed: _lookup,
-                  ),
+                : _verifiedName != null
+                    ? const Padding(padding: EdgeInsets.all(12), child: Icon(DPIcons.checkCircle, color: DP.green))
+                    : IconButton(
+                        tooltip: 'Check name',
+                        icon: Icon(DPIcons.search, color: DP.muted),
+                        onPressed: _lookup,
+                      ),
           ),
-          const SizedBox(height: 18),
-          const DPLabel('Account holder\'s name'),
-          DPField(
-            controller: _name,
-            hint: _sl ? 'Fatmata Kamara' : 'Full name on the account',
-            textCapitalization: TextCapitalization.words,
-          ),
-          if (!isBank) const DPHelper('Use the exact name registered on the mobile money wallet.'),
+          if (_lookingUp)
+            const DPHelper('Checking the account name…')
+          else if (_verifiedName != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: DPCard(
+                color: DP.mint,
+                borderColor: DP.green,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Row(
+                  children: [
+                    const Icon(DPIcons.shieldCheck, color: DP.green, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_verifiedName!, style: DP.bodyStrong.copyWith(color: DP.green)),
+                          Text(isBank ? 'Name confirmed by the bank' : 'Name confirmed by ${str(_bank?['name'], 'the provider')}', style: DP.caption),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (_verifiedName == null) ...[
+            const SizedBox(height: 18),
+            const DPLabel('Account holder\'s name'),
+            DPField(
+              controller: _name,
+              hint: _sl ? 'Fatmata Kamara' : 'Full name on the account',
+              textCapitalization: TextCapitalization.words,
+            ),
+            if (_lookupFailed)
+              const DPHelper('We couldn\'t confirm the name automatically. Type it exactly as it is on the account.')
+            else if (!isBank)
+              const DPHelper('Use the exact name registered on the mobile money wallet.'),
+          ],
           const SizedBox(height: 18),
           DPLabel('Amount they receive${_currency.isEmpty ? '' : ' ($_currency)'}'),
           DPField(
@@ -431,8 +561,31 @@ class _PayoutScreenState extends State<PayoutScreen> {
             prefixText: _currency.isEmpty ? null : '$_currency ',
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+            onChanged: _amountChanged,
           ),
-          const DPHelper('You\'ll see the total in your currency, with fees, before you pay.'),
+          if (_feeLoading && _fee == null)
+            const DPHelper('Working out the fees…')
+          else if (_feeError != null)
+            DPHelper(_feeError!, color: DP.red)
+          else if (_fee != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: DPCard(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                child: Column(
+                  children: [
+                    for (final r in _breakdownRows(_fee!)) DPSummaryRow(r.label, r.value, strong: r.strong),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Cashwyre\'s fee is paid from our Cashwyre wallet and is included in your total.',
+                      style: DP.tiny,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            const DPHelper('Type an amount to see Cashwyre\'s fee, the rate and your total.'),
           const SizedBox(height: 18),
           const DPLabel('Note (optional)'),
           DPField(
