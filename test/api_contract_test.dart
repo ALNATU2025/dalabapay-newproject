@@ -6,6 +6,7 @@
 //   flutter test test/api_contract_test.dart --dart-define=API_URL=http://localhost:4000
 // Set BACKEND_DIR (env) to the backend checkout so the test can promote a
 // user to Super Admin with its script.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -617,6 +618,56 @@ void main() {
     } on ApiException catch (e) {
       expect(e.code, 'WRONG_COUNTRY');
     }
+
+    // New Sierra Leone accounts start at Tier 1, pending approval
+    expect(user.isApproved, isFalse);
+    expect(user.tier, 1);
+    final levels = asMap(await api.get('/api/tiers'));
+    expect(levels['tier'], 1);
+    expect(asList(levels['tiers']).map((t) => t['daily']), [100, 1000, 5000, null]);
+    try {
+      await api.post('/api/wallet/fund/sl-request', {'amount': 50.0, 'method': 'orange', 'reference': 'OM${_uniq()}'});
+      fail('should wait for approval');
+    } on ApiException catch (e) {
+      expect(e.code, 'ACCOUNT_PENDING_APPROVAL');
+    }
+    Future<void> asSl() async => Session.instance.start(asMap(await api.post('/api/auth/login', {
+          'identifier': sl['phone'],
+          'password': 'Passw0rdOk',
+        })));
+
+    // AdminKycPage: approve the account; give Tier 2 no limits for this run
+    await asAdmin();
+    final waiting = asList(await api.get('/api/admin/kyc/accounts', query: {'status': 'pending'}));
+    final slId = str(asMap(sl['user'])['id']);
+    expect(waiting.map((u) => u['id']), contains(slId));
+    await api.post('/api/admin/users/$slId/approve');
+    await api.patch('/api/admin/settings', {
+      'slTiers': {
+        '2': {'daily': null, 'maxBalance': null},
+      },
+    });
+
+    // SlUpgradeScreen: Tier 2 with an ID photo; AdminKycPage approves it
+    await asSl();
+    expect(Session.instance.user!.isApproved, isTrue);
+    final photo = base64Encode(List<int>.generate(600, (i) => i % 251));
+    final req = asMap(await api.post('/api/tiers/upgrade', {
+      'tier': 2,
+      'docType': 'national_id',
+      'docNumber': 'SL${_uniq()}',
+      'front': photo,
+    }));
+    expect(req['status'], 'pending');
+    await asAdmin();
+    final reqs = asList(await api.get('/api/admin/kyc/requests', query: {'status': 'pending'}));
+    final mine = reqs.firstWhere((r) => r['id'] == req['id']);
+    expect(asMap(mine['user'])['fullName'], 'Fatmata Kamara');
+    final detail = asMap(await api.get('/api/admin/kyc/requests/${req['id']}'));
+    expect(asList(detail['files']).first['data'], photo);
+    await api.post('/api/admin/kyc/requests/${req['id']}/approve');
+    await asSl();
+    expect(Session.instance.user!.tier, 2);
 
     // SlAddMoneyScreen
     final info = asMap(await api.get('/api/wallet/sl-funding'));
