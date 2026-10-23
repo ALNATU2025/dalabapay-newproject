@@ -773,8 +773,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
                 const SizedBox(height: 18),
                 Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
                     children: [
                       Text(
                         'Already have an account? ',

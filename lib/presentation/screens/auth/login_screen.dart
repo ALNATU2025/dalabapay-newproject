@@ -229,15 +229,21 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                           const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () =>
-                                setState(() => _rememberMe = !_rememberMe),
-                            child: Text(
-                              'Remember me',
-                              style:
-                                  TextStyle(fontSize: 13.5, color: DP.inkSoft),
+                          // Flexible: large system text sizes must not
+                          // push "Forgot password?" off the screen.
+                          Flexible(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _rememberMe = !_rememberMe),
+                              child: Text(
+                                'Remember me',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 13.5, color: DP.inkSoft),
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 8),
                           const Spacer(),
                           DPTextLink(
                             label: 'Forgot password?',

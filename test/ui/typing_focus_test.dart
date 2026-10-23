@@ -8,12 +8,15 @@ import 'package:dalabapay/presentation/screens/auth/login_screen.dart';
 import 'package:dalabapay/presentation/screens/auth/register_screen.dart';
 import 'package:dalabapay/ui/ui.dart';
 
+import 'screenshot_helpers.dart';
+
 Future<void> _typeLetterByLetter(WidgetTester tester, Widget screen, String text) async {
   tester.view.physicalSize = const Size(1080, 2340);
   tester.view.devicePixelRatio = 2.75;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(MaterialApp(
     builder: (context, child) => ThemeRefresher(child: DPResponsiveFrame(child: child!)),
+    theme: ThemeData(fontFamily: 'Roboto'),
     home: screen,
   ));
   await tester.pump(const Duration(seconds: 1));
@@ -45,6 +48,7 @@ Future<void> _typeLetterByLetter(WidgetTester tester, Widget screen, String text
 }
 
 void main() {
+  setUpAll(loadTestFonts);
   testWidgets('login: typing keeps focus', (tester) async {
     await _typeLetterByLetter(tester, const LoginScreen(), 'alusine@gmail.com');
   });
