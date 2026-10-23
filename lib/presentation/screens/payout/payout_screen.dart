@@ -356,7 +356,6 @@ class _PayoutScreenState extends State<PayoutScreen> {
 
     final charge = toDouble(q['charge']);
     final sendCode = str(q['currency']);
-    final cross = sendCode != DP.currency;
     final method = _type == 'bank' ? 'Bank account' : 'Mobile money';
     final txn = await showReviewAndPay(
       context,
