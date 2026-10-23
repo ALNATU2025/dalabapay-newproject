@@ -106,6 +106,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _Tool('Service Commission', 'Rates & revenue', Icons.trending_up_rounded, DP.green, '/admin/commission', 'commission:read'),
     _Tool('Transaction Limits', 'Caps & maintenance', Icons.speed_rounded, DP.amber, '/admin/limits', 'limits:read'),
     _Tool('Sierra Leone', 'Payment accounts & bonuses', Icons.flag_outlined, DP.green, '/admin/sl-funding', 'settings:read'),
+    _Tool('Transfers & Cards', 'Cashwyre pricing', Icons.credit_card_rounded, DP.navyIcon, '/admin/cashwyre', 'settings:read'),
   ];
 
   List<_Tool> get _allowedTools =>

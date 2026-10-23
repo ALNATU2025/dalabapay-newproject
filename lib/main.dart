@@ -10,6 +10,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'ui/ui.dart';
 import 'presentation/screens/payout/payout_screen.dart';
+import 'presentation/screens/admin/admin_cashwyre_page.dart';
 import 'presentation/screens/cards/cards_screen.dart';
 import 'presentation/screens/admin/admin_all_transactions_page.dart';
 import 'presentation/screens/admin/admin_control_page.dart';
@@ -159,6 +160,7 @@ class DalabapayApp extends StatelessWidget {
     '/admin/commission': (_) => const AdminServiceCommissionPage(),
     '/admin/limits': (_) => const AdminTransactionLimitsPage(),
     '/admin/sl-funding': (_) => const AdminSlFundingPage(),
+    '/admin/cashwyre': (_) => const AdminCashwyrePage(),
   };
 
   @override
