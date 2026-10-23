@@ -153,6 +153,8 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Bank / mobile money transfers: Sierra Leone accounts only.
+                    if (Session.instance.isSierraLeone) ...[
                     DPCard(
                       onTap: () => Navigator.pushNamed(context, '/payout'),
                       padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
@@ -176,6 +178,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                     const SizedBox(height: 18),
                     Text('Or send to a Dalabapay user', style: DP.section),
                     const SizedBox(height: 12),
+                    ],
                     DPSegmented(
                       options: const ['Phone Number', 'Email'],
                       index: _mode,

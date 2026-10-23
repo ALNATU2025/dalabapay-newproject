@@ -398,6 +398,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   /// Bank / mobile money transfers (other countries too) and dollar cards.
+  /// Sierra Leone accounts only.
   Widget _buildGlobalServices() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -737,11 +738,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   delay: const Duration(milliseconds: 120),
                                   child: _buildServicesGrid(),
                                 ),
-                                const SizedBox(height: 20),
-                                DPAppear(
-                                  delay: const Duration(milliseconds: 190),
-                                  child: _buildGlobalServices(),
-                                ),
+                                // Sierra Leone accounts only (Cashwyre).
+                                if (_sl) ...[
+                                  const SizedBox(height: 20),
+                                  DPAppear(
+                                    delay: const Duration(milliseconds: 190),
+                                    child: _buildGlobalServices(),
+                                  ),
+                                ],
                                 const SizedBox(height: 20),
                                 DPAppear(
                                   delay: const Duration(milliseconds: 260),

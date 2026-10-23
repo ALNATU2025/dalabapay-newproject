@@ -142,8 +142,9 @@ class DalabapayApp extends StatelessWidget {
     '/sl/add-money': (_) => const SlAddMoneyScreen(),
     '/send-money': (_) => const SendMoneyScreen(),
     // Bank / mobile money transfers and dollar cards (Cashwyre)
-    '/payout': (_) => const PayoutScreen(),
-    '/cards': (_) => const CardsScreen(),
+    // Sierra Leone accounts only.
+    '/payout': (_) => Session.instance.isSierraLeone ? const PayoutScreen() : const DashboardScreen(),
+    '/cards': (_) => Session.instance.isSierraLeone ? const CardsScreen() : const DashboardScreen(),
     // Admin console (staff roles only; the server checks permissions)
     '/admin': (_) => const AdminDashboardScreen(),
     '/admin/users': (_) => const AdminUsersPage(),
