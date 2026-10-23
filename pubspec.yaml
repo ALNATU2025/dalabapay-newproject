@@ -25,6 +25,8 @@ dependencies:
   # Sign-up SMS codes (Firebase Phone Auth) — see lib/core/firebase_setup.dart
   firebase_core: ^4.14.0
   firebase_auth: ^6.7.0
+  # Phone push notifications — see lib/core/push.dart
+  firebase_messaging: ^16.0.0
 
 dev_dependencies:
   flutter_test:

@@ -441,10 +441,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (_maintenance != null && _maintenance!.isNotEmpty)
         DPBanner(_maintenance!, tone: DPTone.warning, icon: DPIcons.info),
       if (user != null && !user.isApproved)
-        const DPBanner(
-          'Your account is waiting for approval. You can look around, but payments are paused until it\'s approved.',
-          tone: DPTone.warning,
-          icon: DPIcons.info,
+        GestureDetector(
+          onTap: _sl ? () => _go('/sl/tiers') : null,
+          child: DPBanner(
+            user.approvalNote != null
+                ? 'Your account was not approved: ${user.approvalNote}. Contact support if you think this is a mistake.'
+                : 'Your account is waiting for approval. You can look around, but payments are paused until it\'s approved.',
+            tone: user.approvalNote != null ? DPTone.error : DPTone.warning,
+            icon: DPIcons.info,
+          ),
+        ),
+      // Sierra Leone: account level and how to raise the limits.
+      if (user != null && _sl && user.isApproved && user.tier > 0 && user.tier < 4)
+        DPCard(
+          onTap: () => _go('/sl/tiers'),
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          child: Row(
+            children: [
+              const DPIconBadge(DPIcons.shieldCheck, size: 38, iconSize: 19),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Tier ${user.tier} account', style: DP.bodyStrong),
+                    Text('Upgrade for higher daily limits and balance', style: DP.caption),
+                  ],
+                ),
+              ),
+              Icon(DPIcons.chevronRight, color: DP.muted),
+            ],
+          ),
         ),
       if (user != null && !user.pinSet)
         GestureDetector(

@@ -6,11 +6,14 @@ import 'package:flutter/services.dart';
 
 import 'core/api/api.dart';
 import 'core/api/session.dart';
+import 'core/push.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'ui/ui.dart';
 import 'presentation/screens/payout/payout_screen.dart';
 import 'presentation/screens/admin/admin_cashwyre_page.dart';
+import 'presentation/screens/admin/admin_kyc_page.dart';
+import 'presentation/screens/sierra_leone/sl_tiers_screen.dart';
 import 'presentation/screens/cards/cards_screen.dart';
 import 'presentation/screens/admin/admin_all_transactions_page.dart';
 import 'presentation/screens/admin/admin_control_page.dart';
@@ -89,6 +92,13 @@ void main() {
       );
     }
   };
+  // Push notifications that arrive while the app is open.
+  PushNotifications.onForeground = (title, body) {
+    Session.instance.unread.value += 1;
+    Session.instance.refreshQuietly();
+    final ctx = DalabapayApp.navigatorKey.currentContext;
+    if (ctx != null) dpSnack(ctx, title.isEmpty ? body : (body.isEmpty ? title : '$title — $body'));
+  };
   runApp(const DalabapayApp());
 }
 
@@ -140,6 +150,7 @@ class DalabapayApp extends StatelessWidget {
     '/sl/electricity': (_) => const SlElectricityScreen(),
     '/sl/cable': (_) => const SlCableScreen(),
     '/sl/add-money': (_) => const SlAddMoneyScreen(),
+    '/sl/tiers': (_) => const SlTiersScreen(),
     '/send-money': (_) => const SendMoneyScreen(),
     // Bank / mobile money transfers and dollar cards (Cashwyre)
     // Sierra Leone accounts only.
@@ -162,6 +173,7 @@ class DalabapayApp extends StatelessWidget {
     '/admin/limits': (_) => const AdminTransactionLimitsPage(),
     '/admin/sl-funding': (_) => const AdminSlFundingPage(),
     '/admin/cashwyre': (_) => const AdminCashwyrePage(),
+    '/admin/kyc': (_) => const AdminKycPage(),
   };
 
   @override

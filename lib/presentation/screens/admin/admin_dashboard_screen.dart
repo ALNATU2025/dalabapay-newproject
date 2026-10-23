@@ -92,6 +92,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   static const _tools = [
+    _Tool('KYC Review', 'Approve accounts & tier upgrades', Icons.verified_user_outlined, DP.green, '/admin/kyc', 'users:read'),
     _Tool('Manage Users', 'View, edit, fund, approve', Icons.group_outlined, DP.green, '/admin/users', 'users:read'),
     _Tool('Transactions', 'All payments & export', Icons.receipt_long_outlined, DP.navyIcon, '/admin/transactions', 'transactions:read'),
     _Tool('Status Update', 'Change transaction status', Icons.update_rounded, DP.navyIcon, '/admin/status', 'transactions:status'),

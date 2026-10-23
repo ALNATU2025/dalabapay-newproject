@@ -1,6 +1,7 @@
 // lib/presentation/screens/admin/admin_sl_funding_page.dart
 // Sierra Leone settings: the accounts customers pay into (Orange Money,
-// Afrimoney, bank), top-up limits and referral bonuses — all in Leones.
+// Afrimoney, bank), top-up limits, account levels (Tier 1–4) and referral
+// bonuses — all in Leones.
 //   GET   /api/admin/settings
 //   PATCH /api/admin/settings { slFunding, slReferral }
 // Customers' "I've paid" requests then appear in Status Update as pending
@@ -46,6 +47,10 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
   final _minDeposit = TextEditingController();
   bool _loaded = false;
   bool _saving = false;
+  // Account levels: daily limit and maximum balance per tier (empty = none).
+  final _tierDaily = {for (final t in ['1', '2', '3', '4']) t: TextEditingController()};
+  final _tierMax = {for (final t in ['1', '2', '3', '4']) t: TextEditingController()};
+  bool _notifyTransactions = true;
 
   @override
   void dispose() {
@@ -54,7 +59,7 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
       m.accountName.dispose();
       m.bankName.dispose();
     }
-    for (final c in [_min, _max, _instructions, _bonus, _indirect, _minDeposit]) {
+    for (final c in [_min, _max, _instructions, _bonus, _indirect, _minDeposit, ..._tierDaily.values, ..._tierMax.values]) {
       c.dispose();
     }
     super.dispose();
@@ -85,6 +90,13 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
       _bonus.text = _n(r['bonus']);
       _indirect.text = _n(r['indirectBonus']);
       _minDeposit.text = _n(r['minFirstDeposit']);
+      final tiers = asMap(s['slTiers']);
+      for (final t in _tierDaily.keys) {
+        final v = asMap(tiers[t]);
+        _tierDaily[t]!.text = v['daily'] == null ? '' : _n(v['daily']);
+        _tierMax[t]!.text = v['maxBalance'] == null ? '' : _n(v['maxBalance']);
+      }
+      _notifyTransactions = asMap(s['adminNotify'])['transactions'] != false;
       _loaded = true;
     }
     return s;
@@ -110,6 +122,14 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
               },
           ],
         },
+        'slTiers': {
+          for (final t in _tierDaily.keys)
+            t: {
+              'daily': _tierDaily[t]!.text.trim().isEmpty ? null : double.tryParse(_tierDaily[t]!.text),
+              'maxBalance': _tierMax[t]!.text.trim().isEmpty ? null : double.tryParse(_tierMax[t]!.text),
+            },
+        },
+        'adminNotify': {'transactions': _notifyTransactions},
         'slReferral': {
           'bonus': double.tryParse(_bonus.text) ?? 0,
           'indirectBonus': double.tryParse(_indirect.text) ?? 0,
@@ -186,6 +206,26 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
             const DPSectionHeader('Top-up limits'),
             _num('Minimum top-up', _min),
             _num('Maximum top-up', _max),
+            const SizedBox(height: 6),
+            const DPSectionHeader('Account levels (leave empty for no limit)'),
+            for (final t in _tierDaily.keys)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _num('Tier $t daily limit', _tierDaily[t]!)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _num('Tier $t max balance', _tierMax[t]!)),
+                ],
+              ),
+            StatefulBuilder(
+              builder: (context, setLocal) => SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _notifyTransactions,
+                onChanged: canEdit ? (v) => setLocal(() => _notifyTransactions = v) : null,
+                title: Text('Notify admins of every transaction', style: DP.bodyStrong),
+                subtitle: Text('Push to staff phones for each credit and debit. Alerts and new sign-ups always notify.', style: DP.caption),
+              ),
+            ),
             const SizedBox(height: 6),
             const DPSectionHeader('Referral bonuses'),
             _num('Bonus to referrer and new user (0 = off)', _bonus),

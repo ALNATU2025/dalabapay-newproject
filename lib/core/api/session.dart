@@ -4,6 +4,9 @@
 import 'package:flutter/foundation.dart';
 
 import '../../ui/dp_tokens.dart';
+import 'dart:async';
+
+import '../push.dart';
 import 'api.dart';
 
 class AppUser {
@@ -28,6 +31,15 @@ class AppUser {
   double get commissionBalance =>
       num.tryParse('${json['commissionBalance']}')?.toDouble() ?? 0;
   String get referralCode => json['referralCode']?.toString() ?? '';
+
+  /// Sierra Leone account level (1–4); 0 for other countries.
+  int get tier => num.tryParse('${json['tier']}')?.toInt() ?? 0;
+
+  /// Why an admin turned the account down, if they did.
+  String? get approvalNote {
+    final v = json['approvalNote']?.toString();
+    return v == null || v.isEmpty ? null : v;
+  }
 
   /// "NG" or "SL". Decides services, dashboard and currency.
   String get country => json['country']?.toString() ?? 'NG';
@@ -77,6 +89,7 @@ class Session extends ValueNotifier<AppUser?> {
     if (!api.hasToken) return false;
     try {
       await refresh();
+      unawaited(PushNotifications.register());
       return true;
     } on ApiException catch (e) {
       if (e.status == 401 || e.status == 403) await api.clearToken();
@@ -93,6 +106,7 @@ class Session extends ValueNotifier<AppUser?> {
     }
     final u = data['user'];
     if (u is Map) value = AppUser(u.cast<String, dynamic>());
+    if (api.hasToken) unawaited(PushNotifications.register());
   }
 
   Future<AppUser?> refresh() async {
@@ -114,6 +128,7 @@ class Session extends ValueNotifier<AppUser?> {
   String get homeRoute => (value?.pinSet ?? false) ? '/dashboard' : '/pin-setup';
 
   Future<void> logout() async {
+    await PushNotifications.unregister();
     await api.clearToken();
     value = null;
     unread.value = 0;
