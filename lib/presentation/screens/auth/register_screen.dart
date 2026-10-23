@@ -20,7 +20,8 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends State<RegisterScreen>
+    with WidgetsBindingObserver {
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -33,6 +34,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// Set when the server verifies sign-ups by SMS (Firebase) instead of
   /// an email code.
   bool _sms = false;
+
+  /// Sierra Leone: Firebase emails a verification link instead of a code.
+  bool _emailLink = false;
+  bool _sendingLink = false;
+  final _linkVerifier = EmailLinkVerification();
   String _phoneE164 = '';
   bool _sendingSms = false;
   final _smsVerifier = SmsVerification();
@@ -71,6 +77,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     for (final c in [
       _fullNameController,
       _emailController,
@@ -85,6 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _resendTimer?.cancel();
     _fullNameController.dispose();
     _emailController.dispose();
@@ -131,10 +139,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = false;
         _showVerifyStep = true;
         _sms = data['verification'] == 'sms';
+        _emailLink = data['verification'] == 'email_link';
         _phoneE164 = str(data['phoneE164']);
       });
       if (_sms) {
         await _sendSms();
+      } else if (_emailLink) {
+        await _sendEmailLink();
       } else {
         _startResendTimer();
         showDevCode(context, r);
@@ -154,6 +165,143 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _showVerifyStep = false;
       _error = null;
     });
+  }
+
+  /// Back in the app after tapping the link in the email: check at once.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _emailLink && _showVerifyStep && !_isLoading) {
+      _checkEmailLink(quiet: true);
+    }
+  }
+
+  Future<void> _sendEmailLink() async {
+    setState(() {
+      _sendingLink = true;
+      _error = null;
+    });
+    try {
+      await _linkVerifier.start(
+        _emailController.text.trim().toLowerCase(),
+        _passwordController.text,
+      );
+      if (!mounted) return;
+      setState(() => _sendingLink = false);
+      _startResendTimer();
+      dpSnack(context, 'Verification link sent to ${_emailController.text.trim()}', success: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sendingLink = false;
+        _error = errorMessage(e);
+      });
+    }
+  }
+
+  Future<void> _resendEmailLink() async {
+    try {
+      await _linkVerifier.resend();
+      _startResendTimer();
+      if (mounted) dpSnack(context, 'A new link is on its way.', success: true);
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  /// Creates the account once Firebase says the email is verified.
+  /// [quiet]: don't complain if the link hasn't been tapped yet.
+  Future<void> _checkEmailLink({bool quiet = false}) async {
+    setState(() {
+      _isLoading = true;
+      if (!quiet) _error = null;
+    });
+    try {
+      final token = await _linkVerifier.verifiedToken();
+      if (token == null) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          if (!quiet) {
+            _error = 'Not verified yet. Open the email, tap the link, then come back and try again.';
+          }
+        });
+        return;
+      }
+      final data = await api.post('/api/auth/register/verify-email-link', {
+        'email': _emailController.text.trim().toLowerCase(),
+        'idToken': token,
+      });
+      await Session.instance.start((data as Map).cast<String, dynamic>());
+      await EmailLinkVerification.finish();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/pin-setup', (_) => false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = errorMessage(e);
+      });
+    }
+  }
+
+  /// Step 2 for Sierra Leone — tap the link in the email.
+  Widget _buildEmailLinkBlock() {
+    final email = _emailController.text.trim();
+    return Column(
+      children: [
+        DPTopBar(title: 'Verify your email', onBack: _backToDetails),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const DPIconBadge(DPIcons.mail, size: 64, iconSize: 30),
+                const SizedBox(height: 28),
+                Text('Check your email.', style: DP.display),
+                const SizedBox(height: 10),
+                Text(
+                  _sendingLink
+                      ? 'Sending a verification link to $email…'
+                      : 'We sent a verification link to $email. Open the email, tap the link, then come back here.',
+                  style: DP.body.copyWith(color: DP.muted),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  DPHelper(_error!, color: DP.red, icon: DPIcons.alert),
+                ],
+                const SizedBox(height: 24),
+                DPButton(
+                  label: _isLoading ? 'Checking…' : 'I\'ve verified my email',
+                  loading: _isLoading,
+                  onPressed: _isLoading || _sendingLink ? null : () => _checkEmailLink(),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: _resendSeconds > 0
+                      ? Text(
+                          'Resend link in 00:${_resendSeconds.toString().padLeft(2, '0')}',
+                          style: DP.caption,
+                        )
+                      : DPTextLink(label: 'Resend link', onTap: _resend),
+                ),
+                const SizedBox(height: 10),
+                Center(
+                  child: DPTextLink(
+                    label: 'Change email address',
+                    onTap: _isLoading ? null : _backToDetails,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const DPBanner(
+                  'The email comes from Dalabapay (noreply@dalabapay-sms.firebaseapp.com). Can\'t find it? Check your spam or promotions folder.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /// Asks Firebase to text the code (also used for "Resend code").
@@ -219,6 +367,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _resend() async {
     if (_sms) return _sendSms();
+    if (_emailLink) return _resendEmailLink();
     try {
       final r = await api.post('/api/auth/register/resend',
           {'email': _emailController.text.trim().toLowerCase()});
@@ -289,7 +438,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: _showVerifyStep
                 ? KeyedSubtree(
                     key: const ValueKey('verify'),
-                    child: _buildEmailVerificationBlock(),
+                    child: _emailLink
+                        ? _buildEmailLinkBlock()
+                        : _buildEmailVerificationBlock(),
                   )
                 : KeyedSubtree(
                     key: const ValueKey('details'),

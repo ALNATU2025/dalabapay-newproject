@@ -147,3 +147,84 @@ class SmsVerification {
     return 'We couldn\'t send the SMS code. Please try again.';
   }
 }
+
+/// Sierra Leone sign-ups: Firebase emails a "Verify your email" link
+/// (Firebase can't email a code). The person taps it, comes back, and the
+/// app hands the server a Firebase ID token that says the email is verified.
+class EmailLinkVerification {
+  /// Creates (or reuses) the Firebase login for [email] and sends the link.
+  Future<void> start(String email, String password) async {
+    await FirebaseSetup.ensure();
+    final auth = FirebaseAuth.instance;
+    try {
+      try {
+        await auth.createUserWithEmailAndPassword(email: email, password: password);
+      } on FirebaseAuthException catch (e) {
+        // Started before (e.g. the app was closed): sign back in.
+        if (e.code != 'email-already-in-use') rethrow;
+        await auth.signInWithEmailAndPassword(email: email, password: password);
+      }
+      final user = auth.currentUser;
+      if (user != null && !user.emailVerified) await user.sendEmailVerification();
+    } catch (e) {
+      throw ApiException(0, 'EMAIL_LINK', _message(e));
+    }
+  }
+
+  /// Sends the link again.
+  Future<void> resend() async {
+    try {
+      await FirebaseAuth.instance.currentUser?.sendEmailVerification();
+    } catch (e) {
+      throw ApiException(0, 'EMAIL_LINK', _message(e));
+    }
+  }
+
+  /// Firebase ID token once the link has been tapped, otherwise null.
+  Future<String?> verifiedToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    try {
+      await user.reload();
+    } catch (_) {}
+    final fresh = FirebaseAuth.instance.currentUser;
+    if (fresh == null || !fresh.emailVerified) return null;
+    return fresh.getIdToken(true);
+  }
+
+  /// After the account exists on our server the Firebase login isn't
+  /// needed any more; removing it lets the email be used again cleanly.
+  static Future<void> finish() async {
+    if (Firebase.apps.isEmpty) return;
+    try {
+      await FirebaseAuth.instance.currentUser?.delete();
+    } catch (_) {}
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+  }
+
+  static String _message(Object e) {
+    if (e is ApiException) return e.message;
+    if (e is FirebaseAuthException) {
+      debugPrint('Firebase email link: ${e.code} ${e.message}');
+      switch (e.code) {
+        case 'wrong-password':
+        case 'invalid-credential':
+          return 'This email started sign-up earlier with another password. Use the same password, or contact support.';
+        case 'operation-not-allowed':
+          return 'Email sign-up isn\'t switched on yet (Firebase settings). Please contact support. [${e.code}]';
+        case 'too-many-requests':
+          return 'Too many emails requested. Please wait a few minutes and try again.';
+        case 'network-request-failed':
+          return 'Can\'t reach the verification service. Check your internet connection.';
+        case 'invalid-email':
+          return 'This email address isn\'t valid.';
+      }
+      return '${e.message ?? 'We couldn\'t send the verification email.'} [${e.code}]';
+    }
+    debugPrint('Email link error: $e');
+    return 'We couldn\'t send the verification email. Please try again.';
+  }
+}
+
