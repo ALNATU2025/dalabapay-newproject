@@ -9,6 +9,8 @@ import 'core/api/session.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'ui/ui.dart';
+import 'presentation/screens/payout/payout_screen.dart';
+import 'presentation/screens/cards/cards_screen.dart';
 import 'presentation/screens/admin/admin_all_transactions_page.dart';
 import 'presentation/screens/admin/admin_control_page.dart';
 import 'presentation/screens/admin/admin_dashboard_screen.dart';
@@ -138,6 +140,9 @@ class DalabapayApp extends StatelessWidget {
     '/sl/cable': (_) => const SlCableScreen(),
     '/sl/add-money': (_) => const SlAddMoneyScreen(),
     '/send-money': (_) => const SendMoneyScreen(),
+    // Bank / mobile money transfers and dollar cards (Cashwyre)
+    '/payout': (_) => const PayoutScreen(),
+    '/cards': (_) => const CardsScreen(),
     // Admin console (staff roles only; the server checks permissions)
     '/admin': (_) => const AdminDashboardScreen(),
     '/admin/users': (_) => const AdminUsersPage(),

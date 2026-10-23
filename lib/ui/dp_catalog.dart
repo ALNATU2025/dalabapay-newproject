@@ -31,6 +31,8 @@ const List<DPService> kDalabapayServices = [
   DPService('Pay Bills', DPIcons.receipt, '/bills', DPAssets.svcBills, DP.navyIcon),
   DPService('Add Money', DPIcons.plus, '/wallet:add', DPAssets.svcAddMoney, DP.green),
   DPService('Send Money', DPIcons.upRight, '/wallet:send', DPAssets.svcSendMoney, DP.navyIcon),
+  DPService('Bank & Mobile Money', DPIcons.bank, '/payout', null, DP.navyIcon),
+  DPService('Dollar Card', DPIcons.card, '/cards', null, DP.green),
   DPService('Earnings', DPIcons.sparkle, '/commission', DPAssets.svcEarnings, DP.green),
 ];
 
@@ -42,6 +44,8 @@ const List<DPService> kSierraLeoneServices = [
   DPService('TV Packages', DPIcons.tv, '/sl/cable', DPAssets.svcTv, DP.navyIcon),
   DPService('Add Money', DPIcons.plus, '/wallet:add', DPAssets.svcAddMoney, DP.green),
   DPService('Send Money', DPIcons.upRight, '/wallet:send', DPAssets.svcSendMoney, DP.navyIcon),
+  DPService('Bank & Mobile Money', DPIcons.bank, '/payout', null, DP.navyIcon),
+  DPService('Dollar Card', DPIcons.card, '/cards', null, DP.green),
   DPService('Earnings', DPIcons.sparkle, '/commission', DPAssets.svcEarnings, DP.green),
 ];
 

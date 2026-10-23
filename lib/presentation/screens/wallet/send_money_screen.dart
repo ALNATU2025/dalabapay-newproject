@@ -153,6 +153,29 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    DPCard(
+                      onTap: () => Navigator.pushNamed(context, '/payout'),
+                      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                      child: Row(
+                        children: [
+                          const DPIconBadge.blue(DPIcons.bank, size: 40, iconSize: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('To a bank or mobile money', style: DP.bodyStrong),
+                                Text('At home or in other countries', style: DP.caption),
+                              ],
+                            ),
+                          ),
+                          Icon(DPIcons.chevronRight, color: DP.muted),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text('Or send to a Dalabapay user', style: DP.section),
+                    const SizedBox(height: 12),
                     DPSegmented(
                       options: const ['Phone Number', 'Email'],
                       index: _mode,

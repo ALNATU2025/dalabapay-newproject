@@ -313,6 +313,9 @@ class DPIcons {
   static const IconData mail = Icons.mail_outline_rounded;
   static const IconData bank = Icons.account_balance_outlined;
   static const IconData wallet = Icons.account_balance_wallet_outlined;
+  static const IconData card = Icons.credit_card_rounded;
+  static const IconData snowflake = Icons.ac_unit_rounded;
+  static const IconData camera = Icons.photo_camera_outlined;
   static const IconData people = Icons.group_outlined;
   static const IconData referral = Icons.group_add_outlined;
   static const IconData badge = Icons.badge_outlined;

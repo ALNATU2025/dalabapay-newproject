@@ -397,6 +397,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// Bank / mobile money transfers (other countries too) and dollar cards.
+  Widget _buildGlobalServices() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const DPSectionHeader('Send & Spend Globally'),
+          DPServiceGrid(
+            columns: 3,
+            tiles: [
+              DPServiceTile(
+                icon: DPIcons.bank,
+                label: 'Bank & Mobile Money',
+                color: DP.navyIcon,
+                onTap: () => _openServiceRoute('/payout'),
+              ),
+              DPServiceTile(
+                icon: DPIcons.card,
+                label: 'Dollar Card',
+                color: DP.green,
+                onTap: () => _openServiceRoute('/cards'),
+              ),
+              DPServiceTile(
+                icon: DPIcons.upRight,
+                label: 'Send to User',
+                image: DPAssets.svcSendMoney,
+                color: DP.navyIcon,
+                onTap: () => _openServiceRoute('/wallet:send'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNotices() {
     final user = Session.instance.user;
     final notices = <Widget>[
@@ -699,6 +736,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 DPAppear(
                                   delay: const Duration(milliseconds: 120),
                                   child: _buildServicesGrid(),
+                                ),
+                                const SizedBox(height: 20),
+                                DPAppear(
+                                  delay: const Duration(milliseconds: 190),
+                                  child: _buildGlobalServices(),
                                 ),
                                 const SizedBox(height: 20),
                                 DPAppear(
