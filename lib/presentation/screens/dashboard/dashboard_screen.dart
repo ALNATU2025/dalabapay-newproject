@@ -70,6 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     DPService('EDSA', DPIcons.bolt, '/sl/electricity', DPAssets.svcElectricity, DP.green),
     DPService('Airtime', DPIcons.smartphone, '/sl/airtime', DPAssets.svcAirtime, DP.navyIcon),
     DPService('Data', DPIcons.wifi, '/sl/data', DPAssets.svcData, DP.navyIcon),
+    DPService('International', DPIcons.globe, '/international-airtime', DPAssets.svcInternational, DP.navyIcon),
   ];
   static const List<DPService> _slTvGroup = [
     DPService('DSTV', DPIcons.tv, '/sl/cable', DPAssets.dstv, DP.navyIcon),
@@ -328,7 +329,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Pay Bills',
             () => _showServiceGroup(
               'Pay Bill',
-              _sl ? 'EDSA, airtime and data' : 'Electricity, airtime and data',
+              _sl ? 'EDSA, airtime, data and international airtime' : 'Electricity, airtime and data',
               _billGroup,
             ),
           ),
@@ -359,7 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: DP.green,
                 onTap: () => _showServiceGroup(
                   'Pay Bill',
-                  _sl ? 'EDSA, airtime and data' : 'Electricity, airtime and data',
+                  _sl ? 'EDSA, airtime, data and international airtime' : 'Electricity, airtime and data',
                   _billGroup,
                 ),
               ),
@@ -422,11 +423,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onTap: () => _openServiceRoute('/cards'),
               ),
               DPServiceTile(
-                icon: DPIcons.upRight,
-                label: 'Send to User',
-                image: DPAssets.svcSendMoney,
+                icon: DPIcons.globe,
+                label: 'International Airtime',
+                image: DPAssets.svcInternational,
                 color: DP.navyIcon,
-                onTap: () => _openServiceRoute('/wallet:send'),
+                onTap: () => _openServiceRoute('/international-airtime'),
               ),
             ],
           ),

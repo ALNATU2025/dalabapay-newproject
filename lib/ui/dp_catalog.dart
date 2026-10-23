@@ -40,6 +40,7 @@ const List<DPService> kSierraLeoneServices = [
   DPService('Data', DPIcons.wifi, '/sl/data', DPAssets.svcData, DP.navyIcon),
   DPService('EDSA Electricity', DPIcons.bolt, '/sl/electricity', DPAssets.svcElectricity, DP.green),
   DPService('TV Packages', DPIcons.tv, '/sl/cable', DPAssets.svcTv, DP.navyIcon),
+  DPService('International Airtime', DPIcons.globe, '/international-airtime', DPAssets.svcInternational, DP.navyIcon),
   DPService('Add Money', DPIcons.plus, '/wallet:add', DPAssets.svcAddMoney, DP.green),
   DPService('Send Money', DPIcons.upRight, '/wallet:send', DPAssets.svcSendMoney, DP.navyIcon),
   DPService('Bank & Mobile Money', DPIcons.bank, '/payout', null, DP.navyIcon),

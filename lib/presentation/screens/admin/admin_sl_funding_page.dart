@@ -51,6 +51,9 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
   final _tierDaily = {for (final t in ['1', '2', '3', '4']) t: TextEditingController()};
   final _tierMax = {for (final t in ['1', '2', '3', '4']) t: TextEditingController()};
   bool _notifyTransactions = true;
+  // International airtime: Le per ₦1 (empty = automatic) and margin %.
+  final _intlRate = TextEditingController();
+  final _intlMargin = TextEditingController();
 
   @override
   void dispose() {
@@ -59,7 +62,7 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
       m.accountName.dispose();
       m.bankName.dispose();
     }
-    for (final c in [_min, _max, _instructions, _bonus, _indirect, _minDeposit, ..._tierDaily.values, ..._tierMax.values]) {
+    for (final c in [_min, _max, _instructions, _bonus, _indirect, _minDeposit, ..._tierDaily.values, ..._tierMax.values, _intlRate, _intlMargin]) {
       c.dispose();
     }
     super.dispose();
@@ -97,6 +100,9 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
         _tierMax[t]!.text = v['maxBalance'] == null ? '' : _n(v['maxBalance']);
       }
       _notifyTransactions = asMap(s['adminNotify'])['transactions'] != false;
+      final intl = asMap(s['slInternational']);
+      _intlRate.text = intl['rateLePerNaira'] == null ? '' : '${intl['rateLePerNaira']}';
+      _intlMargin.text = _n(intl['marginPercent'] ?? 3);
       _loaded = true;
     }
     return s;
@@ -130,6 +136,10 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
             },
         },
         'adminNotify': {'transactions': _notifyTransactions},
+        'slInternational': {
+          'rateLePerNaira': _intlRate.text.trim().isEmpty ? null : double.tryParse(_intlRate.text.trim()),
+          'marginPercent': double.tryParse(_intlMargin.text.trim()) ?? 0,
+        },
         'slReferral': {
           'bonus': double.tryParse(_bonus.text) ?? 0,
           'indirectBonus': double.tryParse(_indirect.text) ?? 0,
@@ -227,6 +237,27 @@ class _AdminSlFundingPageState extends State<AdminSlFundingPage> {
               ),
             ),
             const SizedBox(height: 6),
+            const DPSectionHeader('International airtime (VTpass)'),
+            const DPHelper('VTpass charges your Naira wallet; customers pay Leones. Leave the rate empty to use the live dollar rates.'),
+            const SizedBox(height: 8),
+            const DPLabel('Le per ₦1 (optional)'),
+            DPField(
+              controller: _intlRate,
+              hint: 'Automatic',
+              enabled: canEdit,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,6}'))],
+            ),
+            const SizedBox(height: 12),
+            const DPLabel('Margin'),
+            DPField(
+              controller: _intlMargin,
+              enabled: canEdit,
+              suffix: const Padding(padding: EdgeInsets.all(14), child: Text('%')),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+            ),
+            const SizedBox(height: 18),
             const DPSectionHeader('Referral bonuses'),
             _num('Bonus to referrer and new user (0 = off)', _bonus),
             _num('Indirect bonus', _indirect),

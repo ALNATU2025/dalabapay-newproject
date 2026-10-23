@@ -1,7 +1,8 @@
 // lib/presentation/screens/international_airtime/international_airtime_screen.dart
 // Country → type → network → plan/amount, all from
 // /api/services/international/*, priced with the provider's exchange rate;
-// payment is POST /api/services/international.
+// payment is POST /api/services/international. Sierra Leone accounts use
+// /api/services/sl/international/* (same VTpass plans, priced in Leones).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -37,6 +38,10 @@ class InternationalAirtimeScreen extends StatefulWidget {
   State<InternationalAirtimeScreen> createState() =>
       _InternationalAirtimeScreenState();
 }
+
+/// API path for the signed-in account's country.
+String get _base => Session.instance.isSierraLeone ? '/api/services/sl/international' : '/api/services/international';
+String get _service => Session.instance.isSierraLeone ? 'sl_international' : 'international';
 
 class _InternationalAirtimeScreenState
     extends State<InternationalAirtimeScreen> {
@@ -76,14 +81,14 @@ class _InternationalAirtimeScreenState
   }
 
   Future<void> _loadCountries() async {
-    final r = await _step(() => api.get('/api/services/international/countries'));
+    final r = await _step(() => api.get('$_base/countries'));
     if (r == null || !mounted) return;
     setState(() => _countries = asList(r).map(_Country.fromJson).toList());
   }
 
   Future<void> _loadTypes() async {
     final c = _country!;
-    final r = await _step(() => api.get('/api/services/international/product-types',
+    final r = await _step(() => api.get('$_base/product-types',
         query: {'country': c.code}));
     if (r == null || !mounted || _country != c) return;
     setState(() => _types = {for (final t in asList(r)) str(t['name']): str(t['id'])});
@@ -92,7 +97,7 @@ class _InternationalAirtimeScreenState
   Future<void> _loadOperators() async {
     final c = _country!;
     final type = _types[_type]!;
-    final r = await _step(() => api.get('/api/services/international/operators',
+    final r = await _step(() => api.get('$_base/operators',
         query: {'country': c.code, 'productType': type}));
     if (r == null || !mounted || _country != c) return;
     setState(() => _operators = {for (final o in asList(r)) str(o['name']): str(o['id'])});
@@ -100,7 +105,7 @@ class _InternationalAirtimeScreenState
 
   Future<void> _loadVariations() async {
     final c = _country!;
-    final r = await _step(() => api.get('/api/services/international/variations', query: {
+    final r = await _step(() => api.get('$_base/variations', query: {
           'country': c.code,
           'operator': _operators[_operator],
           'productType': _types[_type],
@@ -190,7 +195,7 @@ class _InternationalAirtimeScreenState
       title: '$_operator · ${c.name}',
       serviceLabel: 'International Airtime',
       amount: _naira,
-      service: 'international',
+      service: _service,
       rows: [
         DPReviewRow('Phone number', '${c.dialCode} ${_phone.text.trim()}'),
         DPReviewRow('Network', _operator!),
@@ -198,12 +203,12 @@ class _InternationalAirtimeScreenState
         if (_fixed) DPReviewRow('Plan', str(_variation!['name'])),
         if (_fixedNaira == null && _planRate > 0)
           DPReviewRow('Exchange rate', '1 ${c.currency} ≈ ${DP.naira(_planRate)}'),
-        const DPReviewRow('Service fee', '₦0.00'),
+        DPReviewRow('Service fee', DP.naira(0)),
         DPReviewRow('You pay', DP.naira(_naira), strong: true),
       ],
       footnote: 'International airtime can\'t be reversed once delivered.',
       onPay: (pin) async {
-        final r = await api.post('/api/services/international', {...body, 'pin': pin});
+        final r = await api.post(_base, {...body, 'pin': pin});
         return asMap(asMap(r)['transaction']);
       },
     );
@@ -392,7 +397,7 @@ class _InternationalAirtimeScreenState
                                 '1 ${c.currency} ≈ ${DP.naira(_planRate)}',
                               ),
                             DPSummaryRow('Airtime value', DP.naira(_naira)),
-                            const DPSummaryRow('Service fee', '₦0.00'),
+                            DPSummaryRow('Service fee', DP.naira(0)),
                             DPSummaryRow(
                               'You pay',
                               DP.naira(_naira),
