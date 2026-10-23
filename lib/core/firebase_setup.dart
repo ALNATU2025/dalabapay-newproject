@@ -138,9 +138,10 @@ class SmsVerification {
         case 'app-not-authorized':
         case 'missing-client-identifier':
         case 'invalid-app-credential':
-          return 'This app isn\'t authorised for SMS yet (Firebase app settings). Please contact support.';
+          return 'This app isn\'t authorised for SMS yet (Firebase app settings). Please contact support. [${e.code}]';
       }
-      return e.message ?? 'We couldn\'t send the SMS code. Please try again.';
+      // The code in brackets tells support exactly what Firebase said.
+      return '${e.message ?? 'We couldn\'t send the SMS code. Please try again.'} [${e.code}]';
     }
     debugPrint('SMS verification error: $e');
     return 'We couldn\'t send the SMS code. Please try again.';
