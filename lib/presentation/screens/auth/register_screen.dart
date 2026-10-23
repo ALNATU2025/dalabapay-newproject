@@ -35,6 +35,15 @@ class _RegisterScreenState extends State<RegisterScreen>
   /// an email code.
   bool _sms = false;
 
+  /// SMS code sent by our server (Twilio) — the usual way for both countries.
+  bool _serverSms = false;
+
+  /// "Verify by email instead" (Firebase link) is available.
+  bool _emailBackup = false;
+
+  /// Any phone-code screen (server or Firebase SMS).
+  bool get _phoneCode => _sms || _serverSms;
+
   /// Sierra Leone: Firebase emails a verification link instead of a code.
   bool _emailLink = false;
   bool _sendingLink = false;
@@ -139,10 +148,17 @@ class _RegisterScreenState extends State<RegisterScreen>
         _isLoading = false;
         _showVerifyStep = true;
         _sms = data['verification'] == 'sms';
+        _serverSms = data['verification'] == 'sms_code';
         _emailLink = data['verification'] == 'email_link';
+        _emailBackup = data['emailBackup'] == true;
         _phoneE164 = str(data['phoneE164']);
+        // The SMS couldn't be sent: say why (email backup is offered).
+        _error = data['smsError']?.toString();
       });
-      if (_sms) {
+      if (_serverSms) {
+        _startResendTimer();
+        if (data['smsError'] == null) dpSnack(context, 'Code sent to $_phoneE164', success: true);
+      } else if (_sms) {
         await _sendSms();
       } else if (_emailLink) {
         await _sendEmailLink();
@@ -380,8 +396,53 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
   }
 
+  /// The SMS didn't arrive: switch this sign-up to the Firebase email link.
+  Future<void> _switchToEmail() async {
+    setState(() => _error = null);
+    try {
+      await api.post('/api/auth/register/use-email', {
+        'email': _emailController.text.trim().toLowerCase(),
+      });
+      if (!mounted) return;
+      _resendTimer?.cancel();
+      _otpController.clear();
+      setState(() {
+        _sms = false;
+        _serverSms = false;
+        _emailLink = true;
+        _resendSeconds = 0;
+      });
+      await _sendEmailLink();
+    } catch (e) {
+      if (mounted) setState(() => _error = errorMessage(e));
+    }
+  }
+
   Future<void> _verifyAndCreate() async {
     FocusScope.of(context).unfocus();
+    if (_serverSms) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+      try {
+        final data = await api.post('/api/auth/register/verify-sms', {
+          'email': _emailController.text.trim().toLowerCase(),
+          'code': _otpController.text.trim(),
+        });
+        await Session.instance.start((data as Map).cast<String, dynamic>());
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, '/pin-setup', (_) => false);
+      } catch (e) {
+        if (!mounted) return;
+        _otpController.clear();
+        setState(() {
+          _isLoading = false;
+          _error = errorMessage(e);
+        });
+      }
+      return;
+    }
     if (_sms) {
       setState(() {
         _isLoading = true;
@@ -640,20 +701,20 @@ class _RegisterScreenState extends State<RegisterScreen>
     final email = _emailController.text.trim();
     return Column(
       children: [
-        DPTopBar(title: _sms ? 'Verify your phone' : 'Verify your email', onBack: _backToDetails),
+        DPTopBar(title: _phoneCode ? 'Verify your phone' : 'Verify your email', onBack: _backToDetails),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DPIconBadge(_sms ? DPIcons.sms : DPIcons.mail, size: 64, iconSize: 30),
+                DPIconBadge(_phoneCode ? DPIcons.sms : DPIcons.mail, size: 64, iconSize: 30),
                 const SizedBox(height: 28),
                 Text('One quick check.', style: DP.display),
                 const SizedBox(height: 10),
                 Text(
-                  _sms
-                      ? (_sendingSms
+                  _phoneCode
+                      ? (_sendingSms && _sms
                           ? 'Sending a 6-digit code by SMS to $_phoneE164…'
                           : 'Enter the 6-digit code we texted to $_phoneE164.')
                       : 'Enter the 6-digit code we sent to $email.',
@@ -687,7 +748,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 DPButton(
                   label: _isLoading
                       ? 'Creating your account…'
-                      : (_sms ? 'Verify phone' : 'Verify email'),
+                      : (_phoneCode ? 'Verify phone' : 'Verify email'),
                   loading: _isLoading,
                   onPressed: _otpController.text.trim().length == 6 && !_isLoading
                       ? _verifyAndCreate
@@ -696,13 +757,22 @@ class _RegisterScreenState extends State<RegisterScreen>
                 const SizedBox(height: 10),
                 Center(
                   child: DPTextLink(
-                    label: _sms ? 'Change phone number' : 'Change email address',
+                    label: _phoneCode ? 'Change phone number' : 'Change email address',
                     onTap: _isLoading ? null : _backToDetails,
                   ),
                 ),
+                if (_phoneCode && _emailBackup) ...[
+                  const SizedBox(height: 6),
+                  Center(
+                    child: DPTextLink(
+                      label: 'Didn\'t get the SMS? Verify by email instead',
+                      onTap: _isLoading ? null : _switchToEmail,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 DPBanner(
-                  _sms
+                  _phoneCode
                       ? 'The SMS can take up to a minute. Make sure the number is right and your phone has signal.'
                       : 'Can\'t find your code? Check your inbox and spam folder. Codes expire after 10 minutes.',
                 ),
