@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -135,7 +135,8 @@ jobs:
       - name: Build errors
         if: failure()
         run: |
-          grep -E "^e: |error:|What went wrong|> " build.log | head -n 20 | while read -r l; do echo "::error title=android::$l"; done
+          grep -iE "^e: |error|missing class|R8|What went wrong" build.log | grep -v "^\s*> Run with\|help.gradle" | head -n 30 | while read -r l; do echo "::error title=android::$l"; done
+          f=$(find build -name missing_rules.txt | head -n 1); [ -n "$f" ] && sed -n '1,40p' "$f" | while read -r l; do echo "::error title=missing_rules::$l"; done || true
 
   # Runs the app's API client against the real backend + MongoDB.
   contract:
