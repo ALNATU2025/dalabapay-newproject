@@ -76,9 +76,14 @@ class Api {
     }
   }
 
-  Future<void> setFlag(String key) async {
+  /// Sets (or with [on] false, clears) a small saved flag.
+  Future<void> setFlag(String key, {bool on = true}) async {
     try {
-      await _storage.write(key: 'flag_$key', value: '1');
+      if (on) {
+        await _storage.write(key: 'flag_$key', value: '1');
+      } else {
+        await _storage.delete(key: 'flag_$key');
+      }
     } catch (_) {}
   }
 

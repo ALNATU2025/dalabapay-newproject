@@ -18,6 +18,10 @@ class _LoginScreenState extends State<LoginScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  /// NG or SL — must be picked before logging in.
+  String? _country;
+  DPCountry get _countryInfo => DPCountry.of(_country);
+
   bool _obscurePassword = true;
   bool _rememberMe = true;
   bool _isLoading = false;
@@ -31,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen>
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
 
   bool get _formValid =>
+      _country != null &&
       _emailController.text.trim().isNotEmpty &&
       _passwordController.text.isNotEmpty;
 
@@ -39,6 +44,27 @@ class _LoginScreenState extends State<LoginScreen>
     super.initState();
     _emailController.addListener(() => setState(() {}));
     _passwordController.addListener(() => setState(() {}));
+    _restoreCountry();
+  }
+
+  /// Pre-selects the country used last time on this device.
+  Future<void> _restoreCountry() async {
+    final sl = await api.readFlag('login_country_sl');
+    final ng = await api.readFlag('login_country_ng');
+    if (!mounted || (!sl && !ng)) return;
+    setState(() => _country ??= sl ? 'SL' : 'NG');
+  }
+
+  Future<void> _rememberCountry(String code) async {
+    await api.setFlag(code == 'SL' ? 'login_country_sl' : 'login_country_ng', on: true);
+    await api.setFlag(code == 'SL' ? 'login_country_ng' : 'login_country_sl', on: false);
+  }
+
+  /// Email as typed; a phone number in the chosen country's local form.
+  String get _identifier {
+    final raw = _emailController.text.trim();
+    if (raw.contains('@')) return raw;
+    return _countryInfo.localPhone(raw) ?? raw;
   }
 
   @override
@@ -57,9 +83,11 @@ class _LoginScreenState extends State<LoginScreen>
     });
     try {
       final data = await api.post('/api/auth/login', {
-        'identifier': _emailController.text.trim(),
+        'identifier': _identifier,
         'password': _passwordController.text,
+        'country': _country,
       });
+      await _rememberCountry(_country!);
       await Session.instance.start(
         (data as Map).cast<String, dynamic>(),
         remember: _rememberMe,
@@ -123,10 +151,39 @@ class _LoginScreenState extends State<LoginScreen>
                         style: DP.body.copyWith(color: DP.muted),
                       ),
                       const SizedBox(height: 24),
+                      DPSelectField(
+                        value: _country == null
+                            ? null
+                            : '${_countryInfo.name} · ${_countryInfo.currencyName}',
+                        hint: 'Select country',
+                        leading: _country == null
+                            ? const Icon(DPIcons.globe, size: 20)
+                            : DPFlag(_country!, width: 24),
+                        onTap: () async {
+                          final picked = await dpPickFromList<DPCountry>(
+                            context,
+                            title: 'Select country',
+                            items: DPCountry.all,
+                            selected: _country == null ? null : _countryInfo,
+                            labelOf: (c) => c.name,
+                            subtitleOf: (c) => c.currencyName,
+                            leadingOf: (c) => DPFlag(c.code, width: 28),
+                          );
+                          if (picked != null && mounted) {
+                            setState(() {
+                              _country = picked.code;
+                              _error = null;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 14),
                       DPField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        hint: 'Email or Phone Number',
+                        hint: _country == null
+                            ? 'Email or Phone Number'
+                            : 'Email or phone (e.g. ${_countryInfo.phoneHint})',
                         textInputAction: TextInputAction.next,
                         prefix: const Icon(DPIcons.user, size: 20),
                       ),
