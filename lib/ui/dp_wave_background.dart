@@ -40,23 +40,33 @@ class DPWaveBackground extends StatelessWidget {
           final top = topHeight(h);
           final bottom = bottomHeight(h);
           final footer = showBottom && !keyboardOpen;
+          // The list of children never changes shape, and each has a key:
+          // hiding the footer while the keyboard is open must not make
+          // Flutter rebuild the form underneath (that took the focus away
+          // from the field being typed in after every letter).
           return Stack(
             children: [
               Positioned(
+                key: const ValueKey('dp-wave-top'),
                 top: 0,
                 right: 0,
                 width: w * 0.62,
                 child: DPWaves(top: true, height: top),
               ),
-              if (footer)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
+              Positioned(
+                key: const ValueKey('dp-wave-footer'),
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Visibility(
+                  visible: footer,
+                  maintainState: true,
                   child: DPWaves(height: bottom),
                 ),
+              ),
               // Content sits above the footer waves so nothing hides behind.
               Positioned.fill(
+                key: const ValueKey('dp-wave-content'),
                 bottom: footer ? bottom * 0.72 : 0,
                 child: child,
               ),
