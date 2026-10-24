@@ -233,10 +233,15 @@ class _InternationalAirtimeScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DPHeadline(
-                      'Send a little connection.',
-                      subtitle: 'Top up a loved one\'s number abroad.',
+const DPServiceBanner(
+                      title: 'Top up loved ones abroad in seconds.',
+                      subtitle: 'Airtime, data and PINs in 100+ countries.',
+                      icon: DPIcons.globe,
+                      image: DPAssets.svcInternational,
+                      style: DPBannerStyle.sunset,
+                      tag: 'International airtime',
                     ),
+                    const SizedBox(height: 20),
                     const DPLabel('Destination country'),
                     DPSelectField(
                       value: c == null ? null : '${c.flag}  ${c.name}',

@@ -168,7 +168,15 @@ class _SlCableScreenState extends State<SlCableScreen> with SlAvailability {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DPHeadline('Your shows, right on time.', subtitle: 'Renew DStv, GOtv or StarTimes in Leones.'),
+                    const DPServiceBanner(
+                      title: 'Pay, renew or activate your subscription in seconds.',
+                      subtitle: 'DStv, GOtv and StarTimes — paid in Leones.',
+                      icon: DPIcons.tv,
+                      image: DPAssets.svcTv,
+                      style: DPBannerStyle.navy,
+                      tag: 'Cable TV',
+                    ),
+                    const SizedBox(height: 20),
                     if (!slConnected) const SlComingSoon('Cable TV'),
                     const SectionTitle('TV provider'),
                     DPChipRow(

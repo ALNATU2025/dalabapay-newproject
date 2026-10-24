@@ -1,4 +1,6 @@
 // lib/ui/dp_widgets.dart
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -19,6 +21,7 @@ class DPTopBar extends StatelessWidget {
   final VoidCallback? onAction;
   final Widget? trailing;
   final bool showBack;
+  final bool showLogo;
 
   const DPTopBar({
     super.key,
@@ -28,6 +31,7 @@ class DPTopBar extends StatelessWidget {
     this.onAction,
     this.trailing,
     this.showBack = true,
+    this.showLogo = true,
   });
 
   @override
@@ -58,6 +62,11 @@ class DPTopBar extends StatelessWidget {
           if (trailing != null) trailing!,
           if (actionLabel != null)
             DPTextLink(label: actionLabel!, onTap: onAction),
+          // The Dalabapay mark on every screen's top bar.
+          if (showLogo) ...[
+            const SizedBox(width: 10),
+            const Semantics(label: 'Dalabapay', child: DPLogoMark(size: 26)),
+          ],
         ],
       ),
     );
@@ -1802,7 +1811,10 @@ class DPAvatar extends StatelessWidget {
   final String name;
   final double size;
   final String? imageUrl;
-  const DPAvatar({super.key, required this.name, this.size = 56, this.imageUrl});
+
+  /// A photo already in memory (the user's own profile photo).
+  final Uint8List? bytes;
+  const DPAvatar({super.key, required this.name, this.size = 56, this.imageUrl, this.bytes});
 
   static String initials(String name) {
     final parts =
@@ -1831,6 +1843,19 @@ class DPAvatar extends StatelessWidget {
         ),
       ),
     );
+    if (bytes != null && bytes!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(size * 0.3),
+        child: Image.memory(
+          bytes!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => fallback,
+        ),
+      );
+    }
     if (imageUrl == null || imageUrl!.isEmpty) return fallback;
     return ClipRRect(
       borderRadius: BorderRadius.circular(size * 0.3),

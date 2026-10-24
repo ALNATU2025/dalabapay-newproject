@@ -182,6 +182,15 @@ class _InternetScreenState extends State<InternetScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const DPServiceBanner(
+                      title: 'Buy data bundles in seconds.',
+                      subtitle: 'Daily, weekly and monthly plans on every network.',
+                      icon: DPIcons.wifi,
+                      image: DPAssets.svcData,
+                      style: DPBannerStyle.ocean,
+                      tag: 'Data',
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'More streaming, scrolling and staying close.',
                       style: DP.body.copyWith(color: DP.muted),

@@ -130,7 +130,15 @@ class _SlElectricityScreenState extends State<SlElectricityScreen> with SlAvaila
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DPHeadline('Keep the lights on.', subtitle: 'Buy EDSA prepaid units in Leones.'),
+                    const DPServiceBanner(
+                      title: 'Buy EDSA units and get your token instantly.',
+                      subtitle: 'Prepaid electricity, any time of day — in Leones.',
+                      icon: DPIcons.bolt,
+                      image: DPAssets.svcElectricity,
+                      style: DPBannerStyle.green,
+                      tag: 'EDSA Electricity',
+                    ),
+                    const SizedBox(height: 20),
                     if (!slConnected) const SlComingSoon('EDSA electricity'),
                     DPLabel(
                       'Meter number',

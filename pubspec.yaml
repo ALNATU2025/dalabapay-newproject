@@ -20,6 +20,8 @@ dependencies:
   share_plus: ^10.1.4
   url_launcher: ^6.3.1
   image_picker: ^1.1.2
+  # Fingerprint / face sign-in after the session expires
+  local_auth: ^2.3.0
   # Animations for success, loading and empty states (assets/animations/)
   lottie: ^3.1.2
   # Sign-up SMS codes (Firebase Phone Auth) — see lib/core/firebase_setup.dart

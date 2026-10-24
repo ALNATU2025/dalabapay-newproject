@@ -107,10 +107,15 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       children: [
-        DPHeadline(
-          'Top up in Leones.',
-          subtitle: 'Balance: ${DP.naira(Session.instance.user?.balance ?? 0)}',
+        DPServiceBanner(
+          title: 'Add money to your wallet.',
+          subtitle: 'Orange Money, Afrimoney or bank. Balance: ${DP.naira(Session.instance.user?.balance ?? 0)}',
+          icon: DPIcons.plus,
+          image: DPAssets.svcAddMoney,
+          style: DPBannerStyle.green,
+          tag: 'Add money',
         ),
+        const SizedBox(height: 20),
         if (methods.isEmpty)
           const DPEmptyState(
             icon: DPIcons.wallet,

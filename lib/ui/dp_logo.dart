@@ -13,8 +13,11 @@ class DPAssets {
   static const String _d = 'assets/images/';
 
   // Brand
-  static const String mark = '${_d}dabalogo.png';
-  static const String wordmark = '${_d}dalabapay2.png';
+  // Trimmed, transparent versions (the original files have wide white
+  // margins, which made the logo tiny on screen).
+  static const String mark = '${_d}logo_mark.png';
+  static const String wordmark = '${_d}logo_wordmark.png';
+  static const String wordmarkLight = '${_d}logo_wordmark_light.png'; // for dark backgrounds
 
   // Onboarding illustrations (portrait, transparent PNG)
   static const String onboarding1 = '${_d}onboarding_1.png';
@@ -142,15 +145,17 @@ class DPLogoMark extends StatelessWidget {
   }
 }
 
-/// Mark + "Dalabapay" wordmark.
+/// Mark + "Dalabapay" wordmark. [light] (default: dark mode) uses white
+/// letters for dark backgrounds.
 class DPWordmark extends StatelessWidget {
   final double height;
-  const DPWordmark({super.key, this.height = 34});
+  final bool? light;
+  const DPWordmark({super.key, this.height = 34, this.light});
 
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      DPAssets.wordmark,
+      (light ?? DP.isDark) ? DPAssets.wordmarkLight : DPAssets.wordmark,
       height: height,
       fit: BoxFit.contain,
       errorBuilder: (_, __, ___) => Row(

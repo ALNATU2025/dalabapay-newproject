@@ -220,7 +220,14 @@ class _CreateCardScreenState extends State<CreateCardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DPHeadline('Your dollar card.', subtitle: 'Choose how much to load. You can add more any time.'),
+                    const DPServiceBanner(
+                      title: 'Your dollar card, ready in a minute.',
+                      subtitle: 'Choose how much to load. You can add more any time.',
+                      icon: DPIcons.card,
+                      style: DPBannerStyle.sunset,
+                      tag: 'New card',
+                    ),
+                    const SizedBox(height: 20),
                     const SectionTitle('Amount to load'),
                     DPChipGrid(
                       options: quick,

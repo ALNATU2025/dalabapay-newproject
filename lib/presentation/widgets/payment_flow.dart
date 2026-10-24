@@ -278,6 +278,30 @@ class _ReviewPageState extends State<_ReviewPage> {
 
   void _close() => Navigator.of(context).pop(_txn);
 
+  /// The provider's logo when we have it (MTN, DStv…), else the service icon.
+  Widget _providerLogo() {
+    final name = '${widget.title} ${widget.serviceLabel}';
+    final asset = DPAssets.providerFor(name);
+    final icon = Icon(widget.icon, color: DP.navyIcon, size: 30);
+    // Sierra Leone providers without a logo file: their name in their colour.
+    final lower = name.toLowerCase();
+    const named = {
+      'orange': ('Orange', Color(0xFFFF7900)),
+      'africell': ('Africell', Color(0xFF8E1F7E)),
+      'qcell': ('Qcell', Color(0xFFE30613)),
+      'edsa': ('EDSA', Color(0xFF0B6E4F)),
+    };
+    for (final e in named.entries) {
+      if (asset == null && lower.contains(e.key)) {
+        return FittedBox(
+          child: Text(e.value.$1, style: TextStyle(color: e.value.$2, fontWeight: FontWeight.w900, fontSize: 16)),
+        );
+      }
+    }
+    if (asset == null) return icon;
+    return DPImage(asset, width: 48, height: 48, fallback: icon);
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = widget.amount + widget.fee;
@@ -322,6 +346,7 @@ class _ReviewPageState extends State<_ReviewPage> {
           rows: rows,
           onDone: _close,
           onShare: () => shareReceipt(txn, title: widget.title),
+          provider: _providerLogo(),
         ),
       );
     }

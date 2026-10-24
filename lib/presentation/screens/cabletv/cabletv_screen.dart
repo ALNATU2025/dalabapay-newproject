@@ -237,6 +237,15 @@ class _CableTvScreenState extends State<CableTvScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const DPServiceBanner(
+                      title: 'Pay, renew or activate your subscription in seconds.',
+                      subtitle: 'DStv, GOtv, StarTimes and Showmax.',
+                      icon: DPIcons.tv,
+                      image: DPAssets.svcTv,
+                      style: DPBannerStyle.navy,
+                      tag: 'Cable TV',
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'Your shows, right on time. Renew or change your package.',
                       style: DP.body.copyWith(color: DP.muted),

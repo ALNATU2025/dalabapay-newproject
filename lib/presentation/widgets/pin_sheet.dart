@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/quick_login.dart';
 import '../../ui/ui.dart';
 
 /// Returns the PIN, or null if the sheet was closed.
@@ -12,8 +13,15 @@ Future<String?> askPin(
   required String title,
   String? message,
   String confirmLabel = 'Confirm',
-}) {
-  return showModalBottomSheet<String>(
+}) async {
+  // No screenshots or app-switcher preview while the PIN is on screen.
+  await SecureScreen.enter();
+  if (!context.mounted) {
+    await SecureScreen.exit();
+    return null;
+  }
+  try {
+    return await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: DP.bg,
@@ -22,6 +30,9 @@ Future<String?> askPin(
     ),
     builder: (ctx) => _PinSheet(title: title, message: message, confirmLabel: confirmLabel),
   );
+  } finally {
+    await SecureScreen.exit();
+  }
 }
 
 class _PinSheet extends StatefulWidget {

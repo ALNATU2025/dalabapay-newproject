@@ -172,10 +172,15 @@ class _SlTopUpScreenState extends State<SlTopUpScreen> with SlAvailability {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    DPHeadline(
-                      widget.data ? 'Stay online.' : 'Keep the conversation going.',
-                      subtitle: 'Top up any Sierra Leone number in Leones.',
+                    DPServiceBanner(
+                      title: widget.data ? 'Buy data bundles in seconds.' : 'Top up airtime in seconds.',
+                      subtitle: 'Africell, Orange and Qcell — any Sierra Leone number.',
+                      icon: widget.data ? DPIcons.wifi : DPIcons.smartphone,
+                      image: widget.data ? DPAssets.svcData : DPAssets.svcAirtime,
+                      style: widget.data ? DPBannerStyle.ocean : DPBannerStyle.navy,
+                      tag: widget.data ? 'Data' : 'Airtime',
                     ),
+                    const SizedBox(height: 20),
                     if (!slConnected) SlComingSoon(widget.data ? 'Data' : 'Airtime'),
                     const SectionTitle('Choose network'),
                     DPChipRow(

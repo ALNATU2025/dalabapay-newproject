@@ -1,12 +1,16 @@
 // lib/core/api/session.dart
 // The logged-in user. Screens listen to [Session.instance] so balances and
 // names update everywhere after a payment or profile change.
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 
 import '../../ui/dp_tokens.dart';
 import 'dart:async';
 
 import '../push.dart';
+import '../quick_login.dart';
 import 'api.dart';
 
 class AppUser {
@@ -31,6 +35,22 @@ class AppUser {
   double get commissionBalance =>
       num.tryParse('${json['commissionBalance']}')?.toDouble() ?? 0;
   String get referralCode => json['referralCode']?.toString() ?? '';
+
+  /// Profile photo as a data URI (from /api/me), or null.
+  String? get avatar {
+    final v = json['avatar']?.toString();
+    return v == null || v.isEmpty ? null : v;
+  }
+
+  Uint8List? get avatarBytes {
+    final a = avatar;
+    if (a == null || !a.contains(',')) return null;
+    try {
+      return base64Decode(a.split(',').last);
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Sierra Leone account level (1–4); 0 for other countries.
   int get tier => num.tryParse('${json['tier']}')?.toInt() ?? 0;
@@ -106,12 +126,25 @@ class Session extends ValueNotifier<AppUser?> {
     }
     final u = data['user'];
     if (u is Map) value = AppUser(u.cast<String, dynamic>());
-    if (api.hasToken) unawaited(PushNotifications.register());
+    if (api.hasToken) {
+      unawaited(PushNotifications.register());
+      // Load the photo, then let this phone sign back in with the PIN.
+      unawaited(refreshQuietly().then((_) {
+        final j = value?.json;
+        if (j != null) QuickLogin.remember(j);
+      }));
+    }
   }
 
   Future<AppUser?> refresh() async {
     final data = await api.get('/api/me');
-    if (data is Map) value = AppUser(data.cast<String, dynamic>());
+    if (data is Map) {
+      // /api/me/home and others don't carry the photo: keep the last one.
+      final m = data.cast<String, dynamic>();
+      if (!m.containsKey('avatar') && value?.avatar != null) m['avatar'] = value!.avatar;
+      value = AppUser(m);
+      unawaited(QuickLogin.updateProfile(m));
+    }
     return value;
   }
 
@@ -122,7 +155,11 @@ class Session extends ValueNotifier<AppUser?> {
     } catch (_) {}
   }
 
-  void setUser(Map<String, dynamic> json) => value = AppUser(json);
+  void setUser(Map<String, dynamic> json) {
+    final m = Map<String, dynamic>.from(json);
+    if (!m.containsKey('avatar') && value?.avatar != null) m['avatar'] = value!.avatar;
+    value = AppUser(m);
+  }
 
   /// Where to go after logging in: PIN setup first if there's no PIN yet.
   String get homeRoute => (value?.pinSet ?? false) ? '/dashboard' : '/pin-setup';

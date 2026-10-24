@@ -49,6 +49,24 @@ void main() {
     });
   }
 
+  for (final dark in [false, true]) {
+    testWidgets('payment banners${dark ? ' (dark)' : ''}', (tester) async {
+      await snap(tester, 'payment_banners', _banners, dark: dark);
+      expect(find.text('Send money globally.'), findsOneWidget);
+    });
+  }
+
+  testWidgets('receipt with provider and logo', (tester) async {
+    DP.currency = 'SLE';
+    try {
+      await snap(tester, 'receipt_sl', _receipt);
+      expect(find.text('Thank you for using Dalabapay'), findsOneWidget);
+      expect(find.text('Orange'), findsOneWidget);
+    } finally {
+      DP.currency = 'NGN';
+    }
+  });
+
   test('money in other currencies', () {
     expect(usd(1250.5), '\$1,250.50');
     expect(moneyCode(1250, 'GHS'), 'GHS 1,250.00');
@@ -56,3 +74,42 @@ void main() {
     expect(moneyCode(1500, 'NGN'), '₦1,500.00');
   });
 }
+
+// Payment-screen banners and the receipt with the provider badge.
+Widget _banners() => ListView(
+      padding: const EdgeInsets.all(20),
+      children: const [
+        DPServiceBanner(
+          title: 'Pay, renew or activate your subscription in seconds.',
+          subtitle: 'DStv, GOtv and StarTimes — paid in Leones.',
+          icon: DPIcons.tv,
+          image: DPAssets.svcTv,
+          tag: 'Cable TV',
+        ),
+        SizedBox(height: 16),
+        DPServiceBanner(
+          title: 'Send money globally.',
+          subtitle: 'Banks and mobile money in 22 countries.',
+          icon: DPIcons.globe,
+          style: DPBannerStyle.ocean,
+          tag: 'Send money',
+        ),
+        SizedBox(height: 16),
+        DPServiceBanner(
+          title: 'Buy EDSA units and get your token instantly.',
+          subtitle: 'Prepaid electricity, any time of day.',
+          icon: DPIcons.bolt,
+          style: DPBannerStyle.green,
+        ),
+      ],
+    );
+
+Widget _receipt() => DPSuccessPanel(
+      serviceLabel: 'Orange Airtime',
+      amount: 25,
+      rows: const [DPReviewRow('Phone number', '076123456'), DPReviewRow('Reference', 'DP202610241200AB12')],
+      onDone: () {},
+      onShare: () {},
+      provider: const Text('Orange', style: TextStyle(color: Color(0xFFFF7900), fontWeight: FontWeight.w900)),
+    );
+

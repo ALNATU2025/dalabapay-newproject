@@ -8,6 +8,7 @@ import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
 import '../auth/login_screen.dart';
 import '../onboarding/onboarding_screen.dart';
+import '../../../core/quick_login.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -63,6 +64,13 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
     final loggedIn = results[0] == true;
     final onboarded = results[1] == true;
+    // Session expired but this phone can sign back in with the PIN.
+    if (!loggedIn && await QuickLogin.available) {
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/quick-login');
+      return;
+    }
+    if (!mounted) return;
     if (loggedIn) {
       Navigator.pushReplacementNamed(
         context,

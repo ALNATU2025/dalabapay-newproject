@@ -281,6 +281,15 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const DPServiceBanner(
+                      title: 'Insure your car in minutes.',
+                      subtitle: 'Third-party motor cover — stay road-legal.',
+                      icon: DPIcons.shield,
+                      image: DPAssets.svcInsurance,
+                      style: DPBannerStyle.green,
+                      tag: 'Insurance',
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'Third-party motor cover in minutes. Stay road-legal.',
                       style: DP.body.copyWith(color: DP.muted),

@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'core/api/api.dart';
 import 'core/api/session.dart';
 import 'core/push.dart';
+import 'core/quick_login.dart';
+import 'presentation/screens/auth/quick_login_screen.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'ui/ui.dart';
@@ -37,7 +39,6 @@ import 'presentation/screens/auth/forgot_password_screen.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/auth/otp_verification_screen.dart';
 import 'presentation/screens/auth/pin_lock_screen.dart';
-import 'presentation/screens/auth/pin_login_screen.dart';
 import 'presentation/screens/auth/pin_setup_screen.dart';
 import 'presentation/screens/auth/register_screen.dart';
 import 'presentation/screens/auth/reset_password_screen.dart';
@@ -80,10 +81,23 @@ void main() {
   ThemeController.instance.apply();
   // Saved login rejected by the server (expired, password changed,
   // account deactivated): back to the login screen.
-  Api.instance.onUnauthorized = () {
-    Session.instance.logout();
+  // Saved login rejected by the server (expired, password changed,
+  // account deactivated): sign back in with the PIN / fingerprint when this
+  // phone allows it, otherwise the password login.
+  Api.instance.onUnauthorized = () async {
+    await Session.instance.logout();
     final nav = DalabapayApp.navigatorKey.currentState;
     if (nav == null) return;
+    if (await QuickLogin.available) {
+      nav.pushAndRemoveUntil(
+        MaterialPageRoute(
+          settings: const RouteSettings(name: '/quick-login'),
+          builder: (_) => const QuickLoginScreen(notice: 'Your session has ended — sign in again'),
+        ),
+        (_) => false,
+      );
+      return;
+    }
     nav.pushNamedAndRemoveUntil('/login', (_) => false);
     final ctx = DalabapayApp.navigatorKey.currentContext;
     if (ctx != null) {
@@ -117,7 +131,9 @@ class DalabapayApp extends StatelessWidget {
     '/forgot-password': (_) => const ForgotPasswordScreen(),
     '/reset-password': (_) => const ResetPasswordScreen(),
     '/pin-setup': (_) => const PinSetupScreen(),
-    '/pin-login': (_) => const PinLoginScreen(),
+    // Photo + PIN / fingerprint (also after the session expires)
+    '/pin-login': (_) => const QuickLoginScreen(),
+    '/quick-login': (_) => const QuickLoginScreen(),
     '/pin-lock': (_) => const PinLockScreen(),
     '/change-pin': (_) => const ChangePinScreen(),
     '/change-password': (_) => const ChangePasswordScreen(),
@@ -151,7 +167,8 @@ class DalabapayApp extends StatelessWidget {
     '/sl/cable': (_) => const SlCableScreen(),
     '/sl/add-money': (_) => const SlAddMoneyScreen(),
     '/sl/tiers': (_) => const SlTiersScreen(),
-    '/send-money': (_) => const SendMoneyScreen(),
+    // Sierra Leone: Send Money is global sending (banks and mobile money).
+    '/send-money': (_) => Session.instance.isSierraLeone ? const PayoutScreen() : const SendMoneyScreen(),
     // Bank / mobile money transfers and dollar cards (Cashwyre)
     // Sierra Leone accounts only.
     '/payout': (_) => Session.instance.isSierraLeone ? const PayoutScreen() : const DashboardScreen(),

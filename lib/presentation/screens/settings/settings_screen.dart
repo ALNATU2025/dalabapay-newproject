@@ -1,10 +1,15 @@
 // lib/presentation/screens/settings/settings_screen.dart
 // Profile + Security. Details come from the session (GET /api/me); the
 // notifications switch saves to PATCH /api/me/preferences.
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/api/api.dart';
 import '../../../core/api/session.dart';
+import '../../../core/quick_login.dart';
+import '../../widgets/pin_sheet.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../ui/ui.dart';
 
@@ -27,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     Session.instance.addListener(_onSession);
     Session.instance.refreshQuietly();
+    _loadBiometric();
   }
 
   @override
@@ -230,6 +236,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  bool _uploadingPhoto = false;
+  bool _bioSupported = false;
+  bool _bioOn = false;
+
+  Future<void> _loadBiometric() async {
+    final supported = await QuickLogin.biometricsSupported;
+    final on = await QuickLogin.biometricEnabled;
+    if (mounted) setState(() {
+      _bioSupported = supported;
+      _bioOn = on;
+    });
+  }
+
+  Future<void> _setBiometric(bool on) async {
+    if (!on) {
+      await QuickLogin.disableBiometric();
+      if (mounted) setState(() => _bioOn = false);
+      return;
+    }
+    final pin = await askPin(context, title: 'Turn on fingerprint sign-in', message: 'Enter your payment PIN to confirm.');
+    if (pin == null || !mounted) return;
+    try {
+      final ok = await QuickLogin.enableBiometric(pin);
+      if (!mounted) return;
+      setState(() => _bioOn = ok);
+      dpSnack(context, ok ? 'Fingerprint sign-in is on' : 'Fingerprint check was cancelled', success: ok, error: !ok);
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  /// Take or choose a profile photo (or remove it).
+  Future<void> _changePhoto() async {
+    final has = _user?.avatar != null;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: DP.bg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(DP.rXl))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const DPSheetHandle(),
+              const SizedBox(height: 8),
+              Text('Profile photo', style: DP.title),
+              const SizedBox(height: 8),
+              DPMenuRow(icon: DPIcons.camera, title: 'Take a photo', onTap: () => Navigator.pop(ctx, 'camera')),
+              DPMenuRow(icon: DPIcons.download, title: 'Choose from gallery', onTap: () => Navigator.pop(ctx, 'gallery')),
+              if (has) DPMenuRow(icon: DPIcons.close, title: 'Remove photo', color: DP.red, onTap: () => Navigator.pop(ctx, 'remove')),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      if (choice == 'remove') {
+        await api.delete('/api/me/avatar');
+      } else {
+        final file = await ImagePicker().pickImage(
+          source: choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
+          maxWidth: 512,
+          maxHeight: 512,
+          imageQuality: 75,
+          preferredCameraDevice: CameraDevice.front,
+        );
+        if (file == null) return;
+        final bytes = await file.readAsBytes();
+        if (bytes.length > 290 * 1024) {
+          if (mounted) dpSnack(context, 'That photo is too large. Please choose another.', error: true);
+          return;
+        }
+        await api.put('/api/me/avatar', {'image': base64Encode(bytes)});
+      }
+      final me = await api.get('/api/me');
+      if (me is Map) Session.instance.setUser(me.cast<String, dynamic>());
+      if (mounted) {
+        setState(() {});
+        dpSnack(context, choice == 'remove' ? 'Photo removed' : 'Profile photo updated', success: true);
+      }
+    } catch (e) {
+      if (mounted) dpSnack(context, errorMessage(e), error: true);
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
   Future<void> _confirmLogout() async {
     final ok = await dpDialog(
       context,
@@ -244,7 +341,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok == true && mounted) {
       await Session.instance.logout();
       if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+      final quick = await QuickLogin.available;
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, quick ? '/quick-login' : '/login', (_) => false);
     }
   }
 
@@ -353,6 +452,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               _divider(),
+              if (_bioSupported) ...[
+                DPMenuRow(
+                  icon: Icons.fingerprint_rounded,
+                  title: 'Fingerprint / Face sign-in',
+                  subtitle: 'Sign back in without your PIN',
+                  trailing: Switch(value: _bioOn, onChanged: _setBiometric),
+                ),
+                _divider(),
+              ],
               _tile(
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy Policy',
@@ -526,11 +634,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
             ),
-            child: ClipOval(
-              child: SizedBox(
-                width: 64,
-                height: 64,
-                child: DPAvatar(name: _user?.fullName ?? '', size: 64),
+            child: GestureDetector(
+              onTap: _changePhoto,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipOval(
+                    child: SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: DPAvatar(name: _user?.fullName ?? '', bytes: _user?.avatarBytes, size: 64),
+                    ),
+                  ),
+                  Positioned(
+                    right: -4,
+                    bottom: -4,
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(color: DP.green, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                      child: _uploadingPhoto
+                          ? const Padding(padding: EdgeInsets.all(5), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(DPIcons.camera, size: 14, color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

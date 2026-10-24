@@ -203,6 +203,15 @@ class _EducationScreenState extends State<EducationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const DPServiceBanner(
+                      title: 'Exam PINs and result checkers in seconds.',
+                      subtitle: 'WAEC and JAMB, delivered instantly.',
+                      icon: DPIcons.school,
+                      image: DPAssets.svcEducation,
+                      style: DPBannerStyle.ocean,
+                      tag: 'Education',
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'Exam PINs and result checkers, delivered instantly.',
                       style: DP.body.copyWith(color: DP.muted),

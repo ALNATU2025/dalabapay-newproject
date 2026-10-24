@@ -247,24 +247,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: ClipOval(
                           child: DPAvatar(
                               name: Session.instance.user?.fullName ?? '',
+                              bytes: Session.instance.user?.avatarBytes,
                               size: 44),
                         ),
                       ),
                     ),
                   ),
                 ),
-                // Centre logo: assets/images/app_barlogo.png
-                // (shows the drawn wordmark until the file is added).
+                // Centre logo (white letters in dark mode).
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 160),
-                  child: Image.asset(
-                    'assets/images/app_barlogo.png',
-                    height: 34,
-                    fit: BoxFit.contain,
-                    semanticLabel: 'Dalabapay',
-                    errorBuilder: (_, __, ___) =>
-                        const DPWordmark(height: 28),
-                  ),
+                  child: const DPWordmark(height: 30),
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -780,6 +773,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   child: _HomeBanners(
                                     banners: _sl
                                         ? [
+                                            _HomeBannerData(
+                                              title: 'Send Money\nAcross Africa',
+                                              subtitle: 'Banks and mobile money in Sierra Leone, Ghana, Nigeria and more.',
+                                              image: DPAssets.bannerInternational,
+                                              icon: DPIcons.globe,
+                                              onTap: () => _openServiceRoute('/payout'),
+                                            ),
+                                            _HomeBannerData(
+                                              title: 'Your Dollar\nCard',
+                                              subtitle: 'Pay online in dollars — subscriptions, shopping and ads.',
+                                              image: DPAssets.bannerBills,
+                                              icon: DPIcons.card,
+                                              onTap: () => _openServiceRoute('/cards'),
+                                            ),
                                             _HomeBannerData(
                                               title: 'EDSA Units\nin Seconds',
                                               subtitle: 'Buy prepaid electricity and get your token instantly.',

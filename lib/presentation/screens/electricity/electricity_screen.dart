@@ -188,6 +188,15 @@ class _ElectricityScreenState extends State<ElectricityScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const DPServiceBanner(
+                      title: 'Pay electricity and get your token instantly.',
+                      subtitle: 'Prepaid and postpaid meters on every disco.',
+                      icon: DPIcons.bolt,
+                      image: DPAssets.svcElectricity,
+                      style: DPBannerStyle.green,
+                      tag: 'Electricity',
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'A brighter day starts here. Top up your meter.',
                       style: DP.body.copyWith(color: DP.muted),

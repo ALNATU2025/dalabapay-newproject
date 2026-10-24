@@ -244,6 +244,10 @@ class DPSuccessPanel extends StatelessWidget {
   final VoidCallback? onViewReceipt;
   final bool pending;
 
+  /// The service provider's logo (or icon), shown centred on top of the
+  /// receipt.
+  final Widget? provider;
+
   const DPSuccessPanel({
     super.key,
     this.title = 'Payment Successful!',
@@ -256,6 +260,7 @@ class DPSuccessPanel extends StatelessWidget {
     this.onShare,
     this.onViewReceipt,
     this.pending = false,
+    this.provider,
   });
 
   @override
@@ -302,13 +307,36 @@ class DPSuccessPanel extends StatelessWidget {
                   DPAppear(
                     delay: d(540),
                     offsetY: 24,
-                    child: _ReceiptCard(
-                      serviceLabel: serviceLabel,
-                      amount: amount,
-                      pending: pending,
-                      rows: rows,
-                      commission: commission,
-                      rowDelay: d(640),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.topCenter,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(top: provider != null ? 34 : 0),
+                          child: _ReceiptCard(
+                            serviceLabel: serviceLabel,
+                            amount: amount,
+                            pending: pending,
+                            rows: rows,
+                            commission: commission,
+                            rowDelay: d(640),
+                            topGap: provider != null ? 38 : 0,
+                          ),
+                        ),
+                        if (provider != null) _ProviderBadge(child: provider!),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+                  // Dalabapay logo under the receipt.
+                  DPAppear(
+                    delay: d(900),
+                    child: Column(
+                      children: [
+                        const DPWordmark(height: 30),
+                        const SizedBox(height: 6),
+                        Text('Thank you for using Dalabapay', textAlign: TextAlign.center, style: DP.caption),
+                      ],
                     ),
                   ),
                 ],
@@ -393,8 +421,10 @@ class _ReceiptCard extends StatelessWidget {
   final List<DPReviewRow> rows;
   final double? commission;
   final Duration rowDelay;
+  final double topGap;
 
   const _ReceiptCard({
+    this.topGap = 0,
     required this.serviceLabel,
     required this.amount,
     required this.pending,
@@ -417,7 +447,7 @@ class _ReceiptCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(DP.rLg),
         border: Border.all(color: DP.border),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: EdgeInsets.fromLTRB(16, 8 + topGap, 16, 8),
       child: Column(
         children: [
           for (var i = 0; i < all.length; i++) ...[
@@ -466,6 +496,28 @@ class _ReceiptCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Round badge with the provider's logo, sitting on the receipt's top edge.
+class _ProviderBadge extends StatelessWidget {
+  final Widget child;
+  const _ProviderBadge({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 72,
+      height: 72,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: DP.border, width: 2),
+        boxShadow: DP.shadowMd,
+      ),
+      child: ClipOval(child: Center(child: child)),
     );
   }
 }

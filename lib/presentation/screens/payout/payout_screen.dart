@@ -18,6 +18,7 @@ import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/payment_flow.dart';
+import 'payout_onboarding.dart';
 
 /// "GHS 1,250.00" for any currency code.
 String moneyCode(num? value, String code) {
@@ -81,6 +82,11 @@ class _PayoutScreenState extends State<PayoutScreen> {
   void initState() {
     super.initState();
     _load();
+    // First visit: a short introduction to banks and mobile money.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final go = await PayoutOnboarding.showIfNeeded(context);
+      if (!go && mounted) Navigator.of(context).maybePop();
+    });
   }
 
   @override
@@ -395,7 +401,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
         child: Column(
           children: [
             DPTopBar(
-              title: 'Bank & mobile money',
+              title: 'Send money',
               actionLabel: 'History',
               onAction: () => Navigator.pushNamed(context, '/transactions'),
             ),
@@ -444,10 +450,30 @@ class _PayoutScreenState extends State<PayoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DPHeadline(
-            'Send money anywhere.',
-            subtitle: 'To bank accounts and mobile money in ${_countries.length} countries. You pay in ${DP.currency == 'SLE' ? 'Leones' : 'Naira'}.',
+          DPServiceBanner(
+            title: 'Send money globally.',
+            subtitle: 'Banks and mobile money in ${_countries.length} countries. Select the country you want to send to.',
+            icon: DPIcons.globe,
+            image: DPAssets.svcSendMoney,
+            style: DPBannerStyle.ocean,
+            tag: 'Send money',
           ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              for (final step in const ['Country', 'Recipient', 'Amount', 'Pay'])
+                Expanded(
+                  child: Column(
+                    children: [
+                      Container(height: 4, margin: const EdgeInsets.symmetric(horizontal: 3), decoration: BoxDecoration(color: DP.green.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(DP.rPill))),
+                      const SizedBox(height: 6),
+                      Text(step, style: DP.tiny),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
           const DPLabel('Country'),
           DPSelectField(
             value: c == null ? null : '${str(c['name'])} (${str(c['currency'])})',

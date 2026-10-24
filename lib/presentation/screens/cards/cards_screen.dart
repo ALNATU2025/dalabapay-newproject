@@ -14,6 +14,7 @@ import '../../../ui/ui.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/payment_flow.dart';
 import '../../widgets/pin_sheet.dart';
+import '../../../core/quick_login.dart';
 import 'create_card_screen.dart';
 
 String usd(num? v) => '\$${DP.moneyIn(v, 'NGN').replaceFirst('₦', '')}';
@@ -225,6 +226,8 @@ class _CardsScreenState extends State<CardsScreen> {
     final address = [billing['street'], billing['city'], billing['zip'], billing['country']]
         .where((x) => x != null && '$x'.isNotEmpty)
         .join(', ');
+    await SecureScreen.enter(); // no screenshots of the card number
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: DP.bg,
@@ -254,6 +257,7 @@ class _CardsScreenState extends State<CardsScreen> {
         ),
       ),
     );
+    await SecureScreen.exit();
   }
 
   Widget _copyRow(BuildContext ctx, String label, String value, [String? copyValue]) {
@@ -433,10 +437,14 @@ class _CardsScreenState extends State<CardsScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       children: [
-        const DPHeadline(
-          'Pay online in dollars.',
-          subtitle: 'A virtual Visa or Mastercard for subscriptions, shopping and ads — funded from your wallet.',
+        const DPServiceBanner(
+          title: 'Pay online in dollars.',
+          subtitle: 'A virtual Visa or Mastercard for subscriptions, shopping and ads.',
+          icon: DPIcons.card,
+          style: DPBannerStyle.sunset,
+          tag: 'Dollar card',
         ),
+        const SizedBox(height: 20),
         const DollarCardView(card: {'status': 'preview', 'brand': 'Visa', 'balanceUsd': 0}),
         const SizedBox(height: 20),
         if (!_available)

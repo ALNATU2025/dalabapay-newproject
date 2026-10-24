@@ -156,10 +156,15 @@ class _AirtimeScreenState extends State<AirtimeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const DPHeadline(
-                      'Keep the conversation going.',
-                      subtitle: 'Top up any Nigerian number in moments.',
+const DPServiceBanner(
+                      title: 'Top up airtime in seconds.',
+                      subtitle: 'MTN, Airtel, Glo and 9mobile — any Nigerian number.',
+                      icon: DPIcons.smartphone,
+                      image: DPAssets.svcAirtime,
+                      style: DPBannerStyle.navy,
+                      tag: 'Airtime',
                     ),
+                    const SizedBox(height: 20),
                     const SectionTitle('Choose network'),
                     DPChipRow(
                       options: _networkIds.keys.toList(),
