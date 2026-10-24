@@ -65,7 +65,7 @@ class DPTopBar extends StatelessWidget {
           // The Dalabapay mark on every screen's top bar.
           if (showLogo) ...[
             const SizedBox(width: 10),
-            const Semantics(label: 'Dalabapay', child: DPLogoMark(size: 26)),
+            Semantics(label: 'Dalabapay', child: const DPLogoMark(size: 26)),
           ],
         ],
       ),
