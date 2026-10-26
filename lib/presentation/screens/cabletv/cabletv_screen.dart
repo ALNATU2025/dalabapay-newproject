@@ -399,7 +399,8 @@ class _CableTvScreenState extends State<CableTvScreen> {
                       else if (_plansError != null)
                         DPLoadError(error: _plansError, onRetry: _loadPlans)
                       else
-                        for (final p in _plans) _planCard(p),
+                        // ExtraView sits on its bouquet's card, not further down.
+                        for (final p in _plans.where((x) => !x.code.startsWith('xv-'))) _planCard(p),
                     ],
                     if (_isValidated &&
                         _selectedAction != null &&
@@ -449,14 +450,56 @@ class _CableTvScreenState extends State<CableTvScreen> {
     );
   }
 
+  /// The "+ ExtraView" version of [plan], if offered.
+  Plan? _extraViewOf(Plan plan) {
+    for (final p in _plans) {
+      if (p.code == 'xv-${plan.code}') return p;
+    }
+    return null;
+  }
+
+  Widget _extraViewChip(Plan xv) {
+    final on = _selectedPlan == xv;
+    return InkWell(
+      borderRadius: BorderRadius.circular(DP.rMd),
+      onTap: () => setState(() {
+        _selectedPlan = xv;
+        _quantity = 1;
+      }),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 9, 10, 9),
+        decoration: BoxDecoration(
+          color: on ? DP.green.withValues(alpha: 0.12) : DP.bg,
+          borderRadius: BorderRadius.circular(DP.rMd),
+          border: Border.all(color: on ? DP.green : DP.border),
+        ),
+        child: Row(
+          children: [
+            Icon(DPIcons.plus, size: 16, color: on ? DP.green : DP.muted),
+            const SizedBox(width: 6),
+            Expanded(child: Text('With ExtraView', style: DP.bodyStrong.copyWith(fontSize: 13.5))),
+            Text(
+              DP.naira(xv.price, decimals: false),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: DP.green),
+            ),
+            const SizedBox(width: 8),
+            Icon(on ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, size: 18, color: DP.green),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _planCard(Plan plan) {
+    final xv = _extraViewOf(plan);
     final selected = _selectedPlan == plan;
+    final anySelected = selected || (xv != null && _selectedPlan == xv);
     final current = _currentPlan == plan;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: DPCard(
-        color: selected ? DP.mint : DP.surface,
-        borderColor: selected ? DP.green : DP.border,
+        color: anySelected ? DP.mint : DP.surface,
+        borderColor: anySelected ? DP.green : DP.border,
         padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
         onTap: current
             ? () => dpSnack(context, 'You\'re already on this package')
@@ -464,7 +507,9 @@ class _CableTvScreenState extends State<CableTvScreen> {
                   _selectedPlan = plan;
                   _quantity = 1;
                 }),
-        child: Row(
+        child: Column(
+          children: [
+        Row(
           children: [
             Expanded(
               child: Column(
@@ -523,6 +568,12 @@ class _CableTvScreenState extends State<CableTvScreen> {
               size: 20,
               color: current ? DP.faint : DP.green,
             ),
+          ],
+        ),
+            if (xv != null) ...[
+              const SizedBox(height: 10),
+              _extraViewChip(xv),
+            ],
           ],
         ),
       ),

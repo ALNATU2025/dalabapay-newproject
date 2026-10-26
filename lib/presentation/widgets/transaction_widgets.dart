@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/format.dart';
 import '../../ui/ui.dart';
 import 'payment_flow.dart';
+import 'receipt_share.dart';
 
 bool txIsCredit(Map<String, dynamic> t) =>
     t['isCredit'] == true || t['direction'] == 'credit';
@@ -308,7 +309,7 @@ Future<void> showTransactionReceipt(
             DPButton(
               label: 'Share Receipt',
               icon: DPIcons.share,
-              onPressed: () => shareReceipt(tx),
+              onPressed: () => showReceiptShareOptions(ctx, ReceiptData.fromTxn(tx), text: receiptText(tx, title: description)),
             ),
             const SizedBox(height: 10),
             DPOutlineButton(

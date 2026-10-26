@@ -18,6 +18,8 @@ dependencies:
   http: ^1.2.2
   flutter_secure_storage: ^9.2.2
   share_plus: ^10.1.4
+  # Receipts as PDF (lib/presentation/widgets/receipt_share.dart)
+  pdf: ^3.11.1
   url_launcher: ^6.3.1
   image_picker: ^1.1.2
   # Fingerprint / face sign-in after the session expires

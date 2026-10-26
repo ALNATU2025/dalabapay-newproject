@@ -9,6 +9,7 @@ import '../../core/api/api.dart';
 import '../../core/api/session.dart';
 import '../../core/format.dart';
 import '../../ui/ui.dart';
+import 'receipt_share.dart';
 
 /// Commission rates (percent per service) from GET /api/services/rates.
 class CommissionRates {
@@ -345,7 +346,11 @@ class _ReviewPageState extends State<_ReviewPage> {
           pending: pending,
           rows: rows,
           onDone: _close,
-          onShare: () => shareReceipt(txn, title: widget.title),
+          onShare: () => showReceiptShareOptions(
+                context,
+                ReceiptData.fromTxn(txn, title: widget.title, extraRows: rows),
+                text: receiptText(txn, title: widget.title),
+              ),
           provider: _providerLogo(),
         ),
       );
