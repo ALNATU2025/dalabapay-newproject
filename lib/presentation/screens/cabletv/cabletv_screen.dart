@@ -28,7 +28,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
   String? _selectedProvider;
   bool _isValidating = false;
   bool _isValidated = false;
-  String? _selectedAction; // 'renew' | 'change' | 'custom'
+  String? _selectedAction; // 'renew' | 'change'
   final _customAmount = TextEditingController();
   Plan? _selectedPlan;
   int _quantity = 1;
@@ -87,13 +87,21 @@ class _CableTvScreenState extends State<CableTvScreen> {
   static const _actions = {
     'renew': 'Renew current',
     'change': 'Change package',
-    'custom': 'Pay any amount',
   };
 
-  /// DStv accepts any amount (credited to the decoder's account).
+  /// DStv renewals can be paid with an edited amount (credited to the
+  /// decoder's account).
   static const _anyAmountProviders = {'dstv'};
   static const _minCustom = 500.0;
   bool get _allowsCustom => _anyAmountProviders.contains(_providers[_selectedProvider]);
+
+  /// Renew with an editable amount (DStv).
+  bool get _editableRenew => _selectedAction == 'renew' && _allowsCustom;
+
+  void _resetRenewAmount() {
+    final r = toDouble(_customer['renewalAmount']);
+    _customAmount.text = r > 0 ? (r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(2)) : '';
+  }
 
   /// Whether this decoder can be renewed at the provider's renewal price
   /// (StarTimes can't; it is always "choose a package").
@@ -109,15 +117,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
   Map<String, String> get _availableActions => {
         if (_canRenew) 'renew': _actions['renew']!,
         'change': _actions['change']!,
-        if (_allowsCustom) 'custom': _actions['custom']!,
       };
-
-  /// Quick amounts: the renewal price first, then round figures.
-  List<double> get _customSuggestions {
-    final renewal = toDouble(_customer['renewalAmount']);
-    final list = <double>[if (renewal > 0) renewal, 2000, 5000, 10000, 20000];
-    return list.toSet().take(5).toList();
-  }
 
   /// The customer's current package, from the smartcard check.
   Plan? get _currentPlan => !_canRenew || _customer['currentPlanCode'] == null
@@ -130,7 +130,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
         );
 
   double get _amount {
-    if (_selectedAction == 'custom') return double.tryParse(_customAmount.text) ?? 0;
+    if (_editableRenew) return double.tryParse(_customAmount.text) ?? 0;
     if (_selectedAction == 'renew') return _currentPlan?.price ?? 0;
     return _selectedPlan?.price ?? 0;
   }
@@ -170,6 +170,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
         _selectedPlan = null;
         _selectedAction = _canRenew ? 'renew' : 'change';
         if (_quantity > _maxMonths) _quantity = _maxMonths;
+        _resetRenewAmount();
       });
     } catch (e) {
       if (!mounted) return;
@@ -195,16 +196,13 @@ class _CableTvScreenState extends State<CableTvScreen> {
       return;
     }
     final action = _selectedAction!;
-    if (action == 'custom' && _amount < _minCustom) {
+    final edited = _editableRenew;
+    if (edited && _amount < _minCustom) {
       dpSnack(context, 'Enter at least ${DP.naira(_minCustom, decimals: false)}', error: true);
       return;
     }
-    final plan = action == 'custom'
-        ? Plan('custom', 'Any amount', _amount, null)
-        : action == 'renew'
-            ? _currentPlan!
-            : _selectedPlan!;
-    final months = action == 'custom' ? 1 : _quantity;
+    final plan = action == 'renew' ? _currentPlan! : _selectedPlan!;
+    final months = edited ? 1 : _quantity;
     final total = _amount * months;
     final customAmount = _amount;
     final providerId = _providers[_selectedProvider]!;
@@ -219,8 +217,8 @@ class _CableTvScreenState extends State<CableTvScreen> {
       rows: [
         DPReviewRow('Customer', str(_customer['customerName'])),
         DPReviewRow('Smartcard', _smartCardController.text.trim()),
-        DPReviewRow('Package', action == 'custom' ? 'Any amount (paid into your account)' : plan.name),
-        if (action != 'custom') DPReviewRow('Months', '$_quantity'),
+        DPReviewRow('Package', plan.name),
+        if (!edited) DPReviewRow('Months', '$_quantity'),
         const DPReviewRow('Service fee', '₦0.00'),
         DPReviewRow('Total to pay', DP.naira(total), strong: true),
       ],
@@ -232,7 +230,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
           'smartcardNumber': card,
           'action': action,
           if (action == 'change') 'planCode': plan.code,
-          if (action == 'custom') 'amount': customAmount,
+          if (edited) 'amount': customAmount,
           'months': months,
           'phone': phone,
           'pin': pin,
@@ -362,24 +360,13 @@ class _CableTvScreenState extends State<CableTvScreen> {
                               .key;
                           _selectedPlan = null;
                           _quantity = 1;
+                          if (_selectedAction == 'renew') _resetRenewAmount();
                         }),
                       ),
                     ],
-                    if (_isValidated && _selectedAction == 'custom') ...[
+                    if (_isValidated && _editableRenew) ...[
                       const SizedBox(height: 18),
-                      const SectionTitle('How much do you want to pay?'),
-                      DPChipGrid(
-                        options: [
-                          for (final a in _customSuggestions) DP.naira(a, decimals: false),
-                        ],
-                        selected: _customSuggestions.contains(_amount) ? DP.naira(_amount, decimals: false) : null,
-                        height: 44,
-                        onSelect: (label) {
-                          final i = _customSuggestions.map((a) => DP.naira(a, decimals: false)).toList().indexOf(label);
-                          if (i >= 0) setState(() => _customAmount.text = _customSuggestions[i].toStringAsFixed(0));
-                        },
-                      ),
-                      const SizedBox(height: 14),
+                      const DPLabel('Amount to pay'),
                       DPField(
                         controller: _customAmount,
                         hint: '0',
@@ -387,10 +374,15 @@ class _CableTvScreenState extends State<CableTvScreen> {
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
                         onChanged: (_) => setState(() {}),
+                        suffix: IconButton(
+                          tooltip: 'Use the renewal price',
+                          icon: Icon(DPIcons.refresh, color: DP.muted),
+                          onPressed: () => setState(_resetRenewAmount),
+                        ),
                       ),
                       DPHelper(
-                        'Any amount from ${DP.naira(_minCustom, decimals: false)}. It\'s added to your DStv account. '
-                        'Your package stays active only when the balance covers its monthly price.',
+                        'Renewal price: ${DP.naira(toDouble(_customer['renewalAmount']))}. You can change the amount '
+                        '(at least ${DP.naira(_minCustom, decimals: false)}); it\'s added to your DStv account.',
                         icon: DPIcons.info,
                       ),
                     ],
@@ -408,7 +400,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
                         _selectedAction != null &&
                         _amount > 0) ...[
                       const SizedBox(height: 16),
-                      if (_selectedAction != 'custom') ...[
+                      if (!_editableRenew) ...[
                         _buildMonths(),
                         const SizedBox(height: 16),
                       ],
@@ -582,8 +574,8 @@ class _CableTvScreenState extends State<CableTvScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Column(
         children: [
-          if (_selectedAction == 'custom') ...[
-            const DPSummaryRow('Payment', 'Any amount'),
+          if (_editableRenew) ...[
+            DPSummaryRow('Renew', plan?.name.isNotEmpty == true ? plan!.name : 'Current package'),
             DPSummaryRow('Amount to pay', DP.naira(_amount), strong: true, valueColor: DP.green),
           ] else ...[
             DPSummaryRow(
