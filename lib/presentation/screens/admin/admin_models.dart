@@ -21,6 +21,21 @@ class AdminUser {
   int transactions;
   final String kycStatus;
   final String country; // NG | SL
+
+  /// Last sign-in (password, PIN or fingerprint), last time the app was
+  /// used, and the last payment / transfer. Null = never.
+  final DateTime? lastLogin;
+  final DateTime? lastSeen;
+  final DateTime? lastTransaction;
+
+  /// Used the app in the last 15 minutes.
+  bool get online => lastSeen != null && DateTime.now().difference(lastSeen!).inMinutes < 15;
+
+  /// "Online now", "12 mins ago", "Never".
+  String get seenLabel => lastSeen == null ? 'Never' : (online ? 'Online now' : timeAgo(lastSeen!));
+
+  static String when(DateTime? d) => d == null ? 'Never' : '${dateTimeLabel(d)} (${timeAgo(d)})';
+
   String get currency => country == 'SL' ? 'SLE' : 'NGN';
   /// Short country tag for lists ("NG" / "SL").
   String get flag => country;
@@ -44,6 +59,9 @@ class AdminUser {
     this.transactions = 0,
     this.kycStatus = 'none',
     this.country = 'NG',
+    this.lastLogin,
+    this.lastSeen,
+    this.lastTransaction,
   });
 
   factory AdminUser.fromJson(Map<String, dynamic> j) => AdminUser(
@@ -62,7 +80,12 @@ class AdminUser {
         transactions: toInt(j['transactions']),
         kycStatus: str(asMap(j['kyc'])['status'], 'none'),
         country: str(j['country'], 'NG'),
+        lastLogin: _date(j['lastLoginAt']),
+        lastSeen: _date(j['lastSeenAt']),
+        lastTransaction: _date(j['lastTransactionAt']),
       );
+
+  static DateTime? _date(dynamic v) => v == null || '$v'.isEmpty ? null : parseDate(v);
 
   bool get isAdmin => role != 'user';
   int get joinedDaysAgo => DateTime.now().difference(joined).inDays;

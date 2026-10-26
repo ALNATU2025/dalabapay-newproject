@@ -150,6 +150,12 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
                     Text(u.name, style: DP.bodyStrong),
                     Text('${roleLabel(u.role)} · Joined ${dateLabel(u.joined)}',
                         style: DP.caption),
+                    Text(
+                      u.online
+                          ? 'Online now'
+                          : 'Last seen ${u.lastSeen == null ? 'never' : timeAgo(u.lastSeen!).toLowerCase()} · Last sign-in ${u.lastLogin == null ? 'never' : timeAgo(u.lastLogin!).toLowerCase()}',
+                      style: DP.caption.copyWith(color: u.online ? DP.green : DP.muted),
+                    ),
                   ],
                 ),
               ),

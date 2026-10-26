@@ -31,6 +31,7 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
   bool _saving = false;
   Map<String, dynamic>? _health;
   final _message = TextEditingController();
+  final _xvFee = TextEditingController();
 
   bool get _canWrite => adminCan('settings:write');
   bool get _canManageProvider => adminCan('provider:manage');
@@ -44,6 +45,7 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
   @override
   void dispose() {
     _message.dispose();
+    _xvFee.dispose();
     super.dispose();
   }
 
@@ -62,6 +64,7 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
       setState(() {
         _readiness = ready;
         _settings = asMap(results[0]);
+        _xvFee.text = toDouble(asMap(_settings['dstvExtraView'])['fee']).toStringAsFixed(0);
         _provider = asMap(results[1]);
         _message.text = str(_settings['maintenanceMessage']);
         _loading = false;
@@ -407,6 +410,55 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
                       ),
                     ),
                   ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            const DPSectionHeader('DStv ExtraView (Nigeria)'),
+            Text(
+              'VTpass can\'t sell ExtraView packages, so the app offers its own: each bouquet + ExtraView at the bouquet price plus this fee, paid to the decoder account as a renewal of that amount.',
+              style: DP.caption,
+            ),
+            const SizedBox(height: 10),
+            DPCard(
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+              child: Column(
+                children: [
+                  DPMenuRow(
+                    icon: DPIcons.tv,
+                    title: 'Offer ExtraView packages',
+                    subtitle: asMap(_settings['dstvExtraView'])['enabled'] == false ? 'Hidden' : 'Shown to Nigerian customers',
+                    trailing: Switch(
+                      value: asMap(_settings['dstvExtraView'])['enabled'] != false,
+                      onChanged: _saving || !_canWrite
+                          ? null
+                          : (v) => _patch({'dstvExtraView': {'enabled': v}}, done: v ? 'ExtraView packages on' : 'ExtraView packages off'),
+                    ),
+                  ),
+                  const DPLabel('ExtraView fee (added to the bouquet price)'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DPField(
+                          controller: _xvFee,
+                          prefixText: '₦ ',
+                          enabled: _canWrite,
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 96,
+                        child: DPButton(
+                          label: 'Save',
+                          height: 48,
+                          onPressed: !_canWrite || _saving
+                              ? null
+                              : () => _patch({'dstvExtraView': {'fee': double.tryParse(_xvFee.text.trim()) ?? 0}}, done: 'ExtraView fee saved'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

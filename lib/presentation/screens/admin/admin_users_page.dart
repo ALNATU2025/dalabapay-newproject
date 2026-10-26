@@ -31,6 +31,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     'Inactive',
     'Admins',
     'Awaiting Approval',
+    'Online now',
+    'Not seen 30+ days',
   ];
 
   static const _filterValues = {
@@ -39,6 +41,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     'Inactive': 'inactive',
     'Admins': 'admins',
     'Awaiting Approval': 'pending',
+    'Online now': 'online',
+    'Not seen 30+ days': 'dormant',
   };
 
   List<AdminUser> _users = [];
@@ -69,6 +73,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       final r = asMap(await api.get('/api/admin/users', query: {
         'q': _query.trim(),
         'filter': _filterValues[_filter],
+        if (_filter == 'Online now') 'sort': 'last_seen',
         'page': more ? _page + 1 : 1,
       }));
       if (!mounted || id != _req) return;
@@ -153,6 +158,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 DPSummaryRow('KYC', u.kycStatus == 'none' ? 'Not started' : statusLabel(u.kycStatus)),
                 DPSummaryRow('Payment PIN', u.pinLocked ? 'Locked' : (u.pinSet ? 'Set' : 'Not set')),
                 DPSummaryRow('Joined', dateLabel(u.joined)),
+                DPSummaryRow('Last sign-in', AdminUser.when(u.lastLogin)),
+                DPSummaryRow('Last seen', u.online ? 'Online now' : AdminUser.when(u.lastSeen), valueColor: u.online ? DP.green : null),
+                DPSummaryRow('Last transaction', AdminUser.when(u.lastTransaction)),
               ],
             ),
           ),
@@ -430,7 +438,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 for (final u in users)
                   AdminUserRow(
                     name: u.name,
-                    subtitle: '${u.flag} · ${u.email} · ${u.phone}',
+                    subtitle: '${u.flag} · ${u.phone} · ${u.online ? 'Online now' : (u.lastSeen == null ? 'Not seen yet' : 'Seen ${timeAgo(u.lastSeen!).toLowerCase()}')}',
                     onTap: () => _openUser(u),
                     trailing: Column(
                       mainAxisSize: MainAxisSize.min,
