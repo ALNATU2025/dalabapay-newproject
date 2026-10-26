@@ -114,8 +114,9 @@ class _CableTvScreenState extends State<CableTvScreen> {
     return m <= 0 ? 12 : m;
   }
 
+  // DStv can always renew (with a typed amount); others need a renewal price.
   Map<String, String> get _availableActions => {
-        if (_canRenew) 'renew': _actions['renew']!,
+        if (_canRenew || _allowsCustom) 'renew': _actions['renew']!,
         'change': _actions['change']!,
       };
 
@@ -168,7 +169,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
         _isValidated = true;
         _customer = r;
         _selectedPlan = null;
-        _selectedAction = _canRenew ? 'renew' : 'change';
+        _selectedAction = (_canRenew || _allowsCustom) ? 'renew' : 'change';
         if (_quantity > _maxMonths) _quantity = _maxMonths;
         _resetRenewAmount();
       });
@@ -201,7 +202,9 @@ class _CableTvScreenState extends State<CableTvScreen> {
       dpSnack(context, 'Enter at least ${DP.naira(_minCustom, decimals: false)}', error: true);
       return;
     }
-    final plan = action == 'renew' ? _currentPlan! : _selectedPlan!;
+    final plan = action == 'renew'
+        ? (_currentPlan ?? Plan('renew', str(_customer['currentPlan'], 'Current package'), _amount))
+        : _selectedPlan!;
     final months = edited ? 1 : _quantity;
     final total = _amount * months;
     final customAmount = _amount;
@@ -381,8 +384,10 @@ class _CableTvScreenState extends State<CableTvScreen> {
                         ),
                       ),
                       DPHelper(
-                        'Renewal price: ${DP.naira(toDouble(_customer['renewalAmount']))}. You can change the amount '
-                        '(at least ${DP.naira(_minCustom, decimals: false)}); it\'s added to your DStv account.',
+                        toDouble(_customer['renewalAmount']) > 0
+                            ? 'Renewal price: ${DP.naira(toDouble(_customer['renewalAmount']))}. You can change the amount '
+                                '(at least ${DP.naira(_minCustom, decimals: false)}); it\'s added to your DStv account.'
+                            : 'Type the amount to pay (at least ${DP.naira(_minCustom, decimals: false)}); it\'s added to your DStv account.',
                         icon: DPIcons.info,
                       ),
                     ],
