@@ -8,6 +8,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -95,6 +96,33 @@ class Api {
     } catch (_) {
       _token = null;
     }
+    await _loadDeviceId();
+  }
+
+  // A random id for this install, kept across logouts, so the server can
+  // tell the person (and the admins) when the account signs in on a new
+  // phone. It identifies nothing else about the phone.
+  static const _deviceKey = 'dp_device_id';
+  String? _deviceId;
+
+  Future<void> _loadDeviceId() async {
+    if (kIsWeb || _deviceId != null) return;
+    try {
+      var id = await _storage.read(key: _deviceKey);
+      if (id == null || id.length < 16) {
+        final r = Random.secure();
+        id = List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+        await _storage.write(key: _deviceKey, value: id);
+      }
+      _deviceId = id;
+    } catch (_) {}
+  }
+
+  static String get _deviceName {
+    if (kIsWeb) return 'Web browser';
+    if (Platform.isIOS) return 'iPhone';
+    if (Platform.isAndroid) return 'Android phone';
+    return Platform.operatingSystem;
   }
 
   /// Saves the token. With [persist] false ("Remember me" off) it is kept
@@ -130,6 +158,11 @@ class Api {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         if (hasToken) 'Authorization': 'Bearer $_token',
+        if (_deviceId != null) ...{
+          'X-Device-Id': _deviceId!,
+          'X-Device-Name': _deviceName,
+          'X-Device-Platform': kIsWeb ? 'web' : Platform.operatingSystem,
+        },
       };
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>

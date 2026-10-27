@@ -219,6 +219,81 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
     _loadStats();
   }
 
+  bool _testing = false;
+
+  /// Sends a test push to this admin's phone and a test webhook event, and
+  /// shows what is set up on the server.
+  Future<void> _test() async {
+    setState(() => _testing = true);
+    Map<String, dynamic> r;
+    try {
+      r = asMap(await api.post('/api/admin/notifications/test'));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _testing = false);
+      dpSnack(context, errorMessage(e), error: true);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _testing = false);
+    final p = asMap(r['push']);
+    final w = asMap(r['webhook']);
+    final pushOn = p['configured'] == true;
+    final devices = toInt(p['devices']);
+    final delivered = toInt(p['delivered']);
+    final String pushLine;
+    if (!pushOn) {
+      pushLine = 'Off — add FIREBASE_SERVICE_ACCOUNT on Render.';
+    } else if (devices == 0) {
+      pushLine = 'On, but this phone isn\'t registered. Allow notifications for Dalabapay, then log out and in again.';
+    } else if (delivered > 0) {
+      pushLine = 'Working — sent to $delivered phone${delivered == 1 ? '' : 's'}. You should see it now.';
+    } else {
+      pushLine = 'Not delivered${p['error'] != null ? ': ${p['error']}' : ''}.';
+    }
+    final hookLine = w['configured'] != true
+        ? 'Not set (optional) — ADMIN_WEBHOOK_URL on Render.'
+        : (w['ok'] == true ? 'Working — test event sent.' : 'Set, but the URL did not accept the test event.');
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: DP.bg,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const DPSheetHandle(),
+              const SizedBox(height: 8),
+              Text('Notification check', style: DP.title),
+              const SizedBox(height: 14),
+              DPListRow(
+                leading: DPIconBadge.blue(pushOn && delivered > 0 ? Icons.check_circle_rounded : Icons.error_outline_rounded, size: 40, iconSize: 19),
+                title: 'Phone push',
+                subtitle: pushLine,
+                subtitleMaxLines: 3,
+              ),
+              DPListRow(
+                leading: const DPIconBadge.blue(Icons.webhook_rounded, size: 40, iconSize: 19),
+                title: 'Admin webhook',
+                subtitle: hookLine,
+                subtitleMaxLines: 3,
+              ),
+              DPListRow(
+                leading: const DPIconBadge.blue(Icons.phone_android_rounded, size: 40, iconSize: 19),
+                title: 'Phones registered',
+                subtitle: '${toInt(r['usersWithPhones'])} accounts · ${toInt(r['staffWithPhones'])} staff',
+              ),
+              const SizedBox(height: 14),
+              DPButton(label: 'Done', onPressed: () => Navigator.pop(ctx)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AdminScaffold(
@@ -326,6 +401,13 @@ class _AdminSendNotificationPageState extends State<AdminSendNotificationPage> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 16),
+          DPButton.mint(
+            label: _testing ? 'Checking…' : 'Send test notification to my phone',
+            icon: Icons.notifications_active_outlined,
+            loading: _testing,
+            onPressed: _testing ? null : _test,
           ),
           if (_recent.isNotEmpty) ...[
             const SizedBox(height: 22),
