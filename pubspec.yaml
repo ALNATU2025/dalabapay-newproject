@@ -34,6 +34,12 @@ dependencies:
   # Admin notifications with Confirm / Cancel buttons (bank top-ups)
   flutter_local_notifications: ^19.4.0
 
+# Keep the image/archive pair that works together (pub can otherwise pick
+# image 4.11 with an archive that lacks ZLibDecoder.decodeLazy).
+dependency_overrides:
+  image: 4.12.0
+  archive: 4.5.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
