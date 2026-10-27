@@ -13,6 +13,7 @@ import '../../../core/api/api.dart';
 import '../../../core/api/session.dart';
 import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import 'bank_topup_screen.dart';
 
 /// Test mode only: pretends a bank transfer arrived (POST /api/dev/simulate-transfer).
 Future<void> simulateTransfer(BuildContext context, double amount,
@@ -56,9 +57,90 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
     try {
       final w = asMap(await api.get('/api/wallet'));
       if (mounted) setState(() => _wallet = w);
+      if (w['manualBank'] is Map) {
+        final o = asMap(await api.get('/api/wallet/fund/bank/open'));
+        if (mounted) setState(() => _openTopUp = o['topUp'] is Map ? asMap(o['topUp']) : null);
+      }
     } catch (e) {
       if (mounted) dpSnack(context, errorMessage(e), error: true);
     }
+  }
+
+  /// Nigeria: pay the company account, an admin confirms.
+  bool get _manual => _wallet['manualBank'] is Map;
+  Map<String, dynamic>? _openTopUp;
+
+  Future<void> _openBankTopUp(Map<String, dynamic> t) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => BankTopUpScreen(topUp: t)));
+    await Session.instance.refreshQuietly();
+    _load();
+  }
+
+  Future<void> _sendManual() async {
+    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    if (amount < _minFunding || amount > _maxFunding) {
+      dpSnack(context, 'Enter an amount between ${DP.naira(_minFunding)} and ${DP.naira(_maxFunding)}', error: true);
+      return;
+    }
+    if (_pinController.text.length < 6) {
+      dpSnack(context, 'Enter your 6-digit payment PIN', error: true);
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _isLoading = true);
+    final pin = _pinController.text;
+    _pinController.clear();
+    try {
+      final r = asMap(await api.post('/api/wallet/fund/bank', {'amount': amount, 'pin': pin}));
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _amountController.clear();
+      await _openBankTopUp(asMap(r['topUp']));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      dpSnack(context, errorMessage(e), error: true);
+    }
+  }
+
+  List<Widget> _manualForm() {
+    final a = asMap(_wallet['manualBank']);
+    final open = _openTopUp;
+    return [
+      if (open != null) ...[
+        DPBanner(
+          '${DP.naira(toDouble(open['amount']))} top-up ${str(open['stage']) == 'sent' ? 'is waiting for confirmation' : 'is not finished yet'}.',
+          title: 'Top-up in progress',
+          tone: DPTone.info,
+          icon: DPIcons.pending,
+          action: TextButton(onPressed: () => _openBankTopUp(open), child: const Text('Open')),
+        ),
+        const SizedBox(height: 16),
+      ],
+      Text(
+        'Enter the amount you want to add and your PIN. We\'ll show you our ${str(a['bankName'])} account to send it to.',
+        style: DP.body.copyWith(color: DP.muted, fontSize: 14),
+      ),
+      const SizedBox(height: 18),
+      _buildAmountInput(),
+      const SizedBox(height: 18),
+      _buildAuth(),
+      const SizedBox(height: 22),
+      DPButton(
+        label: 'Send',
+        icon: DPIcons.forward,
+        loading: _isLoading,
+        onPressed: _isLoading ? null : _sendManual,
+      ),
+      const SizedBox(height: 14),
+      Center(
+        child: Text(
+          'No funding fee. Your wallet is credited as soon as\nwe confirm your transfer.',
+          textAlign: TextAlign.center,
+          style: DP.caption.copyWith(height: 1.5),
+        ),
+      ),
+    ];
   }
 
   double get _feePercent => toDouble(_wallet['fundingFeePercent'] ?? 1.5);
@@ -143,6 +225,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_manual) ..._manualForm() else ...[
                     DPSegmented(
                       options: _methods,
                       index: _method,
@@ -188,6 +271,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
                           style: DP.caption.copyWith(height: 1.5),
                         ),
                       ),
+                    ],
                     ],
                     const SizedBox(height: 18),
                     DPCard(

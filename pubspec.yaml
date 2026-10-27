@@ -31,6 +31,8 @@ dependencies:
   firebase_auth: ^6.7.0
   # Phone push notifications — see lib/core/push.dart
   firebase_messaging: ^16.0.0
+  # Admin notifications with Confirm / Cancel buttons (bank top-ups)
+  flutter_local_notifications: ^19.4.0
 
 dev_dependencies:
   flutter_test:

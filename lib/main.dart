@@ -15,6 +15,7 @@ import 'ui/ui.dart';
 import 'presentation/screens/payout/payout_screen.dart';
 import 'presentation/screens/admin/admin_cashwyre_page.dart';
 import 'presentation/screens/admin/admin_kyc_page.dart';
+import 'presentation/screens/admin/admin_bank_topups_page.dart';
 import 'presentation/screens/sierra_leone/sl_tiers_screen.dart';
 import 'presentation/screens/cards/cards_screen.dart';
 import 'presentation/screens/admin/admin_all_transactions_page.dart';
@@ -113,7 +114,31 @@ void main() {
     final ctx = DalabapayApp.navigatorKey.currentContext;
     if (ctx != null) dpSnack(ctx, title.isEmpty ? body : (body.isEmpty ? title : '$title — $body'));
   };
+  // Tapped notifications (e.g. an admin's Confirm / Cancel on a bank
+  // top-up) open once the app is unlocked.
+  PushNotifications.onOpen = _openFromPush;
+  DPRouteWatcher.instance.current.addListener(() {
+    final p = PushNotifications.pending;
+    if (p == null || !_unlocked) return;
+    PushNotifications.pending = null;
+    _openFromPush(p);
+  });
+  PushNotifications.init();
   runApp(const DalabapayApp());
+}
+
+const _lockedRoutes = {null, '/', '/onboarding', '/login', '/register', '/pin-login', '/quick-login', '/pin-setup', '/otp-verification'};
+
+bool get _unlocked =>
+    Session.instance.loggedIn && !_lockedRoutes.contains(DPRouteWatcher.instance.current.value);
+
+void _openFromPush(PushAction a) {
+  final nav = DalabapayApp.navigatorKey.currentState;
+  if (nav == null || !_unlocked) {
+    PushNotifications.pending = a;
+    return;
+  }
+  nav.pushNamed(a.route, arguments: {'id': a.id, 'action': a.action});
 }
 
 class DalabapayApp extends StatelessWidget {
@@ -191,6 +216,11 @@ class DalabapayApp extends StatelessWidget {
     '/admin/sl-funding': (_) => const AdminSlFundingPage(),
     '/admin/cashwyre': (_) => const AdminCashwyrePage(),
     '/admin/kyc': (_) => const AdminKycPage(),
+    '/admin/bank-topups': (ctx) {
+      final a = ModalRoute.of(ctx)?.settings.arguments;
+      final m = a is Map ? a : const {};
+      return AdminBankTopUpsPage(focusId: m['id']?.toString(), action: m['action']?.toString());
+    },
   };
 
   @override

@@ -95,6 +95,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _Tool('KYC Review', 'Approve accounts & tier upgrades', Icons.verified_user_outlined, DP.green, '/admin/kyc', 'users:read'),
     _Tool('Manage Users', 'View, edit, fund, approve', Icons.group_outlined, DP.green, '/admin/users', 'users:read'),
     _Tool('Transactions', 'All payments & export', Icons.receipt_long_outlined, DP.navyIcon, '/admin/transactions', 'transactions:read'),
+    _Tool('Bank Top-ups', 'Confirm customer transfers', Icons.account_balance_outlined, DP.green, '/admin/bank-topups', 'transactions:read'),
     _Tool('Status Update', 'Change transaction status', Icons.update_rounded, DP.navyIcon, '/admin/status', 'transactions:status'),
     _Tool('Refund System', 'Disputes & refunds', Icons.currency_exchange_rounded, DP.red, '/admin/refunds', 'disputes:manage'),
     _Tool('Fund Wallet', 'Credit a user wallet', Icons.account_balance_wallet_outlined, DP.green, '/admin/fund-wallet', 'wallet:fund'),
