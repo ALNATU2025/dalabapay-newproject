@@ -282,6 +282,9 @@ Future<void> showTransactionReceipt(
                   ),
                   if (target != null && target.isNotEmpty)
                     DPSummaryRow('Recipient', target),
+                  if (meta['accountName'] != null) DPSummaryRow('Account name', str(meta['accountName'])),
+                  if (meta['bankName'] != null) DPSummaryRow('Bank', str(meta['bankName'])),
+                  for (final r in ReceiptData.transferRows(tx)) DPSummaryRow(r.label, r.value),
                   if (meta['customerName'] != null)
                     DPSummaryRow('Customer', str(meta['customerName'])),
                   if (meta['plan'] != null) DPSummaryRow('Plan', str(meta['plan'])),

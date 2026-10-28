@@ -96,6 +96,9 @@ String receiptText(Map<String, dynamic> txn, {String? title}) {
   final b = StringBuffer('DalabaPay receipt\n');
   if (title != null) b.writeln(title);
   b.writeln('Amount: ${DP.naira(toDouble(txn['amount']))}');
+  for (final r in ReceiptData.transferRows(txn)) {
+    if (r.label != 'You sent') b.writeln('${r.label}: ${r.value}');
+  }
   b.writeln('Status: ${DPStatus.labelFor(str(txn['status']))}');
   if (txn['recipient'] != null) b.writeln('Recipient: ${txn['recipient']}');
   final m = asMap(txn['metadata']);

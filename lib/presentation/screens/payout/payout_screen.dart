@@ -49,7 +49,9 @@ class PayoutScreen extends StatefulWidget {
 class _PayoutScreenState extends State<PayoutScreen> {
   final _number = TextEditingController();
   final _name = TextEditingController();
-  final _amount = TextEditingController();
+  final _amount = TextEditingController(); // what they receive (their currency)
+  final _youSend = TextEditingController(); // what you pay in total (Leones)
+  bool _typedInMine = false; // the last amount typed was in Leones
   final _note = TextEditingController();
 
   bool _loading = true;
@@ -96,6 +98,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
     _feeTimer?.cancel();
     _name.dispose();
     _amount.dispose();
+    _youSend.dispose();
     _note.dispose();
     super.dispose();
   }
@@ -262,30 +265,56 @@ class _PayoutScreenState extends State<PayoutScreen> {
 
   /// As the amount is typed: Cashwyre's fee and rate, and the total.
   void _amountChanged(String _) {
+    _typedInMine = false;
     _feeTimer?.cancel();
     _feeTimer = Timer(const Duration(milliseconds: 600), _loadFee);
   }
 
+  /// Typed in Leones: Cashwyre converts it and the recipient's amount fills in.
+  void _youSendChanged(String _) {
+    _typedInMine = true;
+    _feeTimer?.cancel();
+    _feeTimer = Timer(const Duration(milliseconds: 600), _loadFee);
+  }
+
+  static String _plain(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
   Future<void> _loadFee() async {
     final c = _country;
-    final amount = double.tryParse(_amount.text) ?? 0;
+    final mine = _typedInMine;
+    final amount = double.tryParse((mine ? _youSend : _amount).text) ?? 0;
     final seq = ++_feeSeq;
     if (c == null || amount <= 0) {
       setState(() {
         _fee = null;
         _feeError = null;
         _feeLoading = false;
+        if (mine) {
+          _amount.clear();
+        } else {
+          _youSend.clear();
+        }
       });
       return;
     }
     setState(() => _feeLoading = true);
     try {
-      final r = asMap(await api.post('/api/payouts/fee', {'country': c['code'], 'amount': amount, 'accountType': _type}));
+      final r = asMap(await api.post('/api/payouts/fee', {
+        'country': c['code'],
+        mine ? 'sendAmount' : 'amount': amount,
+        'accountType': _type,
+      }));
       if (!mounted || seq != _feeSeq) return;
       setState(() {
         _fee = r;
         _feeError = null;
         _feeLoading = false;
+        // Fill in the other amount.
+        if (mine) {
+          _amount.text = _plain(toDouble(r['sendAmount']));
+        } else {
+          _youSend.text = toDouble(r['total']).toStringAsFixed(2);
+        }
       });
     } catch (e) {
       if (!mounted || seq != _feeSeq) return;
@@ -389,6 +418,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
     );
     if (txn != null && mounted && str(txn['status']) != 'failed') {
       _amount.clear();
+      _youSend.clear();
+      _fee = null;
       _note.clear();
     }
   }
@@ -577,7 +608,18 @@ class _PayoutScreenState extends State<PayoutScreen> {
               const DPHelper('Use the exact name registered on the mobile money wallet.'),
           ],
           const SizedBox(height: 18),
-          DPLabel('Amount they receive${_currency.isEmpty ? '' : ' ($_currency)'}'),
+          DPLabel('You send (${DP.currency == 'SLE' ? 'Leones' : 'Naira'})'),
+          DPField(
+            controller: _youSend,
+            hint: '0.00',
+            prefixText: DP.currency == 'SLE' ? 'Le ' : '₦ ',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+            onChanged: _youSendChanged,
+          ),
+          const DPHelper('Enter how much you want to spend, fees included — or type what they should receive below.'),
+          const SizedBox(height: 14),
+          DPLabel('They receive${_currency.isEmpty ? '' : ' ($_currency)'}'),
           DPField(
             controller: _amount,
             hint: '0.00',
@@ -605,7 +647,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
               ),
             )
           else
-            const DPHelper('Type an amount to see the service fee, the rate and your total.'),
+            const DPHelper('Type an amount to see the converted amount, service fee, rate and your total.'),
           const SizedBox(height: 18),
           const DPLabel('Note (optional)'),
           DPField(

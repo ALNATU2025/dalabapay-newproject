@@ -18,6 +18,12 @@ import '../../core/format.dart';
 import '../../ui/ui.dart';
 import 'transaction_widgets.dart';
 
+/// "GHS 1,250.00" for any currency code (Naira and Leones with their signs).
+String currencyMoney(num? value, String code) {
+  if (code == 'NGN' || code == 'SLE') return DP.moneyIn(value, code);
+  return '$code ${DP.moneyIn(value, 'NGN').replaceFirst('₦', '')}';
+}
+
 class ReceiptData {
   final String title;
   final String amount;
@@ -43,6 +49,24 @@ class ReceiptData {
 
   /// From a transaction (API JSON). [extraRows] come first (e.g. the rows
   /// the payment screen showed).
+  /// Transfers abroad: both currencies (what was paid and what arrives).
+  static List<DPReviewRow> transferRows(Map<String, dynamic> tx) {
+    final m = asMap(tx['metadata']);
+    final code = str(m['sendCurrency']);
+    if (code.isEmpty || m['sendAmount'] == null) return const [];
+    final mine = txCurrency(tx);
+    final status = str(tx['status']);
+    final rows = <DPReviewRow>[
+      DPReviewRow('You sent', txMoney(tx, toDouble(tx['amount']))),
+      DPReviewRow(status == 'success' ? 'They received' : 'They receive', currencyMoney(toDouble(m['sendAmount']), code)),
+    ];
+    if (str(m['countryName']).isNotEmpty) rows.add(DPReviewRow('Country', str(m['countryName'])));
+    if (m['accountNumber'] != null) rows.add(DPReviewRow('Account number', str(m['accountNumber'])));
+    if (m['serviceFee'] != null) rows.add(DPReviewRow('Service fee', txMoney(tx, toDouble(m['serviceFee']))));
+    if (m['rate'] != null && code != mine) rows.add(DPReviewRow('Rate', '1 $code = ${txMoney(tx, toDouble(m['rate']))}'));
+    return rows;
+  }
+
   factory ReceiptData.fromTxn(Map<String, dynamic> tx, {String? title, List<DPReviewRow> extraRows = const []}) {
     final meta = asMap(tx['metadata']);
     final amount = toDouble(tx['amount']);
@@ -57,6 +81,9 @@ class ReceiptData {
     }
 
     final rows = <DPReviewRow>[...extraRows.where((r) => !r.strong)];
+    for (final r in transferRows(tx)) {
+      add(rows, r.label, r.value);
+    }
     add(rows, 'Type', transactionTypeLabel(str(tx['type'])));
     add(rows, 'Recipient', tx['recipient']?.toString());
     add(rows, 'Customer', meta['customerName']?.toString());

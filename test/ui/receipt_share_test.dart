@@ -36,4 +36,34 @@ void main() {
     final pdf = await receiptPdf(png, d);
     expect(String.fromCharCodes(pdf.take(5)), '%PDF-');
   });
+
+  test('transfer abroad: the receipt shows both currencies', () {
+    final tx = {
+      'reference': 'PO202610280002GH',
+      'type': 'payout',
+      'description': 'Transfer to Kwame Mensah · MTN',
+      'amount': 185.44,
+      'fee': 0,
+      'currency': 'SLE',
+      'status': 'success',
+      'createdAt': '2026-10-28T10:00:00Z',
+      'metadata': {
+        'sendCurrency': 'GHS',
+        'sendAmount': 100,
+        'countryName': 'Ghana',
+        'accountName': 'Kwame Mensah',
+        'accountNumber': '0241234567',
+        'serviceFee': 9.44,
+        'rate': 1.8544,
+      },
+    };
+    final d = ReceiptData.fromTxn(tx);
+    final rows = {for (final r in d.rows) r.label: r.value};
+    expect(rows['You sent'], 'Le 185.44');
+    expect(rows['They received'], 'GHS 100.00');
+    expect(rows['Country'], 'Ghana');
+    expect(rows['Service fee'], 'Le 9.44');
+    expect(rows['Rate'], startsWith('1 GHS = Le'));
+    expect(currencyMoney(1250, 'KES'), 'KES 1,250.00');
+  });
 }
