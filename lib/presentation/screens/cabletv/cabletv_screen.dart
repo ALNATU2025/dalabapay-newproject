@@ -2,6 +2,8 @@
 // Provider, smartcard (POST /api/services/cable/verify), renew or change
 // package (GET /api/services/cable/plans), months → review →
 // POST /api/services/cable.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -39,6 +41,21 @@ class _CableTvScreenState extends State<CableTvScreen> {
   bool _plansLoading = false;
   Object? _plansError;
   Map<String, dynamic> _customer = {};
+
+  // The smartcard is checked automatically once it's fully typed.
+  Timer? _verifyTimer;
+  String? _checkedKey; // provider|card last checked
+  String? _verifyError;
+  static const _minCardLength = 10;
+
+  void _scheduleVerify() {
+    _verifyTimer?.cancel();
+    final card = _smartCardController.text.trim();
+    if (_selectedProvider == null || card.length < _minCardLength) return;
+    final key = '$_selectedProvider|$card';
+    if (key == _checkedKey) return;
+    _verifyTimer = Timer(const Duration(milliseconds: 700), _validate);
+  }
 
   @override
   void initState() {
@@ -138,6 +155,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
 
   @override
   void dispose() {
+    _verifyTimer?.cancel();
     _smartCardController.dispose();
     _phoneController.dispose();
     _customAmount.dispose();
@@ -156,14 +174,23 @@ class _CableTvScreenState extends State<CableTvScreen> {
   }
 
   Future<void> _validate() async {
-    FocusScope.of(context).unfocus();
-    setState(() => _isValidating = true);
+    final provider = _selectedProvider;
+    final card = _smartCardController.text.trim();
+    if (provider == null || card.length < _minCardLength) return;
+    final key = '$provider|$card';
+    _checkedKey = key;
+    setState(() {
+      _isValidating = true;
+      _verifyError = null;
+    });
     try {
       final r = asMap(await api.post('/api/services/cable/verify', {
-        'provider': _providers[_selectedProvider],
-        'smartcardNumber': _smartCardController.text.trim(),
+        'provider': _providers[provider],
+        'smartcardNumber': card,
       }));
-      if (!mounted) return;
+      // The number or provider changed while we were checking.
+      if (!mounted || key != '$_selectedProvider|${_smartCardController.text.trim()}') return;
+      FocusScope.of(context).unfocus();
       setState(() {
         _isValidating = false;
         _isValidated = true;
@@ -174,9 +201,11 @@ class _CableTvScreenState extends State<CableTvScreen> {
         _resetRenewAmount();
       });
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isValidating = false);
-      dpSnack(context, errorMessage(e), error: true);
+      if (!mounted || key != '$_selectedProvider|${_smartCardController.text.trim()}') return;
+      setState(() {
+        _isValidating = false;
+        _verifyError = errorMessage(e);
+      });
     }
   }
 
@@ -186,7 +215,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
         context,
         _isValidated
             ? 'Choose what you want to do and a package'
-            : 'Verify your smartcard number first',
+            : 'Enter a valid smartcard / IUC number',
         error: true,
       );
       return;
@@ -247,7 +276,7 @@ class _CableTvScreenState extends State<CableTvScreen> {
   Widget build(BuildContext context) {
     final card = _smartCardController.text.trim();
     final canValidate = _selectedProvider != null &&
-        card.length >= 8 &&
+        card.length >= _minCardLength &&
         !_isValidating;
 
     return Scaffold(
@@ -302,20 +331,21 @@ class _CableTvScreenState extends State<CableTvScreen> {
                           _selectedPlan = null;
                           _quantity = 1;
                           _customer = {};
+                          _checkedKey = null;
+                          _verifyError = null;
                         });
                         _loadPlans();
+                        _scheduleVerify();
                       },
                     ),
                     const SizedBox(height: 20),
                     DPLabel(
                       'Smartcard / IUC number',
-                      trailing: _isValidated
-                          ? null
-                          : DPTextLink(
-                              label: _isValidating ? 'Checking…' : 'Verify',
-                              color: canValidate ? DP.green : DP.faint,
-                              onTap: canValidate ? _validate : null,
-                            ),
+                      trailing: _isValidating
+                          ? Text('Checking…', style: DP.caption.copyWith(color: DP.green, fontWeight: FontWeight.w600))
+                          : _verifyError != null && canValidate
+                              ? DPTextLink(label: 'Try again', color: DP.green, onTap: _validate)
+                              : null,
                     ),
                     DPField(
                       controller: _smartCardController,
@@ -325,7 +355,14 @@ class _CableTvScreenState extends State<CableTvScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(12),
                       ],
-                      onChanged: (_) => setState(() => _isValidated = false),
+                      onChanged: (_) {
+                        setState(() {
+                          _isValidated = false;
+                          _verifyError = null;
+                          _checkedKey = null;
+                        });
+                        _scheduleVerify();
+                      },
                       style: TextStyle(
                         fontSize: 17,
                         color: DP.ink,
@@ -346,6 +383,15 @@ class _CableTvScreenState extends State<CableTvScreen> {
                               color: _isValidated ? DP.green : DP.muted,
                             ),
                     ),
+                    if (_verifyError != null && !_isValidating)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(_verifyError!, style: DP.caption.copyWith(color: DP.red)),
+                      )
+                    else if (!_isValidated && !_isValidating)
+                      DPHelper(_selectedProvider == null
+                          ? 'Choose your provider, then enter the number. We\'ll check it automatically.'
+                          : 'We\'ll check the number automatically once it\'s complete.'),
                     if (_isValidated) ...[
                       const SizedBox(height: 12),
                       DPAppear(child: _buildCustomerDetails()),

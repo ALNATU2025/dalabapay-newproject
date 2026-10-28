@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api.dart';
 import '../../../core/api/session.dart';
+import '../../../core/dev_code.dart';
+import '../../../core/format.dart';
+import 'device_verify_screen.dart';
 import '../../../ui/ui.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -88,10 +91,26 @@ class _LoginScreenState extends State<LoginScreen>
         'country': _country,
       });
       await _rememberCountry(_country!);
-      await Session.instance.start(
-        (data as Map).cast<String, dynamic>(),
-        remember: _rememberMe,
-      );
+      final m = (data as Map).cast<String, dynamic>();
+      // New device: confirm with the code emailed to the account first.
+      if (m['verification'] == 'device') {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        showDevCode(context, m);
+        final remember = _rememberMe;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DeviceVerifyScreen(
+              challenge: str(m['challenge']),
+              email: str(m['email']),
+              onVerified: (session) => Session.instance.start(session, remember: remember),
+            ),
+          ),
+        );
+        return;
+      }
+      await Session.instance.start(m, remember: _rememberMe);
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(
           context, Session.instance.homeRoute, (_) => false);
