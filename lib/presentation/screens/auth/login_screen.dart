@@ -104,6 +104,9 @@ class _LoginScreenState extends State<LoginScreen>
             builder: (_) => DeviceVerifyScreen(
               challenge: str(m['challenge']),
               email: str(m['email']),
+              method: str(m['method'], 'email'),
+              phoneE164: str(m['phoneE164']),
+              phone: str(m['phone']),
               onVerified: (session) => Session.instance.start(session, remember: remember),
             ),
           ),

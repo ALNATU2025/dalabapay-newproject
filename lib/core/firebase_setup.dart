@@ -28,8 +28,15 @@ class FirebaseSetup {
   static const String projectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'dalabapay-sms');
   static const String iosBundleId = String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID', defaultValue: 'com.dalabapay.newproject');
 
-  static String get _appId =>
-      defaultTargetPlatform == TargetPlatform.iOS ? iosAppId : androidAppId;
+  /// Chrome needs a Web app in Firebase (Project settings → Your apps → Add
+  /// app → Web); run with --dart-define=FIREBASE_WEB_APP_ID=1:…:web:…
+  static const String webAppId = String.fromEnvironment('FIREBASE_WEB_APP_ID', defaultValue: '');
+
+  static String get _appId => kIsWeb
+      ? webAppId
+      : defaultTargetPlatform == TargetPlatform.iOS
+          ? iosAppId
+          : androidAppId;
 
   static bool get configured =>
       apiKey.isNotEmpty && _appId.isNotEmpty && senderId.isNotEmpty && projectId.isNotEmpty;
@@ -38,6 +45,10 @@ class FirebaseSetup {
   /// when this build has no Firebase settings.
   static Future<void> ensure() async {
     if (Firebase.apps.isNotEmpty) return;
+    if (kIsWeb && webAppId.isEmpty) {
+      throw const ApiException(0, 'SMS_NOT_CONFIGURED',
+          'SMS codes work in the Dalabapay phone app. To use them in a browser, add a Web app in Firebase and run with FIREBASE_WEB_APP_ID.');
+    }
     if (!configured) {
       throw const ApiException(0, 'SMS_NOT_CONFIGURED',
           'SMS verification isn\'t set up in this version of the app. Please update the app or contact support.');
@@ -59,6 +70,7 @@ class FirebaseSetup {
 class SmsVerification {
   String? _verificationId;
   int? _resendToken;
+  ConfirmationResult? _web; // Chrome: Firebase uses an invisible reCAPTCHA
 
   /// Sends (or re-sends) the code to [phoneE164] (+234… / +232…).
   /// [onAutoVerified] fires on Android when the code is read automatically.
@@ -69,6 +81,15 @@ class SmsVerification {
     required void Function(String message) onError,
   }) async {
     await FirebaseSetup.ensure();
+    if (kIsWeb) {
+      try {
+        _web = await FirebaseAuth.instance.signInWithPhoneNumber(phoneE164);
+        onCodeSent();
+      } catch (e) {
+        onError(_message(e));
+      }
+      return;
+    }
     await FirebaseAuth.instance.verifyPhoneNumber(
       phoneNumber: phoneE164,
       timeout: const Duration(seconds: 60),
@@ -92,6 +113,17 @@ class SmsVerification {
 
   /// The code the person typed → Firebase ID token.
   Future<String> confirm(String smsCode) async {
+    final web = _web;
+    if (web != null) {
+      try {
+        final r = await web.confirm(smsCode);
+        final token = await r.user?.getIdToken(true);
+        if (token == null) throw const ApiException(0, 'SMS', 'We couldn\'t confirm your phone. Please try again.');
+        return token;
+      } catch (e) {
+        throw ApiException(0, 'SMS', _message(e));
+      }
+    }
     final id = _verificationId;
     if (id == null) {
       throw const ApiException(0, 'SMS', 'Please wait for the code to arrive, or tap Resend code.');
