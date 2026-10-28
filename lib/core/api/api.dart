@@ -99,23 +99,29 @@ class Api {
     await _loadDeviceId();
   }
 
-  // A random id for this install, kept across logouts, so the server can
-  // tell the person (and the admins) when the account signs in on a new
-  // phone. It identifies nothing else about the phone.
+  // A random id for this install (phone or browser), kept across logouts,
+  // so the server can ask for an email code when the account signs in on a
+  // new device. It identifies nothing else about the device.
   static const _deviceKey = 'dp_device_id';
   String? _deviceId;
 
   Future<void> _loadDeviceId() async {
-    if (kIsWeb || _deviceId != null) return;
+    if (_deviceId != null) return;
+    String? id;
     try {
-      var id = await _storage.read(key: _deviceKey);
-      if (id == null || id.length < 16) {
-        final r = Random.secure();
-        id = List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
-        await _storage.write(key: _deviceKey, value: id);
-      }
-      _deviceId = id;
+      id = await _storage.read(key: _deviceKey);
     } catch (_) {}
+    if (id == null || id.length < 16) {
+      final r = Random.secure();
+      id = List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+      try {
+        await _storage.write(key: _deviceKey, value: id);
+      } catch (_) {
+        // Storage unavailable (e.g. a private browser window): the id lasts
+        // until the app is closed, so a code may be asked for next time.
+      }
+    }
+    _deviceId = id;
   }
 
   static String get _deviceName {
