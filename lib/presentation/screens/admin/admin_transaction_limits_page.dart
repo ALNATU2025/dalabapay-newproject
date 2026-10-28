@@ -452,6 +452,20 @@ class _AdminTransactionLimitsPageState
                                 done: v ? 'Maintenance mode on' : 'Maintenance mode off'),
                       ),
                     ),
+                    DPMenuRow(
+                      icon: Icons.phonelink_lock_rounded,
+                      title: 'New device code',
+                      subtitle: asMap(_settings['deviceCheck'])['enabled'] == true
+                          ? 'A code is needed to log in on a new phone (email NG, SMS SL)'
+                          : 'Off: new phones log in straight away (an alert is still sent)',
+                      trailing: Switch(
+                        value: asMap(_settings['deviceCheck'])['enabled'] == true,
+                        onChanged: _saving || !_canSettings
+                            ? null
+                            : (v) => _patchSettings({'deviceCheck': {'enabled': v}},
+                                done: v ? 'New device code on' : 'New device code off'),
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     const DPLabel('Maintenance Message'),
                     DPField(
