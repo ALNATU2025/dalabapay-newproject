@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'core/api/api.dart';
 import 'core/api/session.dart';
 import 'core/push.dart';
+import 'core/web_idle.dart';
 import 'core/quick_login.dart';
 import 'presentation/screens/auth/quick_login_screen.dart';
 import 'core/theme/app_theme.dart';
@@ -238,7 +239,19 @@ class DalabapayApp extends StatelessWidget {
       themeMode: ThemeMode.light,
       navigatorObservers: [DPRouteWatcher.instance],
       builder: (context, child) => ThemeRefresher(
-        child: DPResponsiveFrame(child: child ?? const SizedBox.shrink()),
+        child: WebIdleLogout(
+          onTimeout: () {
+            final nav = navigatorKey.currentState;
+            nav?.pushNamedAndRemoveUntil('/login', (_) => false);
+            final ctx = navigatorKey.currentContext;
+            if (ctx != null) {
+              ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(
+                const SnackBar(content: Text('You were signed out after 15 minutes without activity.')),
+              );
+            }
+          },
+          child: DPResponsiveFrame(child: child ?? const SizedBox.shrink()),
+        ),
       ),
       initialRoute: '/',
       onGenerateRoute: (settings) {

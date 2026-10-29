@@ -14,6 +14,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/api/api.dart';
+import '../../core/download/download.dart';
 import '../../core/format.dart';
 import '../../ui/ui.dart';
 import 'transaction_widgets.dart';
@@ -288,6 +289,12 @@ Future<Uint8List> receiptPdf(Uint8List png, ReceiptData d) async {
 }
 
 Future<void> _share(BuildContext context, Uint8List bytes, String name, String mime, ReceiptData d) async {
+  // Website: download the file (most desktop browsers can't share files).
+  if (kIsWeb && await downloadBytes(bytes, name, mime)) {
+    if (context.mounted) dpSnack(context, 'Receipt downloaded', success: true);
+    return;
+  }
+  if (!context.mounted) return;
   final box = context.findRenderObject() as RenderBox?;
   await Share.shareXFiles(
     [XFile.fromData(bytes, name: name, mimeType: mime)],
