@@ -1,6 +1,7 @@
 // lib/presentation/screens/splash/splash_screen.dart
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api.dart';
@@ -76,6 +77,11 @@ class _SplashScreenState extends State<SplashScreen>
         context,
         Session.instance.user!.pinSet ? '/pin-login' : '/pin-setup',
       );
+      return;
+    }
+    // Website: the front page (log in / sign up / get the app).
+    if (kIsWeb) {
+      Navigator.pushReplacementNamed(context, '/landing');
       return;
     }
     Navigator.pushReplacement(

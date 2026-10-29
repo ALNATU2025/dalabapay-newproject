@@ -107,8 +107,13 @@ class DPResponsiveFrame extends StatelessWidget {
       valueListenable: DPRouteWatcher.instance.current,
       builder: (context, route, _) {
         final admin = route != null && route.startsWith('/admin');
-        final limit =
-            admin ? DPBreakpoints.adminMaxWidth : DPBreakpoints.appMaxWidth;
+        // The website's front page uses the whole window.
+        final full = route == '/landing';
+        final limit = full
+            ? double.infinity
+            : admin
+                ? DPBreakpoints.adminMaxWidth
+                : DPBreakpoints.appMaxWidth;
         final framed = mq.size.width > limit + 48;
         final width = framed ? limit : mq.size.width;
 

@@ -57,6 +57,7 @@ import 'presentation/screens/internet/internet_screen.dart';
 import 'presentation/screens/kyc/kyc_screen.dart';
 import 'presentation/screens/notifications/notifications_screen.dart';
 import 'presentation/screens/onboarding/onboarding_screen.dart';
+import 'presentation/screens/landing/landing_screen.dart';
 import 'presentation/screens/referral/referral_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/sierra_leone/sl_add_money_screen.dart';
@@ -128,7 +129,7 @@ void main() {
   runApp(const DalabapayApp());
 }
 
-const _lockedRoutes = {null, '/', '/onboarding', '/login', '/register', '/pin-login', '/quick-login', '/pin-setup', '/otp-verification'};
+const _lockedRoutes = {null, '/', '/onboarding', '/landing', '/login', '/register', '/pin-login', '/quick-login', '/pin-setup', '/otp-verification'};
 
 bool get _unlocked =>
     Session.instance.loggedIn && !_lockedRoutes.contains(DPRouteWatcher.instance.current.value);
@@ -152,6 +153,7 @@ class DalabapayApp extends StatelessWidget {
   static final Map<String, WidgetBuilder> routes = {
     '/': (_) => const SplashScreen(),
     '/onboarding': (_) => const OnboardingScreen(),
+    '/landing': (_) => const LandingScreen(),
     '/login': (_) => const LoginScreen(),
     '/register': (_) => const RegisterScreen(),
     '/forgot-password': (_) => const ForgotPasswordScreen(),
