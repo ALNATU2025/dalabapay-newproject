@@ -19,8 +19,8 @@ const server = http.createServer((req, res) => {
 
 (async () => {
   await new Promise((r) => server.listen(8080, r));
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const browser = await chromium.launch({ args: ['--lang=en-NG'] });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: 'en-NG' });
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
