@@ -456,7 +456,7 @@ class _AdminTransactionLimitsPageState
                       icon: Icons.phonelink_lock_rounded,
                       title: 'New device code',
                       subtitle: asMap(_settings['deviceCheck'])['enabled'] == true
-                          ? 'A code is needed to log in on a new phone (email NG, SMS SL)'
+                          ? 'A code is emailed when someone logs in on a new phone or browser'
                           : 'Off: new phones log in straight away (an alert is still sent)',
                       trailing: Switch(
                         value: asMap(_settings['deviceCheck'])['enabled'] == true,
