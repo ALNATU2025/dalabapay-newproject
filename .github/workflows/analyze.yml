@@ -153,6 +153,14 @@ jobs:
           set -o pipefail
           bash scripts/build_web.sh 2>&1 | tee build.log
           test -f build/web/index.html && test -f build/web/main.dart.js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Open the website in a browser
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.49.1
+          npx playwright install --with-deps chromium
+          node tool/web_smoke.js build/web
       - name: Build errors
         if: failure()
         run: grep -iE "error" build.log | head -n 30 | while read -r l; do echo "::error title=web::$l"; done
