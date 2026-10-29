@@ -138,6 +138,25 @@ jobs:
           grep -iE "^e: |error|missing class|R8|What went wrong" build.log | grep -v "^\s*> Run with\|help.gradle" | head -n 30 | while read -r l; do echo "::error title=android::$l"; done
           f=$(find build -name missing_rules.txt | head -n 1); [ -n "$f" ] && sed -n '1,40p' "$f" | while read -r l; do echo "::error title=missing_rules::$l"; done || true
 
+  # The website: the same app built for browsers (what Render publishes).
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build website
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/build_web.sh 2>&1 | tee build.log
+          test -f build/web/index.html && test -f build/web/main.dart.js
+      - name: Build errors
+        if: failure()
+        run: grep -iE "error" build.log | head -n 30 | while read -r l; do echo "::error title=web::$l"; done
+
   # Runs the app's API client against the real backend + MongoDB.
   contract:
     runs-on: ubuntu-latest

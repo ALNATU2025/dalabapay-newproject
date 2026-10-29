@@ -1,0 +1,52 @@
+# The Dalabapay website (the app in the browser) as a Render static site.
+# Render → New → Blueprint → choose this repository.
+services:
+  - type: web
+    name: dalabapay-web
+    runtime: static
+    buildCommand: bash scripts/build_web.sh
+    staticPublishPath: build/web
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: API_URL
+        value: https://newproject-backend-bod8.onrender.com
+      - key: FIREBASE_WEB_APP_ID
+        sync: false
+      - key: FIREBASE_WEB_API_KEY
+        sync: false
+    domains:
+      - dalabapay.com
+      - www.dalabapay.com
+    headers:
+      # A payments site must not be shown inside other sites (clickjacking).
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Content-Security-Policy
+        value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(self), microphone=(), geolocation=(), payment=()"
+      # Always fetch the newest app after an update.
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /main.dart.js
+        name: Cache-Control
+        value: no-cache
+      - path: /flutter_bootstrap.js
+        name: Cache-Control
+        value: no-cache
+      - path: /version.json
+        name: Cache-Control
+        value: no-cache
