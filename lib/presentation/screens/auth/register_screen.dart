@@ -41,9 +41,14 @@ class _RegisterScreenState extends State<RegisterScreen>
   /// "Verify by email instead" (Firebase link) is available.
   bool _emailBackup = false;
 
-  /// The server lets the person pick SMS or email (both via Firebase).
+  /// The server lets the person pick SMS or email.
   bool _choose = false;
   bool _canChoose = false;
+
+  /// "Email me a code": our own 6-digit email code (otherwise the Firebase
+  /// email link, for servers without email set up).
+  bool _emailCodeOption = false;
+  bool _emailCode = false;
 
   /// Any phone-code screen (server or Firebase SMS).
   bool get _phoneCode => _sms || _serverSms;
@@ -153,6 +158,8 @@ class _RegisterScreenState extends State<RegisterScreen>
         _showVerifyStep = true;
         _choose = data['verification'] == 'choose';
         _canChoose = _choose;
+        _emailCodeOption = asList(data['options']).contains('email');
+        _emailCode = false;
         _sms = data['verification'] == 'sms';
         _serverSms = data['verification'] == 'sms_code';
         _emailLink = data['verification'] == 'email_link';
@@ -400,8 +407,10 @@ class _RegisterScreenState extends State<RegisterScreen>
     if (_sms) return _sendSms();
     if (_emailLink) return _resendEmailLink();
     try {
-      final r = await api.post('/api/auth/register/resend',
-          {'email': _emailController.text.trim().toLowerCase()});
+      final r = await api.post('/api/auth/register/resend', {
+        'email': _emailController.text.trim().toLowerCase(),
+        if (_emailCode) 'method': 'email',
+      });
       _startResendTimer();
       if (!mounted) return;
       dpSnack(context, 'A new code is on its way.', success: true);
@@ -413,10 +422,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   /// The person picked how to verify (or switched to the other way).
   Future<void> _pick(String option) async {
+    if (option == 'email') return _useEmailCode();
     _resendTimer?.cancel();
     _otpController.clear();
     setState(() {
       _choose = false;
+      _emailCode = false;
       _sms = option == 'sms';
       _emailLink = option == 'email_link';
       _resendSeconds = 0;
@@ -426,6 +437,39 @@ class _RegisterScreenState extends State<RegisterScreen>
       await _sendSms();
     } else {
       await _sendEmailLink();
+    }
+  }
+
+  /// "Email me a code": the server emails a 6-digit code; it's entered in
+  /// the same code boxes and checked with /register/verify.
+  Future<void> _useEmailCode() async {
+    _resendTimer?.cancel();
+    _otpController.clear();
+    setState(() {
+      _choose = false;
+      _sms = false;
+      _serverSms = false;
+      _emailLink = false;
+      _emailCode = true;
+      _resendSeconds = 0;
+      _error = null;
+      _isLoading = true;
+    });
+    try {
+      final r = await api.post('/api/auth/register/use-email-code', {
+        'email': _emailController.text.trim().toLowerCase(),
+      });
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _startResendTimer();
+      dpSnack(context, 'Code sent to ${_emailController.text.trim()}', success: true);
+      showDevCode(context, r);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = errorMessage(e);
+      });
     }
   }
 
@@ -488,9 +532,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ),
                 option(
                   icon: DPIcons.mail,
-                  title: 'Email me a link',
-                  subtitle: 'Verification link to $email',
-                  onTap: () => _pick('email_link'),
+                  title: _emailCodeOption ? 'Email me a code' : 'Email me a link',
+                  subtitle: _emailCodeOption ? '6-digit code to $email' : 'Verification link to $email',
+                  onTap: () => _pick(_emailCodeOption ? 'email' : 'email_link'),
                 ),
               ],
             ),
@@ -502,6 +546,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   /// The SMS didn't arrive: switch this sign-up to the Firebase email link.
   Future<void> _switchToEmail() async {
+    if (_emailCodeOption) return _useEmailCode();
     setState(() => _error = null);
     try {
       await api.post('/api/auth/register/use-email', {
@@ -867,6 +912,15 @@ class _RegisterScreenState extends State<RegisterScreen>
                     onTap: _isLoading ? null : _backToDetails,
                   ),
                 ),
+                if (_emailCode && _canChoose) ...[
+                  const SizedBox(height: 6),
+                  Center(
+                    child: DPTextLink(
+                      label: 'Didn\'t get the email? Text me a code instead',
+                      onTap: _isLoading ? null : () => _pick('sms'),
+                    ),
+                  ),
+                ],
                 if (_phoneCode && (_emailBackup || _canChoose)) ...[
                   const SizedBox(height: 6),
                   Center(
@@ -874,7 +928,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                       label: 'Didn\'t get the SMS? Verify by email instead',
                       onTap: _isLoading
                           ? null
-                          : (_canChoose ? () => _pick('email_link') : _switchToEmail),
+                          : (_canChoose ? () => _pick(_emailCodeOption ? 'email' : 'email_link') : _switchToEmail),
                     ),
                   ),
                 ],
