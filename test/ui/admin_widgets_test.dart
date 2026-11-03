@@ -15,11 +15,11 @@ Widget _page() => AdminScaffold(
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const AdminStatGrid(stats: [
-            AdminStat(label: 'Revenue', value: '₦1,250,500', icon: Icons.payments_outlined, color: DP.green, sub: '+12.5%'),
-            AdminStat(label: 'Total Users', value: '2,431', icon: Icons.group_outlined, sub: '+38'),
+          AdminStatGrid(stats: [
+            const AdminStat(label: 'Revenue', value: '₦1,250,500', icon: Icons.payments_outlined, color: DP.green, sub: '+12.5%'),
+            const AdminStat(label: 'Total Users', value: '2,431', icon: Icons.group_outlined, sub: '+38'),
             AdminStat(label: 'Sales Volume', value: '₦18,420,000', icon: Icons.receipt_long_outlined, color: DP.navyInk, sub: '-3%'),
-            AdminStat(label: 'Pending', value: '7', icon: DPIcons.pending, color: DP.amber),
+            const AdminStat(label: 'Pending', value: '7', icon: DPIcons.pending, color: DP.amber),
           ]),
           const SizedBox(height: 16),
           AdminBarChart(values: const [3, 5, 2, 8, 6, 9, 12], format: (v) => '$v'),
