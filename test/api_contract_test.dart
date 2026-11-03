@@ -70,6 +70,16 @@ void main() {
   test('auth: sign up, login, PIN, password reset', () async {
     friend = await _signUp('Chidi Eze');
     me = await _signUp('Adaeze Okafor', referral: str(asMap(friend['user'])['referralCode']));
+    // New Nigerian accounts wait for an admin's approval (AdminKycPage);
+    // approve both so the payment tests below can run.
+    expect(Session.instance.user!.isApproved, isFalse);
+    final backendDir = Platform.environment['BACKEND_DIR'];
+    if (backendDir != null) {
+      for (final u in [friend, me]) {
+        final r = await Process.run('node', ['scripts/approve-user.js', str(u['email'])], workingDirectory: backendDir);
+        expect(r.exitCode, 0, reason: '${r.stdout}\n${r.stderr}');
+      }
+    }
     expect(Session.instance.user!.firstName, 'Adaeze');
     expect(Session.instance.homeRoute, '/pin-setup');
 
