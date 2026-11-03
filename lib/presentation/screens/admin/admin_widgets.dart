@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../ui/ui.dart';
 
-/// Page frame used by every admin screen: top bar with an ADMIN badge and a
-/// breadcrumb under the title.
+/// Page frame used by every admin screen: a navy header with soft rings,
+/// the title, an ADMIN badge and a breadcrumb; the page fades in below.
 class AdminScaffold extends StatelessWidget {
   final String title;
   final String breadcrumb;
@@ -26,58 +26,148 @@ class AdminScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DP.bg,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-              child: Row(
+      body: Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: DP.navyGradient,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(26)),
+              boxShadow: DP.glow(DP.navy, strength: 0.6),
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(26)),
+              child: Stack(
                 children: [
-                  DPIconSquare(
-                    icon: DPIcons.back,
-                    size: 40,
-                    background: Colors.transparent,
-                    semanticLabel: 'Back',
-                    onTap: () => Navigator.of(context).maybePop(),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: DP.title.copyWith(fontSize: 18),
+                  Positioned(right: -50, top: -60, child: _Ring(size: 180, opacity: 0.08)),
+                  Positioned(right: 70, bottom: -70, child: _Ring(size: 120, opacity: 0.06)),
+                  SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 12, 16),
+                      child: Row(
+                        children: [
+                          Semantics(
+                            button: true,
+                            label: 'Back',
+                            child: Material(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () => Navigator.of(context).maybePop(),
+                                child: const SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: Icon(DPIcons.back, color: Colors.white, size: 20),
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            const AdminBadge(),
-                          ],
-                        ),
-                        Text(
-                          breadcrumb,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: DP.caption.copyWith(fontSize: 11.5),
-                        ),
-                      ],
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 19,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -0.3,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const AdminBadge(),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  breadcrumb,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (actions.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: DP.surface,
+                                borderRadius: BorderRadius.circular(DP.rPill),
+                              ),
+                              child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                  ...actions,
                 ],
               ),
             ),
-            Expanded(child: body),
-          ],
-        ),
+          ),
+          Expanded(child: DPAppear(offsetY: 10, child: body)),
+        ],
       ),
       bottomNavigationBar: bottom,
+    );
+  }
+}
+
+class _Ring extends StatelessWidget {
+  final double size;
+  final double opacity;
+  const _Ring({required this.size, required this.opacity});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: opacity), width: 16),
+        ),
+      );
+}
+
+/// Counts up to the number inside [text] ("₦12,500", "24", "Le 3.50"),
+/// keeping its prefix, suffix, commas and decimals.
+class AdminCountUp extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+  const AdminCountUp(this.text, {super.key, required this.style});
+
+  static final _re = RegExp(r'^(\D*?)(-?[\d,]+(?:\.\d+)?)(.*)$');
+
+  static String _format(double v, int decimals) {
+    final fixed = v.abs().toStringAsFixed(decimals);
+    final parts = fixed.split('.');
+    final whole = parts[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+    return '${v < 0 ? '-' : ''}$whole${decimals > 0 ? '.${parts[1]}' : ''}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = _re.firstMatch(text);
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (m == null || still) return Text(text, style: style, maxLines: 1);
+    final raw = m.group(2)!;
+    final target = double.tryParse(raw.replaceAll(',', '')) ?? 0;
+    final decimals = raw.contains('.') ? raw.split('.').last.length : 0;
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(text),
+      tween: Tween(begin: 0, end: target),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (_, v, __) => Text('${m.group(1)}${_format(v, decimals)}${m.group(3)}', style: style, maxLines: 1),
     );
   }
 }
@@ -107,7 +197,8 @@ class AdminBadge extends StatelessWidget {
   }
 }
 
-/// Small stat card: icon, value, label.
+/// Stat card: icon in a gradient circle, a counting-up value, a label and
+/// an optional change ("+12%", "-3%").
 class AdminStat extends StatelessWidget {
   final String label;
   final String value;
@@ -125,45 +216,71 @@ class AdminStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DPCard(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+    final down = sub != null && sub!.trim().startsWith('-');
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: DP.surface,
+        borderRadius: BorderRadius.circular(DP.rLg),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: DP.isDark ? 0.18 : 0.10), blurRadius: 22, offset: const Offset(0, 10)),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [color.withValues(alpha: 0.85), color],
+                  ),
+                  boxShadow: DP.glow(color, strength: 0.5),
                 ),
-                child: Icon(icon, size: 17, color: color),
+                child: Icon(icon, size: 18, color: Colors.white),
               ),
               const Spacer(),
               if (sub != null)
-                Text(
-                  sub!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: sub!.startsWith('-') ? DP.red : DP.green,
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: (down ? DP.red : DP.green).withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(DP.rPill),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(down ? Icons.trending_down_rounded : Icons.trending_up_rounded, size: 13, color: down ? DP.red : DP.green),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            sub!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: down ? DP.red : DP.green),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
+            child: AdminCountUp(
               value,
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                color: DP.ink,
-              ),
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: DP.ink, letterSpacing: -0.4),
             ),
           ),
           const SizedBox(height: 2),
@@ -171,7 +288,7 @@ class AdminStat extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: DP.caption.copyWith(fontSize: 12),
+            style: DP.caption.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -179,31 +296,41 @@ class AdminStat extends StatelessWidget {
   }
 }
 
-/// Two stat cards per row.
+/// Stat cards in a grid: two per row on phones, four on wide screens;
+/// they rise in one after another.
 class AdminStatGrid extends StatelessWidget {
   final List<Widget> stats;
   const AdminStatGrid({super.key, required this.stats});
 
   @override
   Widget build(BuildContext context) {
-    final rows = <Widget>[];
-    for (var i = 0; i < stats.length; i += 2) {
-      rows.add(
-        Padding(
-          padding: EdgeInsets.only(bottom: i + 2 < stats.length ? 10 : 0),
-          child: Row(
-            children: [
-              Expanded(child: stats[i]),
-              const SizedBox(width: 10),
-              Expanded(
-                child: i + 1 < stats.length ? stats[i + 1] : const SizedBox(),
+    return LayoutBuilder(builder: (context, c) {
+      final cols = c.maxWidth >= 760 ? 4 : 2;
+      final rows = <Widget>[];
+      for (var i = 0; i < stats.length; i += cols) {
+        rows.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: i + cols < stats.length ? 12 : 0),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var j = 0; j < cols; j++) ...[
+                    if (j > 0) const SizedBox(width: 12),
+                    Expanded(
+                      child: i + j < stats.length
+                          ? DPAppear(delay: DPMotion.stagger(i + j, stepMs: 70), child: stats[i + j])
+                          : const SizedBox(),
+                    ),
+                  ],
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      );
-    }
-    return Column(children: rows);
+        );
+      }
+      return Column(children: rows);
+    });
   }
 }
 
@@ -250,11 +377,16 @@ class StatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: c.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(DP.rPill),
+        border: Border.all(color: c.withValues(alpha: 0.18)),
       ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 6, height: 6, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c)),
+        ],
       ),
     );
   }
@@ -317,11 +449,18 @@ class AdminBarChart extends StatelessWidget {
                     duration: Duration(milliseconds: 500 + i * 60),
                     curve: Curves.easeOutCubic,
                     builder: (_, value, __) => Container(
-                      width: 20,
+                      width: 22,
                       height: value,
                       decoration: BoxDecoration(
-                        color: last ? color : color.withValues(alpha: 0.28),
-                        borderRadius: BorderRadius.circular(6),
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: last
+                              ? [color, color.withValues(alpha: 0.75)]
+                              : [color.withValues(alpha: 0.30), color.withValues(alpha: 0.14)],
+                        ),
+                        borderRadius: BorderRadius.circular(7),
+                        boxShadow: last ? DP.glow(color, strength: 0.45) : const [],
                       ),
                     ),
                   ),
@@ -416,15 +555,18 @@ class AdminListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DPCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Column(
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) Divider(height: 1, color: DP.borderSoft),
-            children[i],
+    return DPAppear(
+      offsetY: 14,
+      child: DPCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Column(
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: DP.borderSoft),
+              children[i],
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

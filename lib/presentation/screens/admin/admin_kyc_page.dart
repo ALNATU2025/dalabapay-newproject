@@ -1,5 +1,6 @@
 // lib/presentation/screens/admin/admin_kyc_page.dart
-// Manual KYC for Sierra Leone: approve or reject new accounts, and review
+// Manual KYC: approve or reject new accounts (Nigeria and Sierra Leone),
+// and review Sierra Leone
 // account-level upgrades (Tier 2 ID, Tier 3 bank, Tier 4 business) with
 // their documents.
 //   GET  /api/admin/kyc/accounts?status=pending|rejected
@@ -113,7 +114,7 @@ class _AdminKycPageState extends State<AdminKycPage> {
         children: [
           DPSummaryRow('Email', str(u['email'])),
           DPSummaryRow('Phone', str(u['phone'])),
-          DPSummaryRow('Country', str(u['country']) == 'SL' ? 'Sierra Leone' : str(u['country'])),
+          DPSummaryRow('Country', str(u['country']) == 'SL' ? 'Sierra Leone' : 'Nigeria'),
           DPSummaryRow('Email verified', u['emailVerified'] == true ? 'Yes' : 'No'),
           DPSummaryRow('Phone verified', u['phoneVerified'] == true ? 'Yes' : 'No'),
           DPSummaryRow('Signed up', dateTimeLabel(parseDate(u['createdAt']))),
@@ -187,7 +188,7 @@ class _AdminKycPageState extends State<AdminKycPage> {
                   return DPEmptyState(
                     icon: DPIcons.shieldCheck,
                     title: _status == 'pending' ? 'Nothing to review' : 'None yet',
-                    message: _tab == 0 ? 'New Sierra Leone sign-ups appear here.' : 'Upgrade requests appear here.',
+                    message: _tab == 0 ? 'New sign-ups from Nigeria and Sierra Leone appear here.' : 'Upgrade requests appear here.',
                   );
                 }
                 return RefreshIndicator(
@@ -214,7 +215,13 @@ class _AdminKycPageState extends State<AdminKycPage> {
           padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
           child: Row(
             children: [
-              DPAvatar(name: str(u['fullName']), size: 40),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  DPAvatar(name: str(u['fullName']), size: 40),
+                  Positioned(right: -4, bottom: -2, child: DPFlag(str(u['country']) == 'SL' ? 'SL' : 'NG', width: 18)),
+                ],
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

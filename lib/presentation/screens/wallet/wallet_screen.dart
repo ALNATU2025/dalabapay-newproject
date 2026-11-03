@@ -228,9 +228,9 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
                     if (_manual) ..._manualForm()
                     // Kuda: the customer's own account number is all they need.
                     else if (_wallet['accountNumberOnly'] == true) ...[
-                      _buildDedicatedAccount(),
+                      DPAppear(child: _buildDedicatedAccount()),
                       const SizedBox(height: 14),
-                      _buildBalanceCard(),
+                      DPAppear(delay: DPMotion.stagger(2, stepMs: 80), child: _buildBalanceCard()),
                       const SizedBox(height: 14),
                       const DPBanner(
                         'Send any amount from any Nigerian bank app to your account number above. Your wallet is credited automatically within minutes.',

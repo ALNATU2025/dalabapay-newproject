@@ -54,25 +54,7 @@
     <div class="slow" id="dp-slow">Still loading… If this takes long, check your internet connection and refresh the page.</div>
   </div>
   <noscript>Dalabapay needs JavaScript. Please turn it on, or download the Dalabapay app.</noscript>
-  <script>
-    (function () {
-      var el = document.getElementById('dp-loading');
-      function done() {
-        if (!el) return;
-        var x = el; el = null;
-        x.style.opacity = '0';
-        setTimeout(function () { x.remove(); }, 350);
-      }
-      // The app has drawn its first screen…
-      window.addEventListener('flutter-first-frame', done);
-      // …or its view was added to the page (older/newer Flutter versions).
-      new MutationObserver(function (_, obs) {
-        if (document.querySelector('flutter-view, flt-glass-pane')) { obs.disconnect(); setTimeout(done, 1500); }
-      }).observe(document.body, { childList: true, subtree: true });
-      // Slow connection: say so instead of spinning silently.
-      setTimeout(function () { var s = document.getElementById('dp-slow'); if (el && s) s.style.display = 'block'; }, 20000);
-    })();
-  </script>
+  <script src="loader.js"></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

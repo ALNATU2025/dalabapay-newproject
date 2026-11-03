@@ -22,5 +22,7 @@ DEFINES=(--dart-define=API_URL="${API_URL:-https://newproject-backend-bod8.onren
 if [ -n "${FIREBASE_WEB_APP_ID:-}" ]; then DEFINES+=(--dart-define=FIREBASE_WEB_APP_ID="$FIREBASE_WEB_APP_ID"); fi
 if [ -n "${FIREBASE_WEB_API_KEY:-}" ]; then DEFINES+=(--dart-define=FIREBASE_API_KEY="$FIREBASE_WEB_API_KEY"); fi
 
-flutter build web --release "${DEFINES[@]}"
+# --csp: no eval in the compiled app, so the strict Content-Security-Policy
+# in render.yaml works.
+flutter build web --release --csp "${DEFINES[@]}"
 echo "Website built in build/web"

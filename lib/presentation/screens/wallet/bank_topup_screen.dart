@@ -315,7 +315,14 @@ class _BankTopUpScreenState extends State<BankTopUpScreen> {
   Widget _done() => Column(
         children: [
           const SizedBox(height: 30),
-          const DPIconBadge(DPIcons.checkCircle, size: 84, iconSize: 44),
+          const DPLottie(
+            DPLottie.success,
+            width: 140,
+            height: 140,
+            repeat: false,
+            semanticLabel: 'Wallet funded',
+            fallback: DPIconBadge(DPIcons.checkCircle, size: 84, iconSize: 44),
+          ),
           const SizedBox(height: 18),
           Text('Wallet funded', style: DP.title),
           const SizedBox(height: 8),
