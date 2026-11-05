@@ -27,7 +27,7 @@ Map<String, dynamic> _summary(String currency, {bool empty = false}) {
     'moneyOut': empty ? 0 : 98450 * k,
     'net': empty ? 0 : 26550 * k,
     'commissionEarned': empty ? 0 : 1240.5 * k,
-    'previous': {'moneyIn': empty ? 0 : 100000 * k, 'moneyOut': empty ? 0 : 110000 * k},
+    'previous': {'moneyIn': empty ? 0 : 100000 * k, 'moneyOut': empty ? 0 : 109389 * k},
     'counts': {'total': empty ? 0 : 42, 'success': empty ? 0 : 38, 'pending': empty ? 0 : 1, 'failed': empty ? 0 : 3},
     'categories': empty
         ? []
