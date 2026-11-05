@@ -1,6 +1,7 @@
 // lib/presentation/screens/transactions/transactions_screen.dart
-// "My Wallet" / Transactions tab: GET /api/transactions with status, type,
-// date and search filters, loaded a page at a time.
+// "My Wallet" / Transactions tab: the Transaction Records dashboard
+// (GET /api/transactions/summary) and the list (GET /api/transactions) with
+// status, type, date and search filters, loaded a page at a time.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/transaction_widgets.dart';
+import '../../widgets/transactions_dashboard.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
@@ -65,6 +67,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Object? _error;
   Timer? _debounce;
   int _requestId = 0;
+  int _dashToken = 0; // bump to reload the dashboard
 
   @override
   void initState() {
@@ -92,6 +95,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       if (_range != null) 'from': isoDay(_range!.start),
       if (_range != null) 'to': isoDay(_range!.end),
     };
+  }
+
+  /// Reloads the list and the dashboard (after a refresh or a payment).
+  Future<void> _reloadAll() {
+    setState(() => _dashToken++);
+    return _reload();
   }
 
   Future<void> _reload() async {
@@ -218,7 +227,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 color: DP.green,
                 onRefresh: () async {
                   await Session.instance.refreshQuietly();
-                  await _reload();
+                  await _reloadAll();
                 },
                 child: NotificationListener<ScrollNotification>(
                 onNotification: (n) {
@@ -238,6 +247,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         children: [
                           DPAppear(scaleFrom: 0.97, child: _buildBalanceCard()),
                           const SizedBox(height: 22),
+                          TransactionsDashboard(refreshToken: _dashToken),
+                          const SizedBox(height: 26),
                           const DPSectionHeader('Recent Transactions'),
                           _buildSearchAndFilters(),
                         ],
@@ -323,7 +334,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         index: 1,
         items: kDPTabs,
         onCenter: () => Navigator.pushNamed(context, '/send-money').then((_) {
-          if (mounted) _reload();
+          if (mounted) _reloadAll();
         }),
         onTap: _onNavTap,
       ),
@@ -411,7 +422,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   background: Colors.white,
                   foreground: DP.green,
                   onPressed: () => Navigator.pushNamed(context, '/wallet').then((_) {
-          if (mounted) _reload();
+          if (mounted) _reloadAll();
         }),
                 ),
               ),
@@ -423,7 +434,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   height: 46,
                   background: DP.blue,
                   onPressed: () => Navigator.pushNamed(context, '/send-money').then((_) {
-          if (mounted) _reload();
+          if (mounted) _reloadAll();
         }),
                 ),
               ),

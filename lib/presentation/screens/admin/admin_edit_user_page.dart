@@ -29,6 +29,11 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
   late bool _pinLocked = widget.user.pinLocked;
   late bool _pinSet = widget.user.pinSet;
   DateTime? _lockedUntil;
+  // Cable TV commission % for this user (Nigeria). null = the default.
+  final _cable = TextEditingController();
+  double? _cableRate;
+  double _cableDefault = 0.5;
+  bool _cableLoaded = false;
   bool _saving = false;
   bool _pinBusy = false;
 
@@ -49,6 +54,10 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
         _pinSet = j['pinSet'] == true;
         _lockedUntil = j['pinLockedUntil'] == null ? null : parseDate(j['pinLockedUntil']);
         _balance.text = toDouble(j['balance']).toStringAsFixed(2);
+        _cableRate = j['cableCommission'] == null ? null : toDouble(j['cableCommission']);
+        if (j['cableCommissionDefault'] != null) _cableDefault = toDouble(j['cableCommissionDefault']);
+        _cable.text = _cableRate == null ? '' : _pct(_cableRate!);
+        _cableLoaded = true;
       });
     } catch (_) {}
   }
@@ -72,9 +81,14 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
     }
   }
 
+  static String _pct(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '');
+
+  bool get _nigerian => widget.user.country != 'SL';
+
   @override
   void dispose() {
-    for (final c in [_name, _email, _phone, _balance]) {
+    for (final c in [_name, _email, _phone, _balance, _cable]) {
       c.dispose();
     }
     super.dispose();
@@ -87,7 +101,14 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
       return;
     }
     final u = widget.user;
+    final cableText = _cable.text.trim();
+    final double? cable = cableText.isEmpty ? null : double.tryParse(cableText);
+    if (cableText.isNotEmpty && (cable == null || cable < 0 || cable > 10)) {
+      dpSnack(context, 'Cable TV commission must be between 0% and 10%', error: true);
+      return;
+    }
     final body = <String, dynamic>{
+      if (_nigerian && _cableLoaded && cable != _cableRate) 'cableCommission': cable,
       if (_name.text.trim() != u.name) 'fullName': _name.text.trim(),
       if (_email.text.trim().toLowerCase() != u.email) 'email': _email.text.trim().toLowerCase(),
       if (_phone.text.trim() != u.phone) 'phone': _phone.text.trim(),
@@ -196,6 +217,73 @@ class _AdminEditUserPageState extends State<AdminEditUserPage> {
             readOnly: true,
           ),
           const DPHelper('Use Credit / Debit Wallet on the user to change the balance.'),
+          if (_nigerian) ...[
+            const SizedBox(height: 22),
+            const DPSectionHeader('Cable TV Commission'),
+            DPCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFA855F7)]),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.live_tv_rounded, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Earns on DStv, GOtv & StarTimes', style: DP.bodyStrong),
+                            Text(
+                              _cableRate == null
+                                  ? 'Using the default: ${_pct(_cableDefault)}%'
+                                  : 'Custom rate: ${_pct(_cableRate!)}% (default ${_pct(_cableDefault)}%)',
+                              style: DP.caption,
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusPill(_cableRate == null ? 'DEFAULT' : 'CUSTOM',
+                          color: _cableRate == null ? DP.muted : DP.green),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  DPField(
+                    controller: _cable,
+                    hint: 'Default (${_pct(_cableDefault)}%)',
+                    enabled: _canEdit && _cableLoaded,
+                    onChanged: (_) => setState(() {}),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d{0,2}(\.\d{0,2})?')),
+                    ],
+                    suffix: const Padding(
+                      padding: EdgeInsets.only(right: 14),
+                      child: Text('%', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const DPHelper('Commission paid to this user on every Cable TV payment. Leave empty to use the default.'),
+                  if (_canEdit && _cable.text.isNotEmpty)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => setState(() => _cable.clear()),
+                        icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                        label: Text('Use default (${_pct(_cableDefault)}%)'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 22),
           const DPSectionHeader('Account Controls'),
           DPCard(

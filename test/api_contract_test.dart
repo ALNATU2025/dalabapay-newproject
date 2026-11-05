@@ -363,6 +363,13 @@ void main() {
     final today = isoDay(DateTime.now());
     final ranged = itemsOf(await api.get('/api/transactions', query: {'from': today, 'to': today}));
     expect(ranged, isNotEmpty);
+    // TransactionsDashboard
+    for (final p in ['7d', '30d', '90d', 'year']) {
+      final s = asMap(await api.get('/api/transactions/summary', query: {'period': p}));
+      expect(s.keys, containsAll(['period', 'unit', 'currency', 'moneyIn', 'moneyOut', 'net', 'commissionEarned', 'previous', 'counts', 'categories', 'series', 'to']));
+      expect(asMap(s['counts']).keys, containsAll(['total', 'success', 'pending', 'failed']));
+      expect((s['series'] as List), isNotEmpty);
+    }
 
     // CommissionScreen
     final c = asMap(await api.get('/api/commission'));
@@ -467,7 +474,11 @@ void main() {
 
     // AdminEditUserPage
     final detail = asMap(await api.get('/api/admin/users/${fu.id}'));
-    expect(detail.keys, containsAll(['pinLocked', 'pinSet', 'pinLockedUntil', 'balance', 'transactions']));
+    expect(detail.keys, containsAll(['pinLocked', 'pinSet', 'pinLockedUntil', 'balance', 'transactions', 'cableCommission', 'cableCommissionDefault']));
+    expect(detail['cableCommissionDefault'], 0.5);
+    final cc = asMap(await api.patch('/api/admin/users/${fu.id}', {'cableCommission': 1.25}));
+    expect(cc['cableCommission'], 1.25);
+    await api.patch('/api/admin/users/${fu.id}', {'cableCommission': null});
     await api.patch('/api/admin/users/${fu.id}', {'fullName': 'Chidi Eze Jr'});
     // AdminUserHistoryPage
     final hist = asMap(await api.get('/api/admin/users/${fu.id}/history'));
