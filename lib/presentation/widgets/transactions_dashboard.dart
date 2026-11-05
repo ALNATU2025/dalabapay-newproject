@@ -39,7 +39,7 @@ const _cats = {
   'cable': _Cat('Cable TV', Icons.live_tv_rounded, Color(0xFF7C3AED)),
   'education': _Cat('Education', Icons.school_rounded, Color(0xFF0EA5E9)),
   'insurance': _Cat('Insurance', Icons.health_and_safety_rounded, Color(0xFFEC4899)),
-  'transfers': _Cat('Transfers', Icons.north_east_rounded, Color(0xFF10255A)),
+  'transfers': _Cat('Transfers', Icons.north_east_rounded, Color(0xFF6366F1)),
   'cards': _Cat('Dollar Card', Icons.credit_card_rounded, Color(0xFF14B8A6)),
   'other': _Cat('Other', Icons.more_horiz_rounded, Color(0xFF94A3B8)),
 };
@@ -292,13 +292,21 @@ class _TransactionsDashboardState extends State<TransactionsDashboard> {
                     color: (good ? _inColor : _outColor).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    '${up ? '▲' : '▼'} ${change.abs() >= 1000 ? '999+' : change.abs().toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: good ? _inColor : _outColor,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                          size: 11, color: good ? _inColor : _outColor),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${change.abs() >= 1000 ? '999+' : change.abs().toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: good ? _inColor : _outColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
@@ -423,18 +431,26 @@ class _TransactionsDashboardState extends State<TransactionsDashboard> {
                   tween: Tween(begin: 0, end: 1),
                   duration: const Duration(milliseconds: 700),
                   curve: Curves.easeOutCubic,
-                  builder: (context, t, _) => CustomPaint(
-                    size: Size(box.maxWidth, 150),
-                    painter: _BarsPainter(
-                      ins: ins,
-                      outs: outs,
-                      maxV: maxV,
-                      progress: t,
-                      selected: sel,
-                      grid: DP.borderSoft,
-                      axisText: DP.caption.copyWith(fontSize: 9.5),
-                      maxLabel: maxV == 0 ? '' : _short(maxV),
-                    ),
+                  builder: (context, t, _) => Stack(
+                    children: [
+                      CustomPaint(
+                        size: Size(box.maxWidth, 150),
+                        painter: _BarsPainter(
+                          ins: ins,
+                          outs: outs,
+                          maxV: maxV,
+                          progress: t,
+                          selected: sel,
+                          grid: DP.borderSoft,
+                        ),
+                      ),
+                      if (maxV > 0)
+                        Positioned(
+                          left: 2,
+                          top: 1,
+                          child: Text(_short(maxV), style: DP.caption.copyWith(fontSize: 9.5)),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -618,8 +634,6 @@ class _BarsPainter extends CustomPainter {
   final double progress;
   final int? selected;
   final Color grid;
-  final TextStyle axisText;
-  final String maxLabel;
 
   _BarsPainter({
     required this.ins,
@@ -628,8 +642,6 @@ class _BarsPainter extends CustomPainter {
     required this.progress,
     required this.selected,
     required this.grid,
-    required this.axisText,
-    required this.maxLabel,
   });
 
   @override
@@ -640,10 +652,6 @@ class _BarsPainter extends CustomPainter {
     for (var i = 0; i <= 3; i++) {
       final y = size.height * i / 3;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-    if (maxLabel.isNotEmpty) {
-      final tp = TextPainter(text: TextSpan(text: maxLabel, style: axisText), textDirection: TextDirection.ltr)..layout();
-      tp.paint(canvas, const Offset(2, 2));
     }
     final n = ins.length;
     if (n == 0 || maxV <= 0) return;

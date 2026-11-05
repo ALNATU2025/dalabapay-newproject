@@ -62,7 +62,8 @@ void main() {
       expect(find.text('₦98,450.00'), findsOneWidget);
       expect(find.text('+₦26,550.00'), findsOneWidget);
       expect(find.text('Cable TV · 2 payments'), findsOneWidget);
-      expect(find.text('▼ 10%'), findsOneWidget); // spent less than before
+      expect(find.text('10%'), findsOneWidget); // spent less than before
+      expect(find.byIcon(Icons.arrow_downward_rounded), findsOneWidget);
       expect(find.text('38'), findsOneWidget);
     });
   }
