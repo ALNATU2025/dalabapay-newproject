@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/api/session.dart';
 import '../../../ui/ui.dart';
 
 class HelpScreen extends StatefulWidget {
@@ -187,6 +188,10 @@ class _HelpScreenState extends State<HelpScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
+                  if (Session.instance.user != null) ...[
+                    _aminataCard(),
+                    const SizedBox(height: 18),
+                  ],
                   Container(
                     padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
                     decoration: BoxDecoration(
@@ -280,4 +285,73 @@ class _HelpScreenState extends State<HelpScreen> {
       ),
     );
   }
+
+  /// Chat with Aminata (AI support): the first stop for signed-in customers.
+  Widget _aminataCard() => DPAppear(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(DP.rXl),
+            onTap: () => Navigator.pushNamed(context, '/support-chat'),
+            child: Ink(
+              padding: const EdgeInsets.fromLTRB(18, 18, 16, 18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF079A68), Color(0xFF0EA5A4), Color(0xFF2779FD)],
+                ),
+                borderRadius: BorderRadius.circular(DP.rXl),
+                boxShadow: DP.glow(DP.green, strength: 0.5),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('A', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text('Chat with Aminata',
+                                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text('24/7',
+                                  style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Our assistant checks your payments and helps you fix problems instantly.',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 13, height: 1.35),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }

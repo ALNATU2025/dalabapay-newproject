@@ -476,6 +476,21 @@ void main() {
     final detail = asMap(await api.get('/api/admin/users/${fu.id}'));
     expect(detail.keys, containsAll(['pinLocked', 'pinSet', 'pinLockedUntil', 'balance', 'transactions', 'cableCommission', 'cableCommissionDefault']));
     expect(detail['cableCommissionDefault'], 0.5);
+    // SupportChatScreen (Aminata)
+    final ss = asMap(await api.get('/api/support/status'));
+    expect(ss.keys, containsAll(['available', 'name']));
+    if (ss['available'] != true) {
+      try {
+        await api.post('/api/support/chat', {
+          'messages': [
+            {'role': 'user', 'content': 'hi'}
+          ]
+        });
+        fail('expected AI_NOT_CONFIGURED');
+      } on ApiException catch (e) {
+        expect(e.code, 'AI_NOT_CONFIGURED');
+      }
+    }
     // AdminHawaPage (no ANTHROPIC_API_KEY on the CI server)
     final hs = asMap(await api.get('/api/admin/hawa/status'));
     expect(hs.keys, containsAll(['configured', 'model', 'tools']));

@@ -52,6 +52,7 @@ import 'presentation/screens/disputes/user_disputes_page.dart';
 import 'presentation/screens/education/education_screen.dart';
 import 'presentation/screens/electricity/electricity_screen.dart';
 import 'presentation/screens/help/help_screen.dart';
+import 'presentation/screens/help/support_chat_screen.dart';
 import 'presentation/screens/insurance/insurance_screen.dart';
 import 'presentation/screens/international_airtime/international_airtime_screen.dart';
 import 'presentation/screens/internet/internet_screen.dart';
@@ -173,6 +174,7 @@ class DalabapayApp extends StatelessWidget {
     '/transactions': (_) => const TransactionsScreen(),
     '/user-disputes': (_) => const UserDisputesPage(),
     '/help': (_) => const HelpScreen(),
+    '/support-chat': (_) => const SupportChatScreen(),
     '/transaction-validation': (_) => const TransactionValidationPage(),
     '/airtime': (_) => const AirtimeScreen(),
     '/data': (_) => const InternetScreen(),
