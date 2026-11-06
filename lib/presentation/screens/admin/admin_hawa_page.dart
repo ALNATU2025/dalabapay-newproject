@@ -180,7 +180,7 @@ class _AdminHawaPageState extends State<AdminHawaPage> {
         IconButton(
           tooltip: 'New chat',
           onPressed: _thinking ? null : _clear,
-          icon: const Icon(Icons.add_comment_outlined, color: DP.navyInk, size: 20),
+          icon: Icon(Icons.add_comment_outlined, color: DP.navyInk, size: 20),
         ),
       ],
       body: Column(
