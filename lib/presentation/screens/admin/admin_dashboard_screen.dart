@@ -108,6 +108,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   static const _tools = [
+    _Tool('Ask Hawa', 'AI assistant for your data', Icons.auto_awesome, Color(0xFF7C3AED), '/admin/hawa', 'dashboard:read'),
     _Tool('KYC Review', 'Approve accounts & tier upgrades', Icons.verified_user_outlined, DP.green, '/admin/kyc', 'users:read'),
     _Tool('Manage Users', 'View, edit, fund, approve', Icons.group_outlined, DP.green, '/admin/users', 'users:read'),
     _Tool('Transactions', 'All payments & export', Icons.receipt_long_outlined, DP.navyIcon, '/admin/transactions', 'transactions:read'),
@@ -410,6 +411,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               chip(Icons.how_to_reg_rounded, '$toApprove to approve', adminCan('users:read') ? () => _open('/admin/kyc') : null),
               chip(Icons.account_balance_rounded, '$topUps top-ups to confirm', adminCan('transactions:read') ? () => _open('/admin/bank-topups') : null),
               chip(DPIcons.pending, '$pending pending', adminCan('transactions:status') ? () => _open('/admin/status') : null),
+              chip(Icons.auto_awesome, 'Ask Hawa', () => _open('/admin/hawa')),
             ],
           ),
         ],

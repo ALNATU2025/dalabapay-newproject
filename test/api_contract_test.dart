@@ -476,6 +476,21 @@ void main() {
     final detail = asMap(await api.get('/api/admin/users/${fu.id}'));
     expect(detail.keys, containsAll(['pinLocked', 'pinSet', 'pinLockedUntil', 'balance', 'transactions', 'cableCommission', 'cableCommissionDefault']));
     expect(detail['cableCommissionDefault'], 0.5);
+    // AdminHawaPage (no ANTHROPIC_API_KEY on the CI server)
+    final hs = asMap(await api.get('/api/admin/hawa/status'));
+    expect(hs.keys, containsAll(['configured', 'model', 'tools']));
+    if (hs['configured'] != true) {
+      try {
+        await api.post('/api/admin/hawa/chat', {
+          'messages': [
+            {'role': 'user', 'content': 'hello'}
+          ]
+        });
+        fail('expected HAWA_NOT_CONFIGURED');
+      } on ApiException catch (e) {
+        expect(e.code, 'HAWA_NOT_CONFIGURED');
+      }
+    }
     final cc = asMap(await api.patch('/api/admin/users/${fu.id}', {'cableCommission': 1.25}));
     expect(cc['cableCommission'], 1.25);
     await api.patch('/api/admin/users/${fu.id}', {'cableCommission': null});

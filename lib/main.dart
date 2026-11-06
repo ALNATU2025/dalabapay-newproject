@@ -16,6 +16,7 @@ import 'ui/ui.dart';
 import 'presentation/screens/payout/payout_screen.dart';
 import 'presentation/screens/admin/admin_cashwyre_page.dart';
 import 'presentation/screens/admin/admin_kyc_page.dart';
+import 'presentation/screens/admin/admin_hawa_page.dart';
 import 'presentation/screens/admin/admin_bank_topups_page.dart';
 import 'presentation/screens/sierra_leone/sl_tiers_screen.dart';
 import 'presentation/screens/cards/cards_screen.dart';
@@ -219,6 +220,7 @@ class DalabapayApp extends StatelessWidget {
     '/admin/sl-funding': (_) => const AdminSlFundingPage(),
     '/admin/cashwyre': (_) => const AdminCashwyrePage(),
     '/admin/kyc': (_) => const AdminKycPage(),
+    '/admin/hawa': (_) => const AdminHawaPage(),
     '/admin/bank-topups': (ctx) {
       final a = ModalRoute.of(ctx)?.settings.arguments;
       final m = a is Map ? a : const {};
