@@ -6,6 +6,10 @@
 	<string>Use Face ID to sign in to Dalabapay.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Dalabapay uses your photos to upload a picture of your ID for a dollar card.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Talk to Hawa, the Dalabapay admin assistant, with your voice.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turns what you say to Hawa into text.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Dalabapay uses the camera to take a picture of your ID for a dollar card.</string>
 	<key>CFBundleDevelopmentRegion</key>

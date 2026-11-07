@@ -24,7 +24,19 @@ class PushAction {
   final String route;
   final String id;
   final String? action; // confirm | cancel | null (just open)
-  const PushAction(this.route, this.id, this.action);
+  final Map<String, dynamic> args; // extra route arguments (e.g. Hawa: speak)
+  const PushAction(this.route, this.id, this.action, {this.args = const {}});
+}
+
+/// An admin alert ("Payment failed", "VTpass wallet is low"...) opens Hawa,
+/// who reads it aloud and can help act on it.
+PushAction? alertToHawa(Map<String, dynamic> data, {String? title, String? body}) {
+  final event = data['event']?.toString() ?? '';
+  if (!event.startsWith('alert.') && event != 'funding.sent') return null;
+  final t = title ?? data['title']?.toString() ?? '';
+  final b = body ?? data['body']?.toString() ?? '';
+  if (t.isEmpty && b.isEmpty) return null;
+  return PushAction('/admin/hawa', '', null, args: {'speak': t.isEmpty ? b : (b.isEmpty ? t : '$t. $b')});
 }
 
 const _channel = AndroidNotificationChannel(
@@ -114,6 +126,9 @@ class PushNotifications {
   /// Called with (title, body) for a push received while the app is open.
   static void Function(String title, String body)? onForeground;
 
+  /// Called for an admin alert received while the app is open (Hawa reads it).
+  static void Function(String title, String body, String severity)? onAdminAlert;
+
   /// Called when a notification (or one of its buttons) is tapped.
   static void Function(PushAction action)? onOpen;
 
@@ -179,7 +194,19 @@ class PushNotifications {
           await _initLocal(onTap: (r) => _deliver(_parse(r.payload, r.actionId)));
           await _showActionable(msg);
           if (title.isNotEmpty || body.isNotEmpty) onForeground?.call(title, body);
+          if (alertToHawa(msg.data, title: title, body: body) != null) {
+            onAdminAlert?.call(title, body, msg.data['severity']?.toString() ?? 'info');
+          }
         });
+        // Tapping an alert notification (app in the background or closed)
+        // opens Hawa, who reads it aloud.
+        FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+          _deliver(alertToHawa(msg.data, title: msg.notification?.title, body: msg.notification?.body));
+        });
+        final first = await m.getInitialMessage();
+        if (first != null) {
+          _deliver(alertToHawa(first.data, title: first.notification?.title, body: first.notification?.body));
+        }
       }
     } catch (e) {
       debugPrint('Push notifications unavailable: $e');

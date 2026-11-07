@@ -16,6 +16,7 @@ import 'ui/ui.dart';
 import 'presentation/screens/payout/payout_screen.dart';
 import 'presentation/screens/admin/admin_cashwyre_page.dart';
 import 'presentation/screens/admin/admin_kyc_page.dart';
+import 'core/hawa_voice.dart';
 import 'presentation/screens/admin/admin_hawa_page.dart';
 import 'presentation/screens/admin/admin_bank_topups_page.dart';
 import 'presentation/screens/sierra_leone/sl_tiers_screen.dart';
@@ -127,6 +128,19 @@ void main() {
     PushNotifications.pending = null;
     _openFromPush(p);
   });
+  // Hawa (admin AI): spoken alerts while the app is open, and the
+  // "Talk to Hawa" shortcut on the app icon for admins.
+  HawaVoice.instance.load();
+  PushNotifications.onAdminAlert = (title, body, severity) {
+    final u = Session.instance.user;
+    if (u == null || !u.isAdmin || !HawaVoice.instance.spokenAlerts.value) return;
+    if (DPRouteWatcher.instance.current.value == '/admin/hawa') return; // her page speaks for itself
+    HawaVoice.instance.speak('Hawa here. ${severity == 'critical' ? 'Urgent. ' : ''}$title. $body');
+  };
+  HawaVoice.instance.initShortcut(
+    () => _openFromPush(const PushAction('/admin/hawa', '', null, args: {'voice': true})),
+  );
+  Session.instance.addListener(() => HawaVoice.instance.updateShortcut(admin: Session.instance.user?.isAdmin ?? false));
   PushNotifications.init();
   runApp(const DalabapayApp());
 }
@@ -142,7 +156,7 @@ void _openFromPush(PushAction a) {
     PushNotifications.pending = a;
     return;
   }
-  nav.pushNamed(a.route, arguments: {'id': a.id, 'action': a.action});
+  nav.pushNamed(a.route, arguments: {'id': a.id, 'action': a.action, ...a.args});
 }
 
 class DalabapayApp extends StatelessWidget {
