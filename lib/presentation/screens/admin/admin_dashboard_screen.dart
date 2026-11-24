@@ -108,6 +108,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   static const _tools = [
+    _Tool('VTpass Portal', 'Transactions & commission', Icons.account_balance_rounded, Color(0xFF15368A), '/admin/vtpass/portal', 'commission:read'),
     _Tool('Ask Hawa', 'AI assistant for your data', Icons.auto_awesome, Color(0xFF7C3AED), '/admin/hawa', 'dashboard:read'),
     _Tool('KYC Review', 'Approve accounts & tier upgrades', Icons.verified_user_outlined, DP.green, '/admin/kyc', 'users:read'),
     _Tool('Manage Users', 'View, edit, fund, approve', Icons.group_outlined, DP.green, '/admin/users', 'users:read'),

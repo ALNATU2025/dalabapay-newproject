@@ -241,6 +241,50 @@ class _VtpassSettingsDashboardState extends State<VtpassSettingsDashboard> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
           children: [
+            if (adminCan('commission:read')) ...[
+              DPAppear(
+                child: Material(
+                  color: DP.surface,
+                  borderRadius: BorderRadius.circular(DP.rLg),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(DP.rLg),
+                    onTap: () => Navigator.pushNamed(context, '/admin/vtpass/portal'),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(DP.rLg),
+                        border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(colors: [Color(0xFF15368A), Color(0xFF7C3AED)]),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.space_dashboard_rounded, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('VTpass Portal', style: DP.bodyStrong.copyWith(fontSize: 15)),
+                                Text('All VTpass transactions, totals and Dalabapay commission', style: DP.caption),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.arrow_forward_ios_rounded, size: 16, color: DP.muted),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(

@@ -35,6 +35,7 @@ import 'presentation/screens/admin/admin_transaction_limits_page.dart';
 import 'presentation/screens/admin/admin_transaction_status_page.dart';
 import 'presentation/screens/admin/admin_users_page.dart';
 import 'presentation/screens/admin/admin_verify_payment_page.dart';
+import 'presentation/screens/admin/admin_vtpass_portal_page.dart';
 import 'presentation/screens/admin/vtpass_settings_dashboard.dart';
 import 'presentation/screens/airtime/airtime_screen.dart';
 import 'presentation/screens/auth/change_password_screen.dart';
@@ -231,6 +232,7 @@ class DalabapayApp extends StatelessWidget {
     '/admin/alerts': (_) => const AdminNotificationsPage(),
     '/admin/control': (_) => const AdminControlPage(),
     '/admin/vtpass': (_) => const VtpassSettingsDashboard(),
+    '/admin/vtpass/portal': (_) => const AdminVtpassPortalPage(),
     '/admin/commission': (_) => const AdminServiceCommissionPage(),
     '/admin/limits': (_) => const AdminTransactionLimitsPage(),
     '/admin/sl-funding': (_) => const AdminSlFundingPage(),
