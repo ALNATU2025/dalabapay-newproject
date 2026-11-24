@@ -388,8 +388,8 @@ class _AdminVtpassPortalPageState extends State<AdminVtpassPortalPage> {
           ),
           const SizedBox(height: 14),
           AdminStatGrid(stats: [
-            AdminStat(label: 'Transactions', value: '${toInt(counts['total'])}', icon: Icons.receipt_long_rounded, color: _blue, sub: '${toInt(counts['success'])} successful'),
-            AdminStat(label: 'Successful volume', value: _money(toDouble(s['volume'])), icon: Icons.payments_rounded, color: _green, sub: 'Avg ${_money(toDouble(s['averagePayment']))}'),
+            AdminStat(label: 'Transactions', value: '${toInt(counts['total'])}', icon: Icons.receipt_long_rounded, color: _blue),
+            AdminStat(label: 'Successful volume', value: _money(toDouble(s['volume'])), icon: Icons.payments_rounded, color: _green),
             AdminStat(label: 'Commission earned', value: _money(toDouble(c['earned']), dec: true), icon: Icons.savings_rounded, color: _purple, sub: '${_pct(rate)}% from VTpass'),
             AdminStat(label: 'Success rate', value: sr == null ? '—' : '${toDouble(sr).toStringAsFixed(1)}%', icon: Icons.verified_rounded, color: sr != null && toDouble(sr) < 90 ? _red : _green, sub: '${toInt(counts['failed'])} failed'),
             AdminStat(label: 'Paid to customers', value: _money(toDouble(c['paidToUsers']), dec: true), icon: Icons.volunteer_activism_rounded, color: _amber, sub: 'Customer commission'),
