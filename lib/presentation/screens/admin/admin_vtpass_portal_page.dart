@@ -909,11 +909,17 @@ class _AdminVtpassPortalPageState extends State<AdminVtpassPortalPage> {
           borderRadius: BorderRadius.circular(DP.rLg),
           onTap: () => _detail(t),
           child: Container(
-            padding: const EdgeInsets.all(14),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(DP.rLg),
-              border: Border(left: BorderSide(color: color, width: 3), top: BorderSide(color: DP.border), right: BorderSide(color: DP.border), bottom: BorderSide(color: DP.border)),
+              border: Border.all(color: DP.border),
             ),
+            child: IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(width: 4, color: color),
+            Expanded(
+              child: Padding(
+            padding: const EdgeInsets.all(14),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Container(
@@ -966,6 +972,10 @@ class _AdminVtpassPortalPageState extends State<AdminVtpassPortalPage> {
                 ),
               ],
             ]),
+              ),
+            ),
+              ]),
+            ),
           ),
         ),
       ),

@@ -14,6 +14,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: newer Flutter needs Gradle 9.3+ (project upgrade pending)
+          flutter-version: '3.47.9'
           cache: true
 
       - name: Install packages
@@ -58,6 +60,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: newer Flutter needs Gradle 9.3+ (project upgrade pending)
+          flutter-version: '3.47.9'
           cache: true
       - run: flutter pub get
       - name: Widget tests and screenshots
@@ -125,6 +129,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: newer Flutter needs Gradle 9.3+ (project upgrade pending)
+          flutter-version: '3.47.9'
           cache: true
       - run: flutter pub get
       - name: Build APK
@@ -146,6 +152,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: newer Flutter needs Gradle 9.3+ (project upgrade pending)
+          flutter-version: '3.47.9'
           cache: true
       - name: Build website
         shell: bash
@@ -203,6 +211,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: newer Flutter needs Gradle 9.3+ (project upgrade pending)
+          flutter-version: '3.47.9'
           cache: true
       - run: flutter pub get
       - name: Contract test
