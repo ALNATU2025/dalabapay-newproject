@@ -33,6 +33,7 @@ Widget? mobileMoneyLogo(String nameOrId, {double height = 30}) {
   if (asset == null) return null;
   return Container(
     height: height,
+    width: height * 3.4, // both logos are about 3.2–3.5 times wider than tall
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
     child: Image.asset(asset, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
@@ -249,7 +250,7 @@ class _SlInstantTopupState extends State<SlInstantTopup> {
           ),
           child: Stack(children: [
             Center(
-              child: mobileMoneyLogo(name.isEmpty ? id : name, height: 40) ??
+              child: mobileMoneyLogo(name.isEmpty ? id : name, height: 36) ??
                   Text(name, style: DP.bodyStrong.copyWith(fontSize: 14, color: on ? color : DP.ink)),
             ),
             if (on)

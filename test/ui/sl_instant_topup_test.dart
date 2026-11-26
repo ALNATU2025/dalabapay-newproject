@@ -1,5 +1,8 @@
 // Sierra Leone instant Add Money (Monime): choose Orange Money / Afrimoney.
+import 'dart:ui' show instantiateImageCodec;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dalabapay/presentation/screens/sierra_leone/sl_instant_topup.dart';
@@ -23,6 +26,13 @@ void main() {
   };
 
   testWidgets('instant top-up form', (tester) async {
+    // Load the two logos before the screenshot.
+    await tester.runAsync(() async {
+      for (final a in ['assets/images/orange_money.png', 'assets/images/afrimoney.png']) {
+        final data = await rootBundle.load(a);
+        await instantiateImageCodec(data.buffer.asUint8List());
+      }
+    });
     await snap(
       tester,
       'sl_instant_topup',
