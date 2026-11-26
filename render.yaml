@@ -38,7 +38,7 @@ services:
         value: max-age=31536000; includeSubDomains
       - path: /*
         name: Permissions-Policy
-        value: "camera=(self), microphone=(), geolocation=(), payment=()"
+        value: "camera=(self), microphone=(self), geolocation=(), payment=()"
       # Always fetch the newest app after an update.
       - path: /index.html
         name: Cache-Control

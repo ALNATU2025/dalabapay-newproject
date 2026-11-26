@@ -6,10 +6,14 @@
 #   FIREBASE_WEB_API_KEY  optional: the Web app's apiKey if it differs from Android's
 set -euo pipefail
 
-if ! command -v flutter >/dev/null 2>&1; then
-  FLUTTER_DIR="${FLUTTER_DIR:-$HOME/flutter}"
+# Same Flutter as the app build and CI (a newer one can fail to build, and
+# Render then keeps serving the old website without saying so).
+FLUTTER_VERSION="${FLUTTER_VERSION:-3.47.9}"
+if ! command -v flutter >/dev/null 2>&1 || ! flutter --version 2>/dev/null | grep -q "Flutter $FLUTTER_VERSION "; then
+  FLUTTER_DIR="${FLUTTER_DIR:-$HOME/flutter-$FLUTTER_VERSION}"
   if [ ! -x "$FLUTTER_DIR/bin/flutter" ]; then
-    git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$FLUTTER_DIR"
+    rm -rf "$FLUTTER_DIR"
+    git clone --depth 1 -b "$FLUTTER_VERSION" https://github.com/flutter/flutter.git "$FLUTTER_DIR"
   fi
   export PATH="$FLUTTER_DIR/bin:$PATH"
 fi
