@@ -476,6 +476,12 @@ void main() {
     final detail = asMap(await api.get('/api/admin/users/${fu.id}'));
     expect(detail.keys, containsAll(['pinLocked', 'pinSet', 'pinLockedUntil', 'balance', 'transactions', 'cableCommission', 'cableCommissionDefault']));
     expect(detail['cableCommissionDefault'], 0.5);
+    // SlInstantTopup: Nigerian accounts are refused (Sierra Leone only)
+    try {
+      await api.get('/api/wallet/fund/monime');
+    } on ApiException catch (e) {
+      expect(e.code, 'WRONG_COUNTRY');
+    }
     // SupportChatScreen (Aminata)
     final ss = asMap(await api.get('/api/support/status'));
     expect(ss.keys, containsAll(['available', 'name']));

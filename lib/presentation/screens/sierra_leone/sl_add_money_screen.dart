@@ -1,8 +1,11 @@
 // lib/presentation/screens/sierra_leone/sl_add_money_screen.dart
-// Add money in Sierra Leone: pay one of our Orange Money / Afrimoney /
-// bank accounts, then tap "I've paid" with the transaction ID. An admin
-// confirms it and the wallet is credited (no fee).
-//   GET  /api/wallet/sl-funding
+// Add money in Sierra Leone, two ways:
+//   Instant (Monime) — dial a code, approve with your mobile money PIN,
+//     credited automatically (sl_instant_topup.dart). Shown when connected.
+//   Send & confirm — pay one of our Orange Money / Afrimoney / bank
+//     accounts, then tap "I've paid" with the transaction ID; an admin
+//     confirms it.
+//   GET  /api/wallet/sl-funding, /api/wallet/fund/monime
 //   POST /api/wallet/fund/sl-request { amount, method, reference, senderNumber?, note? }
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +15,7 @@ import '../../../core/api/session.dart';
 import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/async_view.dart';
+import 'sl_instant_topup.dart';
 
 class SlAddMoneyScreen extends StatefulWidget {
   const SlAddMoneyScreen({super.key});
@@ -26,6 +30,7 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
   final _sender = TextEditingController();
   String? _method;
   bool _sending = false;
+  bool _manual = false; // false = Instant (when available)
 
   @override
   void dispose() {
@@ -91,7 +96,13 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
             ),
             Expanded(
               child: AsyncView<Map<String, dynamic>>(
-                load: () async => asMap(await api.get('/api/wallet/sl-funding')),
+                load: () async {
+                  final results = await Future.wait([
+                    api.get('/api/wallet/sl-funding'),
+                    api.get('/api/wallet/fund/monime').catchError((_) => <String, dynamic>{}),
+                  ]);
+                  return {...asMap(results[0]), 'instant': asMap(results[1])};
+                },
                 builder: (context, info, _) => _body(info),
               ),
             ),
@@ -104,6 +115,8 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
   Widget _body(Map<String, dynamic> info) {
     final methods = asList(info['methods']);
     final chosen = methods.where((m) => m['id'] == _method).toList();
+    final instant = asMap(info['instant']);
+    final instantOn = instant['available'] == true;
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       children: [
@@ -116,7 +129,13 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
           tag: 'Add money',
         ),
         const SizedBox(height: 20),
-        if (methods.isEmpty)
+        if (instantOn) ...[
+          _modeSwitch(),
+          const SizedBox(height: 20),
+        ],
+        if (instantOn && !_manual)
+          SlInstantTopup(info: instant, onDone: () => Navigator.pop(context))
+        else if (methods.isEmpty)
           const DPEmptyState(
             icon: DPIcons.wallet,
             title: 'Top-ups open soon',
@@ -176,6 +195,44 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _modeSwitch() {
+    Widget tab(bool manual, String label, String sub, IconData icon) {
+      final on = _manual == manual;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _manual = manual),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+            decoration: BoxDecoration(
+              color: on ? DP.green : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(children: [
+              Icon(icon, size: 18, color: on ? Colors.white : DP.muted),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(label, style: DP.bodyStrong.copyWith(fontSize: 13.5, color: on ? Colors.white : DP.ink)),
+                  Text(sub, style: DP.caption.copyWith(fontSize: 11, color: on ? Colors.white70 : null)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: DP.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: DP.border)),
+      child: Row(children: [
+        tab(false, 'Instant', 'Dial & approve', Icons.bolt_rounded),
+        tab(true, 'Send & confirm', 'Manual check', Icons.receipt_long_rounded),
+      ]),
     );
   }
 
