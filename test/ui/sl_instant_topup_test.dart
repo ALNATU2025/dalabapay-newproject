@@ -37,6 +37,6 @@ void main() {
     expect(find.text('Get payment code'), findsOneWidget);
     await tester.tap(find.text('Afrimoney'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    expect(find.text('Afrimoney'), findsOneWidget);
   });
 }

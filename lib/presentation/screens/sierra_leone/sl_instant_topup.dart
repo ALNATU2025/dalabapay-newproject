@@ -236,9 +236,14 @@ class _SlInstantTopupState extends State<SlInstantTopup> {
               alignment: Alignment.center,
               child: Text(name.isEmpty ? '?' : name[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
             ),
-            const SizedBox(width: 10),
-            Expanded(child: Text(name, style: DP.bodyStrong.copyWith(fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis)),
-            if (on) Icon(Icons.check_circle_rounded, color: color, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(name, style: DP.bodyStrong.copyWith(fontSize: 14, color: on ? color : DP.ink)),
+              ),
+            ),
           ]),
         ),
       ),
