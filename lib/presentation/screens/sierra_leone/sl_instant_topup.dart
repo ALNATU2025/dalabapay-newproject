@@ -19,7 +19,25 @@ import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 
 const _orange = Color(0xFFFF7900);
-const _afri = Color(0xFF7B2C8F);
+const _afri = Color(0xFF9B1C7E);
+
+/// The Orange Money / Afrimoney logo for a provider name or id, on a white
+/// rounded tile (readable in dark mode too); null for anything else.
+Widget? mobileMoneyLogo(String nameOrId, {double height = 30}) {
+  final k = nameOrId.toLowerCase();
+  final String? asset = k.contains('orange') || k == 'm17'
+      ? 'assets/images/orange_money.png'
+      : (k.contains('afri') || k.contains('africell') || k == 'm18')
+          ? 'assets/images/afrimoney.png'
+          : null;
+  if (asset == null) return null;
+  return Container(
+    height: height,
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+    child: Image.asset(asset, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+  );
+}
 
 class SlInstantTopup extends StatefulWidget {
   final Map<String, dynamic> info; // GET /api/wallet/fund/monime
@@ -223,27 +241,19 @@ class _SlInstantTopupState extends State<SlInstantTopup> {
         onTap: () => setState(() => _provider = id),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          height: 64,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(DP.rMd),
             border: Border.all(color: on ? color : DP.border, width: on ? 2 : 1),
           ),
-          child: Row(children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              alignment: Alignment.center,
-              child: Text(name.isEmpty ? '?' : name[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+          child: Stack(children: [
+            Center(
+              child: mobileMoneyLogo(name.isEmpty ? id : name, height: 40) ??
+                  Text(name, style: DP.bodyStrong.copyWith(fontSize: 14, color: on ? color : DP.ink)),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(name, style: DP.bodyStrong.copyWith(fontSize: 14, color: on ? color : DP.ink)),
-              ),
-            ),
+            if (on)
+              Positioned(right: -4, top: -6, child: Icon(Icons.check_circle_rounded, color: color, size: 18)),
           ]),
         ),
       ),

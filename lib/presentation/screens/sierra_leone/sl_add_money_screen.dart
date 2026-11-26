@@ -261,7 +261,14 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
         child: Row(
           children: [
-            DPIconBadge(m['id'] == 'bank' ? DPIcons.bank : DPIcons.smartphone, size: 42, iconSize: 20),
+            SizedBox(
+              width: 92,
+              child: mobileMoneyLogo('${m['id']} ${m['name']}', height: 34) ??
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: DPIconBadge(m['id'] == 'bank' ? DPIcons.bank : DPIcons.smartphone, size: 42, iconSize: 20),
+                  ),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

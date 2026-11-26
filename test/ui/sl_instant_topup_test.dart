@@ -32,11 +32,11 @@ void main() {
       ),
       size: const Size(390, 820),
     );
-    expect(find.text('Orange Money'), findsOneWidget);
-    expect(find.text('Afrimoney'), findsOneWidget);
+    expect(find.byType(Image), findsNWidgets(2)); // Orange Money + Afrimoney logos
     expect(find.text('Get payment code'), findsOneWidget);
-    await tester.tap(find.text('Afrimoney'));
+    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    await tester.tap(find.byType(Image).last);
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Afrimoney'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
   });
 }
