@@ -1238,7 +1238,7 @@ class _DownloadBand extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(DP.rPill)),
-              child: const Text('Kushe! 👋', style: TextStyle(color: _green, fontWeight: FontWeight.w900, fontSize: 15)),
+              child: const Text('Kushe!', style: TextStyle(color: _green, fontWeight: FontWeight.w900, fontSize: 15)),
             ),
           ),
         ],
