@@ -40,7 +40,10 @@ Widget countryFlag(String code, {double size = 24}) {
 }
 
 class PayoutScreen extends StatefulWidget {
-  const PayoutScreen({super.key});
+  /// Opened from Send with Orange Money / Afrimoney / Bank already chosen.
+  final String? initialType; // bank | mobile_money
+  final String? initialBankCode;
+  const PayoutScreen({super.key, this.initialType, this.initialBankCode});
 
   @override
   State<PayoutScreen> createState() => _PayoutScreenState();
@@ -59,7 +62,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
   bool _connected = true;
   List<Map<String, dynamic>> _countries = [];
   Map<String, dynamic>? _country;
-  String _type = 'bank'; // bank | mobile_money
+  late String _type = widget.initialType ?? 'bank'; // bank | mobile_money
+  String? _wantBank = ''; // the bank to choose once the list loads
   List<Map<String, dynamic>> _banks = [];
   bool _banksLoading = false;
   Map<String, dynamic>? _bank;
@@ -156,9 +160,14 @@ class _PayoutScreenState extends State<PayoutScreen> {
     try {
       final r = await api.get('/api/payouts/banks', query: {'country': c['code'], 'type': _type});
       if (!mounted) return;
+      final list = asList(r);
+      final want = _wantBank == '' ? widget.initialBankCode : _wantBank;
+      _wantBank = null;
+      final match = want == null ? const <Map<String, dynamic>>[] : list.where((b) => str(b['code']) == want).toList();
       setState(() {
-        _banks = asList(r);
+        _banks = list;
         _banksLoading = false;
+        if (match.isNotEmpty) _bank = match.first;
       });
     } catch (e) {
       if (!mounted) return;

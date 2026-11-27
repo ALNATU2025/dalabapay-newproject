@@ -9,6 +9,7 @@ import '../../../core/api/session.dart';
 import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/payment_flow.dart';
+import '../sierra_leone/sl_instant_topup.dart' show mobileMoneyLogo;
 
 class SendMoneyScreen extends StatefulWidget {
   const SendMoneyScreen({super.key});
@@ -128,6 +129,26 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     }
   }
 
+  /// Orange Money / Afrimoney / Bank: opens the transfer form with it chosen.
+  Widget _payoutTile(String label, String type, String? code) {
+    final logo = code == null ? null : mobileMoneyLogo(code, height: 26);
+    return DPCard(
+      key: ValueKey('send-$label'),
+      onTap: () => Navigator.pushNamed(context, '/payout', arguments: {'type': type, if (code != null) 'bankCode': code}),
+      padding: const EdgeInsets.fromLTRB(8, 14, 8, 12),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 30,
+            child: Center(child: logo ?? const DPIconBadge.blue(DPIcons.bank, size: 30, iconSize: 16)),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: DP.bodyStrong.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final over = _amount > _balance;
@@ -155,25 +176,16 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                   children: [
                     // Bank / mobile money transfers: Sierra Leone accounts only.
                     if (Session.instance.isSierraLeone) ...[
-                    DPCard(
-                      onTap: () => Navigator.pushNamed(context, '/payout'),
-                      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                      child: Row(
-                        children: [
-                          const DPIconBadge.blue(DPIcons.bank, size: 40, iconSize: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('To a bank or mobile money', style: DP.bodyStrong),
-                                Text('At home or in other countries', style: DP.caption),
-                              ],
-                            ),
-                          ),
-                          Icon(DPIcons.chevronRight, color: DP.muted),
-                        ],
-                      ),
+                    Text('Send to mobile money or a bank', style: DP.section),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: _payoutTile('Orange Money', 'mobile_money', 'm17')),
+                        const SizedBox(width: 10),
+                        Expanded(child: _payoutTile('Afrimoney', 'mobile_money', 'm18')),
+                        const SizedBox(width: 10),
+                        Expanded(child: _payoutTile('Bank', 'bank', null)),
+                      ],
                     ),
                     const SizedBox(height: 18),
                     Text('Or send to a Dalabapay user', style: DP.section),

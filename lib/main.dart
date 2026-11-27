@@ -65,6 +65,7 @@ import 'presentation/screens/landing/landing_screen.dart';
 import 'presentation/screens/referral/referral_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/sierra_leone/sl_add_money_screen.dart';
+import 'presentation/screens/sierra_leone/sl_withdraw_screen.dart';
 import 'presentation/screens/sierra_leone/sl_cable_screen.dart';
 import 'presentation/screens/sierra_leone/sl_electricity_screen.dart';
 import 'presentation/screens/sierra_leone/sl_topup_screen.dart';
@@ -217,7 +218,13 @@ class DalabapayApp extends StatelessWidget {
     '/send-money': (_) => Session.instance.isSierraLeone ? const PayoutScreen() : const SendMoneyScreen(),
     // Bank / mobile money transfers and dollar cards (Cashwyre)
     // Sierra Leone accounts only.
-    '/payout': (_) => Session.instance.isSierraLeone ? const PayoutScreen() : const DashboardScreen(),
+    '/payout': (ctx) {
+      if (!Session.instance.isSierraLeone) return const DashboardScreen();
+      final a = ModalRoute.of(ctx)?.settings.arguments;
+      final m = a is Map ? a : const {};
+      return PayoutScreen(initialType: m['type'] as String?, initialBankCode: m['bankCode'] as String?);
+    },
+    '/sl/withdraw': (_) => Session.instance.isSierraLeone ? const SlWithdrawScreen() : const DashboardScreen(),
     '/cards': (_) => Session.instance.isSierraLeone ? const CardsScreen() : const DashboardScreen(),
     // Admin console (staff roles only; the server checks permissions)
     '/admin': (_) => const AdminDashboardScreen(),

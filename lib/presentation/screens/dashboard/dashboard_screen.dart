@@ -317,15 +317,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           DPQuickAction(DPIcons.plus, 'Add Money', () => _go('/wallet')),
           DPQuickAction(DPIcons.upRight, 'Send', () => _go('/send-money')),
-          DPQuickAction(
-            DPIcons.receipt,
-            'Pay Bills',
-            () => _showServiceGroup(
-              'Pay Bill',
-              _sl ? 'EDSA, airtime, data and international airtime' : 'Electricity, airtime and data',
-              _billGroup,
+          // Sierra Leone: Withdraw to your own Orange Money / Afrimoney.
+          if (_sl)
+            DPQuickAction(DPIcons.downLeft, 'Withdraw', () => _go('/sl/withdraw'))
+          else
+            DPQuickAction(
+              DPIcons.receipt,
+              'Pay Bills',
+              () => _showServiceGroup('Pay Bill', 'Electricity, airtime and data', _billGroup),
             ),
-          ),
           DPQuickAction(DPIcons.history, 'History', () => _onNavTap(1)),
         ],
       ),
