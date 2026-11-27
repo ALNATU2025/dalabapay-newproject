@@ -1,0 +1,57 @@
+// Sierra Leone "Kushe!" welcome pop-up.
+import 'dart:ui' show instantiateImageCodec;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:dalabapay/presentation/screens/sierra_leone/sl_welcome_popup.dart';
+import 'package:dalabapay/ui/ui.dart';
+
+import 'screenshot_helpers.dart';
+
+void main() {
+  setUpAll(loadTestFonts);
+
+  testWidgets('welcome pop-up', (tester) async {
+    await tester.runAsync(() async {
+      final data = await rootBundle.load('assets/images/sl_welcome.jpg');
+      await instantiateImageCodec(data.buffer.asUint8List());
+    });
+    await snap(
+      tester,
+      'sl_welcome_popup',
+      () => Scaffold(
+        backgroundColor: DP.navyDeep,
+        body: const ColoredBox(color: Color(0x8C000000), child: SlWelcomePopup(firstName: 'Alusine')),
+      ),
+      size: const Size(390, 844),
+    );
+    expect(find.text('Kushe, Alusine!'), findsOneWidget);
+    expect(find.text('Pay bills now'), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('returns true for Pay bills now, false for close', (tester) async {
+    bool? result;
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => TextButton(
+          onPressed: () async => result = await showSlWelcome(context),
+          child: const Text('open'),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kushe!'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('sl-welcome-go')));
+    await tester.pumpAndSettle();
+    expect(result, isTrue);
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('sl-welcome-close')));
+    await tester.pumpAndSettle();
+    expect(result, isFalse);
+  });
+}

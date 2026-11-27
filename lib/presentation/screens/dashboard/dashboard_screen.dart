@@ -12,6 +12,7 @@ import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/transaction_widgets.dart';
 import '../bills/pay_bills_screen.dart';
+import '../sierra_leone/sl_welcome_popup.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -33,6 +34,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _load();
+    // Sierra Leone: the "Kushe!" welcome pop-up, once after logging in.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !_sl || !Session.instance.welcomePending) return;
+      Session.instance.welcomePending = false;
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      final go = await showSlWelcome(context, firstName: Session.instance.user?.firstName ?? '');
+      if (go == true && mounted) {
+        _showServiceGroup('Pay Bill', 'EDSA, airtime, data and international airtime', _billGroup);
+      }
+    });
   }
 
   Future<void> _load() async {

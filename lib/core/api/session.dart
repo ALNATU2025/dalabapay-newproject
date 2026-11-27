@@ -100,6 +100,9 @@ class Session extends ValueNotifier<AppUser?> {
   final ValueNotifier<int> unread = ValueNotifier<int>(0);
 
   AppUser? get user => value;
+
+  /// The welcome pop-up shows once after each login (and app start).
+  bool welcomePending = true;
   bool get loggedIn => value != null && api.hasToken;
 
   /// On app start: loads the saved token and the profile. Returns true when
@@ -120,6 +123,7 @@ class Session extends ValueNotifier<AppUser?> {
 
   /// Saves the `{ token, user }` returned by login / sign-up.
   Future<void> start(Map<String, dynamic> data, {bool remember = true}) async {
+    welcomePending = true;
     final token = data['token']?.toString();
     if (token != null && token.isNotEmpty) {
       await api.setToken(token, persist: remember);
@@ -169,5 +173,6 @@ class Session extends ValueNotifier<AppUser?> {
     await api.clearToken();
     value = null;
     unread.value = 0;
+    welcomePending = true;
   }
 }
