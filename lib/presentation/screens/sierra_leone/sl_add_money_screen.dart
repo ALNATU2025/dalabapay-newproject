@@ -15,6 +15,7 @@ import '../../../core/api/session.dart';
 import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/async_view.dart';
+import '../../widgets/photo_banner.dart';
 import 'sl_instant_topup.dart';
 
 class SlAddMoneyScreen extends StatefulWidget {
@@ -120,14 +121,19 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       children: [
-        DPServiceBanner(
-          title: 'Add money to your wallet.',
-          subtitle: 'Orange Money, Afrimoney or bank. Balance: ${DP.naira(Session.instance.user?.balance ?? 0)}',
-          icon: DPIcons.plus,
-          image: DPAssets.svcAddMoney,
-          style: DPBannerStyle.green,
+        const PhotoBanner(
+          key: ValueKey('sl-topup-banner'),
           tag: 'Add money',
+          title: 'Top up in\nseconds',
+          subtitle: 'Orange Money, Afrimoney or bank, straight into your wallet.',
+          cta: null,
+          mobileMoney: true,
+          colors: [Color(0xFF2B1204), Color(0xFFB4530F)],
+          accent: Color(0xFFFFB25B),
+          height: 150,
         ),
+        const SizedBox(height: 10),
+        Text('Balance: ${DP.naira(Session.instance.user?.balance ?? 0)}', style: DP.caption),
         const SizedBox(height: 20),
         if (instantOn) ...[
           _modeSwitch(),

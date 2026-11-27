@@ -10,6 +10,7 @@ import '../../../core/api/api.dart';
 import '../../../core/api/session.dart';
 import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/photo_banner.dart';
 import '../../widgets/transaction_widgets.dart';
 import '../bills/pay_bills_screen.dart';
 import '../sierra_leone/sl_welcome_popup.dart';
@@ -314,6 +315,105 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+
+  // ── Promo banners (photo banners, premium) ─────────────────────────
+  static const _navy = [Color(0xFF071A33), Color(0xFF143E7A)];
+  static const _emerald = [Color(0xFF032A1F), Color(0xFF07734F)];
+  static const _plum = [Color(0xFF2A0A2E), Color(0xFF7A1F6E)];
+  static const _ember = [Color(0xFF2B1204), Color(0xFFB4530F)];
+
+  Widget _tvBanner(String route, String subtitle) => PhotoBanner(
+        key: const ValueKey('banner-tv'),
+        tag: 'Cable TV',
+        title: 'Never miss\nyour shows',
+        subtitle: subtitle,
+        cta: 'Renew now',
+        photo: 'assets/images/banner_tv.jpg',
+        photoAlignment: const Alignment(0.3, 0),
+        colors: _navy,
+        accent: const Color(0xFF5CC8FF),
+        chip: 'Instant',
+        chipIcon: Icons.play_arrow_rounded,
+        onTap: () => _openServiceRoute(route),
+      );
+
+  Widget _intlBanner(String subtitle) => PhotoBanner(
+        key: const ValueKey('banner-intl'),
+        tag: 'International airtime',
+        title: 'Call home,\nwherever home is',
+        subtitle: subtitle,
+        cta: 'Top up abroad',
+        photo: 'assets/images/banner_call.jpg',
+        photoAlignment: const Alignment(0, -0.45),
+        colors: _emerald,
+        accent: const Color(0xFF6EE7B7),
+        chip: '150+ countries',
+        chipIcon: Icons.public_rounded,
+        onTap: () => _openServiceRoute('/international-airtime'),
+      );
+
+  List<Widget> _slBanners() => [
+        PhotoBanner(
+          key: const ValueKey('banner-momo'),
+          tag: 'Add money',
+          title: 'Top up in\nseconds',
+          subtitle: 'Dial a code, approve with your Orange Money or Afrimoney PIN. Done.',
+          cta: 'Add money',
+          mobileMoney: true,
+          colors: _ember,
+          accent: const Color(0xFFFFB25B),
+          onTap: () => _go('/wallet'),
+        ),
+        _tvBanner('/sl/cable', 'DStv, GOtv & StarTimes, paid in Leones.'),
+        _intlBanner('Send airtime to family in Nigeria, Ghana, the UK and more.'),
+        PhotoBanner(
+          key: const ValueKey('banner-withdraw'),
+          tag: 'Withdraw',
+          title: 'Cash out\nin a minute',
+          subtitle: 'Straight to your Orange Money or Afrimoney.',
+          cta: 'Withdraw',
+          photo: 'assets/images/banner_wow.jpg',
+          photoAlignment: const Alignment(0, -0.5),
+          colors: _plum,
+          accent: const Color(0xFFF0ABFC),
+          chip: 'Instant',
+          chipIcon: Icons.bolt_rounded,
+          onTap: () => _go('/sl/withdraw'),
+        ),
+      ];
+
+  List<Widget> _ngBanners() => [
+        _intlBanner('Top up loved ones\' phones abroad in seconds.'),
+        _tvBanner('/cable', 'DStv, GOtv & StarTimes, renewed instantly.'),
+        PhotoBanner(
+          key: const ValueKey('banner-earn'),
+          tag: 'Rewards',
+          title: 'Wow! Earn on\nevery bill',
+          subtitle: 'Earn commission each time you buy airtime, data, TV or electricity.',
+          cta: 'See earnings',
+          photo: 'assets/images/banner_wow.jpg',
+          photoAlignment: const Alignment(0, -0.5),
+          colors: _plum,
+          accent: const Color(0xFFF0ABFC),
+          chip: 'Earnings',
+          chipIcon: Icons.auto_awesome_rounded,
+          onTap: () => _go('/commission'),
+        ),
+        PhotoBanner(
+          key: const ValueKey('banner-refer'),
+          tag: 'Refer & earn',
+          title: 'Invite friends,\nboth earn ₦200',
+          subtitle: 'Share your code. You both get ₦200 when they start paying.',
+          cta: 'Invite now',
+          photo: 'assets/images/banner_call.jpg',
+          photoAlignment: const Alignment(0, -0.45),
+          colors: _ember,
+          accent: const Color(0xFFFFB25B),
+          chip: '₦200 each',
+          chipIcon: Icons.card_giftcard_rounded,
+          onTap: () => _go('/referral'),
+        ),
+      ];
 
   Widget _buildBalanceCard() {
     final user = Session.instance.user;
@@ -782,76 +882,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 const SizedBox(height: 20),
                                 DPAppear(
                                   delay: const Duration(milliseconds: 260),
-                                  child: _HomeBanners(
-                                    banners: _sl
-                                        ? [
-                                            _HomeBannerData(
-                                              title: 'Send Money\nAcross Africa',
-                                              subtitle: 'Banks and mobile money in Sierra Leone, Ghana, Nigeria and more.',
-                                              image: DPAssets.bannerInternational,
-                                              icon: DPIcons.globe,
-                                              onTap: () => _openServiceRoute('/payout'),
-                                            ),
-                                            _HomeBannerData(
-                                              title: 'Your Dollar\nCard',
-                                              subtitle: 'Pay online in dollars — subscriptions, shopping and ads.',
-                                              image: DPAssets.bannerBills,
-                                              icon: DPIcons.card,
-                                              onTap: () => _openServiceRoute('/cards'),
-                                            ),
-                                            _HomeBannerData(
-                                              title: 'EDSA Units\nin Seconds',
-                                              subtitle: 'Buy prepaid electricity and get your token instantly.',
-                                              image: DPAssets.bannerBills,
-                                              icon: DPIcons.bolt,
-                                              onTap: () => _openServiceRoute('/sl/electricity'),
-                                            ),
-                                            _HomeBannerData(
-                                              title: 'Never Miss\nYour Shows',
-                                              subtitle: 'Renew DStv, GOtv & StarTimes in Leones.',
-                                              image: DPAssets.bannerCable,
-                                              icon: DPIcons.tv,
-                                              onTap: () => _openServiceRoute('/sl/cable'),
-                                            ),
-                                            _HomeBannerData(
-                                              title: 'Refer a Friend',
-                                              subtitle: 'Invite friends in Sierra Leone to Dalabapay.',
-                                              image: DPAssets.bannerRefer,
-                                              icon: DPIcons.gift,
-                                              onTap: () => _go('/referral'),
-                                            ),
-                                          ]
-                                        : [
-                                      _HomeBannerData(
-                                        title: 'International\nAirtime',
-                                        subtitle:
-                                            'Top up loved ones\' phones abroad in seconds.',
-                                        image: DPAssets.bannerInternational,
-                                        icon: DPIcons.globe,
-                                        onTap: () => _openServiceRoute(
-                                          '/international-airtime',
-                                        ),
-                                      ),
-                                      _HomeBannerData(
-                                        title: 'Never Miss\nYour Shows',
-                                        subtitle:
-                                            'Renew DSTV, GOtv & StarTimes instantly.',
-                                        image: DPAssets.bannerCable,
-                                        icon: DPIcons.tv,
-                                        onTap: () =>
-                                            _openServiceRoute('/cable'),
-                                      ),
-                                      _HomeBannerData(
-                                        title: 'Refer a Friend',
-                                        subtitle:
-                                            'Invite friends and you both earn ₦200.',
-                                        image: DPAssets.bannerRefer,
-                                        icon: DPIcons.gift,
-                                        onTap: () =>
-                                            _go('/referral'),
-                                      ),
-                                    ],
-                                  ),
+                                  child: _HomeBanners(banners: _sl ? _slBanners() : _ngBanners()),
                                 ),
                                 const SizedBox(height: 20),
                                 DPAppear(
@@ -878,24 +909,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _HomeBannerData {
-  final String title;
-  final String subtitle;
-  final String image;
-  final IconData icon;
-  final VoidCallback onTap;
-  const _HomeBannerData({
-    required this.title,
-    required this.subtitle,
-    required this.image,
-    required this.icon,
-    required this.onTap,
-  });
-}
-
 /// Auto-sliding promo banners with page dots.
 class _HomeBanners extends StatefulWidget {
-  final List<_HomeBannerData> banners;
+  final List<Widget> banners;
   const _HomeBanners({required this.banners});
 
   @override
@@ -933,22 +949,15 @@ class _HomeBannersState extends State<_HomeBanners> {
     return Column(
       children: [
         SizedBox(
-          height: 118,
+          height: 186,
           child: PageView.builder(
             controller: _page,
             itemCount: widget.banners.length,
             onPageChanged: (i) => setState(() => _index = i),
             itemBuilder: (context, i) {
-              final b = widget.banners[i];
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: DPPromoBanner(
-                  title: b.title,
-                  subtitle: b.subtitle,
-                  image: b.image,
-                  icon: b.icon,
-                  onTap: b.onTap,
-                ),
+                padding: const EdgeInsets.fromLTRB(6, 2, 6, 12),
+                child: widget.banners[i],
               );
             },
           ),

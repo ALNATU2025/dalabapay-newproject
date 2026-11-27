@@ -13,6 +13,7 @@ import '../../../core/api/api.dart';
 import '../../../core/api/session.dart';
 import '../../../core/format.dart';
 import '../../../ui/ui.dart';
+import '../../widgets/photo_banner.dart';
 import 'bank_topup_screen.dart';
 
 /// Test mode only: pretends a bank transfer arrived (POST /api/dev/simulate-transfer).
@@ -225,6 +226,23 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (!_manual) ...[
+                      const PhotoBanner(
+                        key: ValueKey('topup-banner'),
+                        tag: 'Add money',
+                        title: 'Fund your wallet\nin seconds',
+                        subtitle: 'Transfer from any Nigerian bank app. Credited automatically.',
+                        cta: null,
+                        photo: 'assets/images/banner_wow.jpg',
+                        photoAlignment: Alignment(0, -0.5),
+                        colors: [Color(0xFF032A1F), Color(0xFF07734F)],
+                        accent: Color(0xFF6EE7B7),
+                        chip: 'Automatic',
+                        chipIcon: Icons.bolt_rounded,
+                        height: 150,
+                      ),
+                      const SizedBox(height: 18),
+                    ],
                     if (_manual) ..._manualForm()
                     // Kuda: the customer's own account number is all they need.
                     else if (_wallet['accountNumberOnly'] == true) ...[

@@ -16,6 +16,7 @@ import '../../../core/format.dart';
 import '../../../ui/ui.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/payment_flow.dart';
+import '../../widgets/photo_banner.dart';
 import 'sl_instant_topup.dart' show mobileMoneyLogo;
 
 /// "+23276123456" / "23276123456" → "076123456".
@@ -190,6 +191,21 @@ class _SlWithdrawScreenState extends State<SlWithdrawScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       children: [
+        const PhotoBanner(
+          key: ValueKey('withdraw-banner'),
+          tag: 'Withdraw',
+          title: 'Your money,\non your phone',
+          subtitle: 'Cash out to Orange Money or Afrimoney, usually in under a minute.',
+          cta: null,
+          photo: 'assets/images/banner_wow.jpg',
+          photoAlignment: Alignment(0, -0.5),
+          colors: [Color(0xFF2A0A2E), Color(0xFF7A1F6E)],
+          accent: Color(0xFFF0ABFC),
+          chip: 'Instant',
+          chipIcon: Icons.bolt_rounded,
+          height: 150,
+        ),
+        const SizedBox(height: 16),
         DPCard(
           padding: const EdgeInsets.all(16),
           child: Row(
