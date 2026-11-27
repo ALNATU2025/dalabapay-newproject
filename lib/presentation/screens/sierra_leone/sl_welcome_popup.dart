@@ -170,8 +170,8 @@ class SlWelcomePopup extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                RichText(
-                  text: const TextSpan(
+                const Text.rich(
+                  TextSpan(
                     style: TextStyle(color: Colors.white, fontSize: 18, height: 1.3, fontWeight: FontWeight.w700),
                     children: [
                       TextSpan(text: 'Pay bills and earn '),

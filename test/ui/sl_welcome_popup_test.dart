@@ -1,8 +1,5 @@
 // Sierra Leone "Kushe!" welcome pop-up.
-import 'dart:ui' show instantiateImageCodec;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dalabapay/presentation/screens/sierra_leone/sl_welcome_popup.dart';
@@ -14,10 +11,9 @@ void main() {
   setUpAll(loadTestFonts);
 
   testWidgets('welcome pop-up', (tester) async {
-    await tester.runAsync(() async {
-      final data = await rootBundle.load('assets/images/sl_welcome.jpg');
-      await instantiateImageCodec(data.buffer.asUint8List());
-    });
+    // Decode the photo for real before the screenshot.
+    await tester.pumpWidget(const MaterialApp(home: SlWelcomePopup()));
+    await tester.runAsync(() => precacheImage(const AssetImage('assets/images/sl_welcome.jpg'), tester.element(find.byType(SlWelcomePopup))));
     await snap(
       tester,
       'sl_welcome_popup',
