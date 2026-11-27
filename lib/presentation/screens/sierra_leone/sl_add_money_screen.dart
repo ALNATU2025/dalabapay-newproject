@@ -125,7 +125,7 @@ class _SlAddMoneyScreenState extends State<SlAddMoneyScreen> {
           key: ValueKey('sl-topup-banner'),
           tag: 'Add money',
           title: 'Top up in\nseconds',
-          subtitle: 'Orange Money, Afrimoney or bank, straight into your wallet.',
+          subtitle: 'Straight into your wallet, instantly.',
           cta: null,
           mobileMoney: true,
           colors: [Color(0xFF2B1204), Color(0xFFB4530F)],

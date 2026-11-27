@@ -357,7 +357,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           key: const ValueKey('banner-momo'),
           tag: 'Add money',
           title: 'Top up in\nseconds',
-          subtitle: 'Dial a code, approve with your Orange Money or Afrimoney PIN. Done.',
+          subtitle: 'Dial a code, approve with your PIN. Done.',
           cta: 'Add money',
           mobileMoney: true,
           colors: _ember,

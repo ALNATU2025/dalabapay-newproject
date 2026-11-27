@@ -21,7 +21,7 @@ Widget _gallery() => ListView(
         PhotoBanner(
           tag: 'Add money',
           title: 'Top up in\nseconds',
-          subtitle: 'Dial a code, approve with your Orange Money or Afrimoney PIN. Done.',
+          subtitle: 'Dial a code, approve with your PIN. Done.',
           cta: 'Add money',
           mobileMoney: true,
           colors: [Color(0xFF2B1204), Color(0xFFB4530F)],
@@ -56,7 +56,7 @@ Widget _gallery() => ListView(
         PhotoBanner(
           tag: 'Withdraw',
           title: 'Your money,\non your phone',
-          subtitle: 'Cash out to Orange Money or Afrimoney, usually in under a minute.',
+          subtitle: 'Cash out to Orange Money or Afrimoney.',
           cta: null,
           photo: 'assets/images/banner_wow.jpg',
           photoAlignment: Alignment(0, -0.5),

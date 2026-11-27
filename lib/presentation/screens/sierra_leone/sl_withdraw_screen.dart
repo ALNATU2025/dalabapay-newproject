@@ -195,7 +195,7 @@ class _SlWithdrawScreenState extends State<SlWithdrawScreen> {
           key: ValueKey('withdraw-banner'),
           tag: 'Withdraw',
           title: 'Your money,\non your phone',
-          subtitle: 'Cash out to Orange Money or Afrimoney, usually in under a minute.',
+          subtitle: 'Cash out to Orange Money or Afrimoney.',
           cta: null,
           photo: 'assets/images/banner_wow.jpg',
           photoAlignment: Alignment(0, -0.5),
