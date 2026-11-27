@@ -14,7 +14,7 @@ import '../screens/sierra_leone/sl_instant_topup.dart' show mobileMoneyLogo;
 
 /// The light sweep and floating logos repeat forever, which widget tests
 /// can't wait out: they stay still under `flutter test`.
-final bool _animate = kIsWeb || !Platform.environment.containsKey('FLUTTER_TEST');
+final bool kLoopAnimations = kIsWeb || !Platform.environment.containsKey('FLUTTER_TEST');
 
 class PhotoBanner extends StatefulWidget {
   final String tag;
@@ -58,7 +58,7 @@ class _PhotoBannerState extends State<PhotoBanner> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    if (_animate) _shine.repeat();
+    if (kLoopAnimations) _shine.repeat();
   }
 
   bool _down = false;
